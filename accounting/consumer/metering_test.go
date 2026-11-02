@@ -608,3 +608,72 @@ func TestMeteringImpl_HandleMsgData_ReasoningToken(t *testing.T) {
 		})
 	}
 }
+
+func TestMeteringImpl_ParseMessageExtraData_NestedValueKeepsStringFields(t *testing.T) {
+	metering := &MeteringImpl{}
+
+	// The aigateway records the automatic-routing decision as a nested
+	// object next to the flat token counts. The flat fields the billing
+	// pipeline reads must still come through, or the whole event lands in
+	// the dead-letter queue and the usage is never billed.
+	extra := `{"prompt_token_num":"120","completion_token_num":"49",` +
+		`"auto_route":{"requested_model":"auto","rank":1}}`
+
+	extraMap, err := metering.parseMessageExtraData(extra)
+
+	require.NoError(t, err)
+	require.Equal(t, "120", extraMap[types.PromptTokenNum])
+	require.Equal(t, "49", extraMap[types.CompletionTokenNum])
+	require.Equal(t, `{"requested_model":"auto","rank":1}`, extraMap["auto_route"])
+}
+
+func TestMeteringImpl_ParseMessageExtraData_Empty(t *testing.T) {
+	metering := &MeteringImpl{}
+
+	extraMap, err := metering.parseMessageExtraData("  ")
+
+	require.NoError(t, err)
+	require.Empty(t, extraMap)
+}
+
+func TestMeteringImpl_ParseMessageExtraData_InvalidJSON(t *testing.T) {
+	metering := &MeteringImpl{}
+
+	_, err := metering.parseMessageExtraData(`{invalid`)
+
+	require.Error(t, err)
+}
+
+func TestMeteringImpl_HandleMsgData_NestedExtraValueIsBilled(t *testing.T) {
+	mockMeterComp := mockacct.NewMockMeteringComponent(t)
+	mockAcctEvtComp := mockacct.NewMockAccountingEventComponent(t)
+	metering := &MeteringImpl{
+		meterComp:   mockMeterComp,
+		acctEvtComp: mockAcctEvtComp,
+	}
+
+	ctx := context.Background()
+	event := createTestMeteringEvent()
+	event.Scene = types.SceneModelServerless
+	event.ValueType = types.TokenNumberType
+	event.Extra = `{"prompt_token_num":"120","prompt_token_cache_num":"0",` +
+		`"completion_token_num":"49","reasoning_token_num":"0",` +
+		`"auto_route":{"requested_model":"auto","rank":1}}`
+	data, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	var saved types.MeteringExtra
+	mockMeterComp.EXPECT().SaveMeteringEventRecord(ctx, mock.Anything, mock.Anything).
+		Run(func(_ context.Context, _ *types.MeteringEvent, extra types.MeteringExtra) {
+			saved = extra
+		}).Return(nil)
+
+	result, err := metering.handleMsgData(ctx, data)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, float64(120), saved.PromptToken)
+	require.Equal(t, float64(49), saved.CompletionToken)
+}

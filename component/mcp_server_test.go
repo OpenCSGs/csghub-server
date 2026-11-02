@@ -12,14 +12,12 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
-	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -369,6 +367,24 @@ func TestMCPServerComponent_Index_HalfCreatedRepos(t *testing.T) {
 	require.Len(t, res, 1)
 }
 
+// TestMCPServerComponent_PropertiesAdminAuthorized verifies request authorization removes repository scope filtering.
+func TestMCPServerComponent_PropertiesAdminAuthorized(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	mc := initializeTestMCPServerComponent(ctx, t)
+	req := &types.MCPPropertyFilter{CurrentUser: "module-admin", Kind: types.MCPPropTool, Search: "tool", Per: 10, Page: 2}
+	mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, req.CurrentUser, req.CurrentUser).
+		Return(&rpc.User{UUID: "module-admin-uuid", Roles: []string{"asset_admin"}}, nil).Once()
+	mc.mocks.stores.MCPServerMock().EXPECT().ListProperties(ctx, mock.MatchedBy(func(filter *types.MCPPropertyFilter) bool {
+		return filter.IsAdmin && len(filter.AccessibleRepositoryIDs) == 0 &&
+			filter.Kind == types.MCPPropTool && filter.Search == "tool" && filter.Per == 10 && filter.Page == 2
+	})).Return(nil, 0, nil).Once()
+
+	result, total, err := mc.Properties(ctx, req)
+	require.NoError(t, err)
+	require.Empty(t, result)
+	require.Zero(t, total)
+}
+
 func TestMCPServerComponent_Properties(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMCPServerComponent(ctx, t)
@@ -379,8 +395,9 @@ func TestMCPServerComponent_Properties(t *testing.T) {
 	}
 
 	mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
-		Username: "user",
-		Roles:    []string{"admin"},
+		Username:   "user",
+		Roles:      []string{"maintainer"},
+		SuperAdmin: true,
 	}, nil)
 
 	mc.mocks.stores.MCPServerMock().EXPECT().ListProperties(ctx, req).Return([]database.MCPServerProperty{
@@ -488,7 +505,66 @@ func TestMCPServerComponent_updateSpaceMetaTag(t *testing.T) {
 	require.Nil(t, err)
 }
 
+// TestMCPServerComponent_DeploySuperAdminAuthorization stops at persistence after checking the namespace gate.
+func TestMCPServerComponent_DeploySuperAdminAuthorization(t *testing.T) {
+	for _, tc := range []struct {
+		name, role string
+		superAdmin bool
+	}{
+		{name: "module administrator", role: "asset_admin"},
+		{name: "legacy administrator", role: "admin"},
+		{name: "custom global administrator", role: "maintainer", superAdmin: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			mc := initializeTestMCPServerComponent(ctx, t)
+			req := &types.DeployMCPServerReq{
+				CurrentUser: "alice", MCPRepo: types.RepoRequest{Namespace: "source", Name: "mcp"},
+				CreateRepoReq: types.CreateRepoReq{Username: "alice", Namespace: "target", Name: "space"},
+				ResourceID:    1, ClusterID: "cluster",
+			}
+			source := &database.Repository{ID: 4, DefaultBranch: "main"}
+			resource := &database.SpaceResource{ID: 1}
+			mc.mocks.stores.MCPServerMock().EXPECT().ByPath(ctx, "source", "mcp").Return(&database.MCPServer{Repository: source}, nil).Once()
+			mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "alice", source, rebac.RepositoryCanRead).Return(true, nil).Once()
+			mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, req.ResourceID).Return(resource, nil).Once()
+			mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{
+				UserName: "alice", CurrentUser: "alice", ClusterID: "cluster",
+			}, resource).Return(&types.CheckExclusiveResp{}, nil).Once()
+			mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "target").Return(database.Namespace{Path: "target"}, nil).Once()
+			mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "alice", "alice").Return(&rpc.User{
+				ID: 7, UUID: "alice-uuid", Username: "alice", Email: "alice@example.com",
+				Roles: []string{tc.role}, SuperAdmin: tc.superAdmin,
+			}, nil).Once()
+			persistErr := fmt.Errorf("stop at persistence")
+			if tc.superAdmin {
+				mc.mocks.stores.MCPServerMock().EXPECT().CreateSpaceAndRepoForDeploy(ctx, mock.Anything, mock.Anything).Return(rebac.Relationship{}, persistErr).Once()
+			} else {
+				mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "alice", "target", rebac.NamespaceCanWrite).Return(false, nil).Once()
+			}
+			result, err := mc.Deploy(ctx, req)
+			require.Nil(t, result)
+			if tc.superAdmin {
+				require.ErrorIs(t, err, persistErr)
+				mc.mocks.components.repo.AssertNotCalled(t, "CheckCurrentUserPermission", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			} else {
+				require.ErrorIs(t, err, errorx.ErrForbidden)
+				mc.mocks.stores.MCPServerMock().AssertNotCalled(t, "CreateSpaceAndRepoForDeploy", mock.Anything, mock.Anything, mock.Anything)
+			}
+		})
+	}
+}
+
+// TestMCPServerComponent_CheckDeployBranch checks success and both compensation paths.
 func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
+	for _, stage := range []string{"success", "clone failure", "default files failure"} {
+		t.Run(stage, func(t *testing.T) { testMCPDeploy(t, stage) })
+	}
+}
+
+// testMCPDeploy verifies that compensation receives the exact committed tuple.
+func testMCPDeploy(t *testing.T, stage string) {
+	t.Helper()
 	ctx := context.TODO()
 	mc := initializeTestMCPServerComponent(ctx, t)
 
@@ -551,11 +627,7 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 		ID:            1,
 		Path:          req.Namespace,
 		NamespaceType: database.OrgNamespace,
-	}, nil)
-	organization := database.Organization{
-		UUID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-	}
-	mc.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, req.Namespace).Return(organization, nil)
+	}, nil).Once()
 
 	mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, req.CurrentUser, req.CurrentUser).Return(&rpc.User{
 		ID:       1,
@@ -565,6 +637,7 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 	}, nil)
 	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, req.Username, req.Namespace, rebac.NamespaceCanWrite).Return(true, nil).Once()
 
+	ownerTuple := rebac.Relationship{Subject: rebac.NewSubject(rebac.ObjectTypeOrganization, "org-uuid"), Relation: rebac.RelationOrganization, Object: rebac.RepositoryObject(dbrepo.ID)}
 	mc.mocks.stores.MCPServerMock().EXPECT().CreateSpaceAndRepoForDeploy(ctx, &database.Repository{
 		UserID:         int64(1),
 		Path:           path.Join(req.Namespace, req.Name),
@@ -588,65 +661,35 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 		Template:      "",
 		SKU:           strconv.FormatInt(1, 10),
 		ClusterID:     req.ClusterID,
-	}).Run(func(_ context.Context, repo *database.Repository, _ *database.Space) {
+	}).Run(func(_ context.Context, repo *database.Repository, space *database.Space) {
 		repo.ID = dbrepo.ID
-	}).Return(nil)
-	relationship := rebac.Relationship{
-		Subject:  rebac.NewSubject(rebac.ObjectTypeOrganization, organization.UUID.String()),
-		Relation: rebac.RelationOrganization,
-		Object:   rebac.RepositoryObject(dbrepo.ID),
+		space.ID = 456
+	}).Return(ownerTuple, nil).Once()
+
+	deployErr := fmt.Errorf("injected deploy failure")
+	var cloneErr, filesErr error
+	if stage == "clone failure" {
+		cloneErr = deployErr
+	} else if stage == "default files failure" {
+		filesErr = deployErr
+		mc.mocks.gitServer.EXPECT().DeleteRepo(mock.Anything, mock.Anything).Return(nil).Once()
 	}
-	mc.rebac.(*mockrebac.MockAuthorizer).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject: relationship.Subject, Relation: relationship.Relation, Object: relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: false}, nil).Once()
-	mc.rebac.(*mockrebac.MockAuthorizer).EXPECT().Write(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
-
-	mc.mocks.gitServer.EXPECT().CopyRepository(mock.Anything, mock.Anything).Return(nil)
-
-	mc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, mock.Anything).Return(&types.File{
-		Content: "",
-	}, nil)
-
-	mc.mocks.gitServer.EXPECT().UpdateRepoFile(mock.Anything).Return(nil)
-
-	mc.mocks.gitServer.EXPECT().CommitFiles(ctx, mock.Anything).Return(nil)
-
+	mc.mocks.gitServer.EXPECT().CopyRepository(mock.Anything, mock.Anything).Return(cloneErr).Once()
+	if cloneErr == nil {
+		mc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, mock.Anything).Return(&types.File{Content: ""}, nil).Once()
+		mc.mocks.gitServer.EXPECT().UpdateRepoFile(mock.Anything).Return(nil).Once()
+		mc.mocks.gitServer.EXPECT().CommitFiles(ctx, mock.Anything).Return(filesErr).Once()
+	}
+	if stage != "success" {
+		mc.mocks.stores.MCPServerMock().EXPECT().DeleteSpaceAndRepoForDeploy(ctx, int64(456), dbrepo.ID, ownerTuple).Return(nil).Once()
+	}
 	res, err := mc.Deploy(ctx, req)
-	require.Nil(t, err)
-	require.NotNil(t, res)
-}
-
-// TestMCPServerComponent_CleanupFailedMCPDeployRemovesRepositoryTuple verifies deploy rollback removes ReBAC state.
-func TestMCPServerComponent_CleanupFailedMCPDeployRemovesRepositoryTuple(t *testing.T) {
-	ctx := context.Background()
-	namespace := database.Namespace{
-		Path:          "org",
-		NamespaceType: database.OrgNamespace,
+	if stage == "success" {
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		mc.mocks.stores.MCPServerMock().AssertNotCalled(t, "DeleteSpaceAndRepoForDeploy", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	} else {
+		require.ErrorIs(t, err, deployErr)
+		require.Nil(t, res)
 	}
-	organization := database.Organization{
-		UUID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-	}
-	relationship := rebac.Relationship{
-		Subject:  rebac.NewSubject(rebac.ObjectTypeOrganization, organization.UUID.String()),
-		Relation: rebac.RelationOrganization,
-		Object:   rebac.RepositoryObject(42),
-	}
-	orgStore := mockdb.NewMockOrgStore(t)
-	authorizer := mockrebac.NewMockAuthorizer(t)
-	orgStore.EXPECT().FindByPath(ctx, namespace.Path).Return(organization, nil).Once()
-	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{
-		relationship,
-		{
-			Subject:  relationship.Subject,
-			Relation: rebac.RelationOrganizationDirect,
-			Object:   relationship.Object,
-		},
-	}).Return(nil).Once()
-
-	component := &mcpServerComponentImpl{
-		orgStore: orgStore,
-		rebac:    authorizer,
-	}
-	component.cleanupFailedMCPDeploy(ctx, namespace, 7, 42)
 }

@@ -618,9 +618,6 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName 
 				Resources:       resources,
 				ImagePullPolicy: corev1.PullAlways,
 			},
-			Affinity: &corev1.Affinity{
-				NodeAffinity: nodeAffinity,
-			},
 		}
 		if pvcName != "" {
 			temp.Container.VolumeMounts = []corev1.VolumeMount{

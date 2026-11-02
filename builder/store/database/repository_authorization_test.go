@@ -19,11 +19,14 @@ func TestRepositoryAuthorizationStore_CRUD(t *testing.T) {
 	setOrgStoreTestDB(t, db)
 
 	ctx := context.Background()
-	store := database.NewRepositoryAuthorizationStoreWithDB(db)
+	store := database.NewRepositoryAuthorizationStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 	const repositoryID int64 = 900001
+	// Grant mutations serialize on their repository row.
+	_, err := db.Core.NewInsert().Model(&database.Repository{ID: repositoryID, Path: "repo-auth-user/repo", RepositoryType: types.ModelRepo}).Exec(ctx)
+	require.NoError(t, err)
 
 	user := &database.User{Username: "repo-auth-user", UUID: "repo-auth-user"}
-	require.NoError(t, database.NewUserStoreWithDB(db).Create(ctx, user, &database.Namespace{Path: "repo-auth-user"}))
+	require.NoError(t, database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).Create(ctx, user, &database.Namespace{Path: "repo-auth-user"}))
 	organization := &database.Organization{Nickname: "repo-auth-org", Name: "repo-auth-org", UUID: uuid.New()}
 	require.NoError(t, database.NewOrgStore(false, nil).Create(ctx, organization, &database.Namespace{Path: "repo-auth-org"}))
 
@@ -121,7 +124,7 @@ func TestRepositoryAuthorizationStore_RejectsUnsupportedRole(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 
-	store := database.NewRepositoryAuthorizationStoreWithDB(db)
+	store := database.NewRepositoryAuthorizationStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 	authorization := &database.RepositoryAuthorization{
 		RepositoryID: 900002,
 		SubjectType:  types.RepoAuthSubjectUser,
@@ -141,7 +144,7 @@ func TestRepositoryAuthorizationStore_RejectsUnsupportedSubjectType(t *testing.T
 	defer db.Close()
 
 	ctx := context.Background()
-	store := database.NewRepositoryAuthorizationStoreWithDB(db)
+	store := database.NewRepositoryAuthorizationStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 	invalidSubjectType := types.RepoAuthSubjectType("invalid")
 	authorization := &database.RepositoryAuthorization{
 		RepositoryID: 900003,

@@ -93,10 +93,12 @@ fi
 # Any other explicit dtype is left unchanged. An unset max-model-len
 # uses the model default (262144 for Qwen3.5); the 310P attention mask
 # is allocated as max_model_len squared.
-# This path does not add --enforce-eager. Graph mode follows the vLLM
-# default: the 310P image sets VLLM_ENFORCE_EAGER=0, so graph capture
-# stays on. ACL graph capture can still fail when stream resources are
-# exhausted. Deployments that want eager mode must pass --enforce-eager.
+# This path does not add --enforce-eager: graph mode is what keeps 310P
+# throughput usable. vLLM's default of 35 capture sizes exhausts the ACL
+# graph event pool (each captured graph takes about 73 events against a
+# pool of roughly 1024, so only about 14 fit), so the capture sizes are
+# capped to the pair used in production. Deployments that want eager mode
+# must pass --enforce-eager.
 if [ "${ASCEND_310P:-}" = "1" ]; then
     last_dtype=$(grep -oE -- '--dtype(=|[[:space:]]+)[^[:space:]]+' <<< "$ENGINE_ARGS" | tail -n 1)
     last_dtype_value=${last_dtype#*dtype}
@@ -107,6 +109,15 @@ if [ "${ASCEND_310P:-}" = "1" ]; then
     fi
     if [[ ! $ENGINE_ARGS == *"--max-model-len"* ]] && [[ ! $ENGINE_ARGS == *"--max_model_len"* ]]; then
         ENGINE_ARGS="$ENGINE_ARGS --max-model-len 8192"
+    fi
+    # Keep the JSON free of spaces: ENGINE_ARGS is expanded unquoted below.
+    # vLLM normalizes underscores to dashes, so skip when either spelling is
+    # already present rather than overriding the caller.
+    if [[ ! $ENGINE_ARGS == *"--compilation-config"* ]] && \
+       [[ ! $ENGINE_ARGS == *"--compilation_config"* ]] && \
+       [[ ! $ENGINE_ARGS == *"--cudagraph-capture-sizes"* ]] && \
+       [[ ! $ENGINE_ARGS == *"--cudagraph_capture_sizes"* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --compilation-config {\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[2,16]}"
     fi
     echo "310P engine args: $ENGINE_ARGS"
 fi

@@ -16,10 +16,10 @@ func TestCodeStore_CRUD(t *testing.T) {
 	ctx := context.TODO()
 
 	store := database.NewCodeStoreWithDB(db)
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "foo/bar",
 		Private: true,
-	})
+	}))
 	require.Nil(t, err)
 
 	_, err = store.Create(ctx, database.Code{
@@ -88,21 +88,21 @@ func TestCodeStore_UserLikesCodes(t *testing.T) {
 
 	store := database.NewCodeStoreWithDB(db)
 
-	repo1, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo1, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "foo/bar",
 		GitPath: "p1",
-	})
+	}))
 	require.Nil(t, err)
-	repo2, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo2, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "foo/bar2",
 		GitPath: "p2",
-	})
+	}))
 	require.Nil(t, err)
 
-	repo3, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo3, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "foo/bar3",
 		GitPath: "p3",
-	})
+	}))
 	require.Nil(t, err)
 
 	_, err = store.Create(ctx, database.Code{

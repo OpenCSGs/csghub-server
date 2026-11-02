@@ -101,12 +101,11 @@ func (s *spaceStoreImpl) FindByPath(ctx context.Context, namespace, name string)
 		NewSelect().
 		Model(resSpace).
 		Relation("Repository.User").
-		Relation("Repository.Statistics").
-		Where("repository.path = ? and repository.repository_type = ?", fmt.Sprintf("%s/%s", namespace, name), types.SpaceRepo).
+		Where("LOWER(repository.path) = LOWER(?) and repository.repository_type = ?", fmt.Sprintf("%s/%s", namespace, name), types.SpaceRepo).
 		Scan(ctx)
 	err = errorx.HandleDBError(err, nil)
 	if err != nil {
-		return nil, fmt.Errorf("select space by path, error: %w", err)
+		return nil, fmt.Errorf("select space by path, error: %w", resourceLookupError(err, namespace, name))
 	}
 
 	err = s.db.Operator.Core.NewSelect().

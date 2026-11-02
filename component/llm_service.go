@@ -15,6 +15,7 @@ import (
 	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -53,15 +54,17 @@ type LLMServiceComponent interface {
 }
 
 type llmServiceComponentImpl struct {
-	llmConfigStore    database.LLMConfigStore
-	upstreamStore     database.UpstreamStore
-	promptPrefixStore database.PromptPrefixStore
-	repoStore         database.RepoStore
-	healthStateStore  database.AIGatewayUpstreamHealthStateStore
-	circuitStateStore database.AIGatewayUpstreamCircuitStateStore
-	metricEventStore  database.AIGatewayMetricEventStore
-	accountComponent  AccountingComponent
-	sampleRegistry    *sample.Registry
+	llmConfigStore     database.LLMConfigStore
+	upstreamStore      database.UpstreamStore
+	promptPrefixStore  database.PromptPrefixStore
+	repoStore          database.RepoStore
+	healthStateStore   database.AIGatewayUpstreamHealthStateStore
+	circuitStateStore  database.AIGatewayUpstreamCircuitStateStore
+	metricEventStore   database.AIGatewayMetricEventStore
+	llmModelGrantStore database.LLMConfigModelGrantStore
+	nsStore            database.NamespaceStore
+	accountComponent   AccountingComponent
+	sampleRegistry     *sample.Registry
 }
 
 var ErrInvalidLLMConfig = errors.New("invalid llm config")
@@ -74,20 +77,24 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 	healthStateStore := database.NewAIGatewayUpstreamHealthStateStore()
 	circuitStateStore := database.NewAIGatewayUpstreamCircuitStateStore()
 	metricEventStore := database.NewAIGatewayMetricEventStore()
+	llmModelGrantStore := database.NewLLMConfigModelGrantStore(config)
+	nsStore := database.NewNamespaceStore()
 	ac, err := NewAccountingComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounting component: %w", err)
 	}
 	llmServiceComp := &llmServiceComponentImpl{
-		llmConfigStore:    llmConfigStore,
-		upstreamStore:     upstreamStore,
-		promptPrefixStore: promptPrefixStore,
-		repoStore:         repoStore,
-		healthStateStore:  healthStateStore,
-		circuitStateStore: circuitStateStore,
-		metricEventStore:  metricEventStore,
-		accountComponent:  ac,
-		sampleRegistry:    sample.NewDefaultRegistry(),
+		llmConfigStore:     llmConfigStore,
+		upstreamStore:      upstreamStore,
+		promptPrefixStore:  promptPrefixStore,
+		repoStore:          repoStore,
+		healthStateStore:   healthStateStore,
+		circuitStateStore:  circuitStateStore,
+		metricEventStore:   metricEventStore,
+		llmModelGrantStore: llmModelGrantStore,
+		nsStore:            nsStore,
+		accountComponent:   ac,
+		sampleRegistry:     sample.NewDefaultRegistry(),
 	}
 	return llmServiceComp, nil
 }
@@ -129,6 +136,7 @@ func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page 
 			RepoID:             cfg.RepoID,
 			NeedSensitiveCheck: cfg.NeedSensitiveCheck,
 			ModelSizeB:         cfg.ModelSizeB,
+			AccessPolicy:       cfg.AccessPolicy,
 			IsAvailable:        cfg.Enabled && isAvailable,
 			AvailabilityReason: reason,
 			CreatedAt:          cfg.CreatedAt,
@@ -192,6 +200,7 @@ func (s *llmServiceComponentImpl) ListMetricEvents(ctx context.Context, query ty
 			RequestID:           e.RequestID,
 			StartTime:           startTime,
 			CreatedAt:           e.CreatedAt.In(loc).Format(time.DateTime),
+			RequestModel:        e.RequestModel,
 			Model:               e.Model,
 			Provider:            e.Provider,
 			APIKeyMasked:        e.APIKeyMasked,
@@ -203,6 +212,7 @@ func (s *llmServiceComponentImpl) ListMetricEvents(ctx context.Context, query ty
 			LatencyMs:           e.LatencyMs,
 			TTFTMs:              e.TTFTMs,
 			QueueWaitMs:         e.QueueWaitMs,
+			QueueDepth:          e.QueueDepth,
 			PromptTokens:        e.PromptTokens,
 			CompletionTokens:    e.CompletionTokens,
 			TotalTokens:         e.TotalTokens,
@@ -235,6 +245,7 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 		RepoID:             dbLlmConfig.RepoID,
 		NeedSensitiveCheck: dbLlmConfig.NeedSensitiveCheck,
 		ModelSizeB:         dbLlmConfig.ModelSizeB,
+		AccessPolicy:       dbLlmConfig.AccessPolicy,
 		CreatedAt:          dbLlmConfig.CreatedAt,
 		UpdatedAt:          dbLlmConfig.UpdatedAt,
 	}
@@ -306,6 +317,13 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.ModelSizeB != nil {
 		llmConfig.ModelSizeB = *req.ModelSizeB
 	}
+	if req.AccessPolicy != nil {
+		accessPolicy, err := normalizeLLMAccessPolicy(*req.AccessPolicy)
+		if err != nil {
+			return nil, err
+		}
+		llmConfig.AccessPolicy = accessPolicy
+	}
 	updatedConfig, updateErr := s.llmConfigStore.Update(ctx, *llmConfig)
 	if updateErr != nil {
 		return nil, updateErr
@@ -328,6 +346,7 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		RepoID:             updatedConfig.RepoID,
 		NeedSensitiveCheck: updatedConfig.NeedSensitiveCheck,
 		ModelSizeB:         updatedConfig.ModelSizeB,
+		AccessPolicy:       updatedConfig.AccessPolicy,
 		CreatedAt:          updatedConfig.CreatedAt,
 		UpdatedAt:          updatedConfig.UpdatedAt,
 	}
@@ -379,6 +398,10 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	if err := validateLLMTypes(req.Types); err != nil {
 		return nil, err
 	}
+	accessPolicy, err := normalizeLLMAccessPolicy(req.AccessPolicy)
+	if err != nil {
+		return nil, err
+	}
 	dbLLMConfig := database.LLMConfig{
 		ModelName:          modelName,
 		Type:               database.CombineLLMTypes(req.Types),
@@ -388,6 +411,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		RepoID:             repoID,
 		NeedSensitiveCheck: req.NeedSensitiveCheck,
 		ModelSizeB:         req.ModelSizeB,
+		AccessPolicy:       accessPolicy,
 	}
 	dbRes, err := s.llmConfigStore.Create(ctx, dbLLMConfig)
 	if err != nil {
@@ -408,6 +432,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 			AuthHeader:            u.AuthHeader,
 			Provider:              strings.TrimSpace(u.Provider),
 			IsFullURL:             u.IsFullURL,
+			Priority:              clampUpstreamPriority(u.Priority),
 			SupportedEndpoints:    normalizeSupportedEndpoints(u.SupportedEndpoints),
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
@@ -438,6 +463,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		RepoID:             dbRes.RepoID,
 		NeedSensitiveCheck: dbRes.NeedSensitiveCheck,
 		ModelSizeB:         dbRes.ModelSizeB,
+		AccessPolicy:       dbRes.AccessPolicy,
 		CreatedAt:          dbRes.CreatedAt,
 		UpdatedAt:          dbRes.UpdatedAt,
 	}
@@ -451,6 +477,26 @@ func normalizeRequiredLLMModelName(modelName string) (string, error) {
 	trimmed := strings.TrimSpace(modelName)
 	if trimmed == "" {
 		return "", fmt.Errorf("%w: model_name cannot be empty", ErrInvalidLLMConfig)
+	}
+	return trimmed, nil
+}
+
+// normalizeLLMAccessPolicy validates an access policy value from admin input.
+// An empty value defaults to the public policy so legacy clients that omit
+// the field keep creating publicly accessible models.
+func normalizeLLMAccessPolicy(policy string) (string, error) {
+	trimmed := strings.ToLower(strings.TrimSpace(policy))
+	if trimmed == "" {
+		return types.LLMAccessPolicyPublic, nil
+	}
+	if trimmed != types.LLMAccessPolicyPublic && trimmed != types.LLMAccessPolicyWhitelist {
+		// Wrap both sentinels: ErrInvalidLLMConfig routes the error to the
+		// admin handlers' 400 branch, while ReqParamInvalid carries the
+		// structured parameter detail for the response payload.
+		return "", fmt.Errorf("%w: %w",
+			ErrInvalidLLMConfig,
+			errorx.ReqParamInvalid(
+				fmt.Errorf("access_policy must be %q or %q", types.LLMAccessPolicyPublic, types.LLMAccessPolicyWhitelist), nil))
 	}
 	return trimmed, nil
 }
@@ -620,6 +666,8 @@ func (s *llmServiceComponentImpl) DeleteLLMConfig(ctx context.Context, id int64)
 	llmName := llmConfig.ModelName
 	// Clean up relational upstreams
 	_ = s.upstreamStore.DeleteByLLMConfigID(ctx, id)
+	// Clean up access whitelist grants
+	s.cleanupLLMConfigModelGrants(ctx, id)
 	err = s.llmConfigStore.Delete(ctx, id)
 	if err != nil {
 		return err
@@ -650,6 +698,18 @@ func (s *llmServiceComponentImpl) DeleteLLMConfig(ctx context.Context, id int64)
 	}
 
 	return nil
+}
+
+// cleanupLLMConfigModelGrants removes all grants of an LLM config.
+// Best-effort: failures are logged and do not block the config deletion.
+func (s *llmServiceComponentImpl) cleanupLLMConfigModelGrants(ctx context.Context, llmConfigID int64) {
+	if s.llmModelGrantStore == nil {
+		return
+	}
+	if err := s.llmModelGrantStore.DeleteByLLMConfigID(ctx, llmConfigID); err != nil {
+		slog.WarnContext(ctx, "delete llm config model grant records failed",
+			slog.Int64("llm_config_id", llmConfigID), slog.Any("err", err))
+	}
 }
 
 func (s *llmServiceComponentImpl) DeletePromptPrefix(ctx context.Context, id int64) error {
@@ -709,6 +769,7 @@ func (s *llmServiceComponentImpl) ListExternalLLMs(ctx context.Context) ([]*type
 			Enabled:      cfg.Enabled,
 			Provider:     cfg.Provider,
 			RepoID:       cfg.RepoID,
+			AccessPolicy: cfg.AccessPolicy,
 			CreatedAt:    cfg.CreatedAt,
 			UpdatedAt:    cfg.UpdatedAt,
 		}
@@ -774,6 +835,7 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 		AuthHeader:            req.AuthHeader,
 		Provider:              strings.TrimSpace(req.Provider),
 		IsFullURL:             req.IsFullURL,
+		Priority:              clampUpstreamPriority(req.Priority),
 		SupportedEndpoints:    normalizeSupportedEndpoints(req.SupportedEndpoints),
 		HealthCheckEnabled:    req.HealthCheckEnabled != nil && *req.HealthCheckEnabled,
 		CircuitBreakerEnabled: req.CircuitBreakerEnabled != nil && *req.CircuitBreakerEnabled,
@@ -859,6 +921,9 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	}
 	if req.Weight != nil {
 		dbUp.Weight = *req.Weight
+	}
+	if req.Priority != nil {
+		dbUp.Priority = clampUpstreamPriority(*req.Priority)
 	}
 	if req.Enabled != nil {
 		dbUp.Enabled = *req.Enabled
@@ -1016,6 +1081,19 @@ func (s *llmServiceComponentImpl) DeleteUpstream(ctx context.Context, id int64) 
 	return nil
 }
 
+// clampUpstreamPriority keeps the configured channel tier inside the
+// supported range: 0 (low-priority channel, the default) through 100 (the
+// highest tier). Values above 100 carry no additional routing meaning.
+func clampUpstreamPriority(priority int) int {
+	if priority < 0 {
+		return 0
+	}
+	if priority > 100 {
+		return 100
+	}
+	return priority
+}
+
 // upstreamPtrsToValues converts a slice of upstream pointers to a slice of values.
 func upstreamPtrsToValues(ptrs []*database.Upstream) []database.Upstream {
 	result := make([]database.Upstream, 0, len(ptrs))
@@ -1040,6 +1118,7 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 			AuthHeader:            u.AuthHeader,
 			Provider:              u.Provider,
 			IsFullURL:             u.IsFullURL,
+			Priority:              u.Priority,
 			SupportedEndpoints:    u.SupportedEndpoints,
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,

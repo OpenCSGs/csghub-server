@@ -75,18 +75,24 @@ func (h *embeddingPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 
 	var req types.EmbeddingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Message: err.Error(), Type: types.ErrTypeInvalidRequest,
+		}})
 		return nil, err
 	}
 	if req.Model == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Model cannot be empty"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Message: types.MsgModelEmpty, Type: types.ErrTypeInvalidRequest,
+		}})
 		return nil, fmt.Errorf("model cannot be empty")
 	}
 	if req.Input.OfString.String() == "" &&
 		len(req.Input.OfArrayOfStrings) == 0 &&
 		len(req.Input.OfArrayOfTokenArrays) == 0 &&
 		len(req.Input.OfArrayOfTokens) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Input cannot be empty"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Message: types.MsgInputEmpty, Type: types.ErrTypeInvalidRequest,
+		}})
 		return nil, fmt.Errorf("input cannot be empty")
 	}
 
@@ -96,7 +102,6 @@ func (h *embeddingPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 		Model:         req.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -109,7 +114,6 @@ func (h *embeddingPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 func (h *embeddingPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	requestID := commontrace.GetTraceIDInGinContext(c)
 
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -215,7 +219,7 @@ func (h *embeddingPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 
 		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record embedding token usage", "error", err)
 			}
 		}

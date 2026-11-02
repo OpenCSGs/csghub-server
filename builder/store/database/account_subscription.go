@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,8 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+var ErrSubscriptionRenewalSkipped = errors.New("subscription renewal skipped because its state changed")
+
 type AccountSubscriptionStore interface {
 	List(ctx context.Context, req *types.SubscriptionListReq) (*SubscriptionListResult, error)
 	CreateOrUpdate(ctx context.Context, req *types.SubscriptionUpdateReq) (*AccountSubscription, error)
@@ -21,7 +24,7 @@ type AccountSubscriptionStore interface {
 	GetByID(ctx context.Context, id int64) (*AccountSubscription, error)
 	StatusByUserUUID(ctx context.Context, userUUID string, skuType types.SKUType) (*AccountSubscription, error)
 	ListRenews(ctx context.Context) ([]AccountSubscription, error)
-	Renew(ctx context.Context, sub *AccountSubscription, eventUUID uuid.UUID) error
+	Renew(ctx context.Context, sub *AccountSubscription, req types.SubscriptionRenewReq) error
 }
 
 type SubscriptionListResult struct {
@@ -99,72 +102,85 @@ func (a *accountSubscriptionStoreImpl) StatusByUserUUID(ctx context.Context, use
 func (a *accountSubscriptionStoreImpl) CreateOrUpdate(ctx context.Context, req *types.SubscriptionUpdateReq) (*AccountSubscription, error) {
 	respSub := &AccountSubscription{}
 	err := a.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		var err error
-		var postPrice AccountPrice
-		var acctSub AccountSubscription
-
-		if req.ResourceID != types.SubscriptionFree {
-			err = tx.NewSelect().Model(&postPrice).
-				Where("sku_type = ?", req.SkuType).
-				Where("sku_kind = ?", types.SKUTimeSpan).
-				Where("resource_id = ?", req.ResourceID).
-				Where("sku_unit_type = ?", req.SkuUnitType).
-				Order("created_at desc").Limit(1).Scan(ctx, &postPrice)
-			if err != nil {
-				return errorx.HandleDBError(err,
-					errorx.Ctx().
-						Set("query_price_post_resource_id", req.ResourceID).
-						Set("unit_type", req.SkuUnitType))
-			}
-		}
-
-		err = tx.NewSelect().Model(&acctSub).
-			Where("user_uuid = ?", req.UserUUID).
-			Where("sku_type = ?", req.SkuType).
-			Scan(ctx, &acctSub)
-
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return errorx.HandleDBError(err, errorx.Ctx().Set("query_acct_user_sub", req.UserUUID))
-		}
-
-		if errors.Is(err, sql.ErrNoRows) {
-			// no subscription found
-			if req.ResourceID == types.SubscriptionFree {
-				respSub.UserUUID = req.UserUUID
-				respSub.SkuType = req.SkuType
-				respSub.ResourceID = req.ResourceID
-				respSub.Status = types.SubscriptionStatusCanceled
-				slog.Warn("no subscription found and no action required for create free subscription", slog.Any("req", req))
-				return nil
-			}
-
-			// build new subscription
-			return a.buildNewSubscription(ctx, tx, req, respSub, &postPrice)
-		}
-
-		if req.ResourceID == types.SubscriptionFree {
-			// close subscription
-			err = a.closeSubscription(ctx, tx, &acctSub)
-		} else if acctSub.Status != types.SubscriptionStatusActive && acctSub.LastPeriodEnd.Unix() < time.Now().Unix() {
-			// refresh expired subscription
-			err = a.refreshSubscription(ctx, tx, req, &acctSub, &postPrice)
-		} else {
-			// update in use subscription
-			err = a.updateInUseSubscription(ctx, tx, req, &postPrice, &acctSub)
-		}
-
-		if err != nil {
+		if err := lockSubscriptionPurchase(ctx, tx, req); err != nil {
 			return err
 		}
-
-		copySubscriptionValues(respSub, &acctSub)
-		return nil
+		if err := a.applySubscriptionUpdate(ctx, tx, req, respSub); err != nil {
+			return err
+		}
+		if req.ResourceID == types.SubscriptionFree {
+			return nil
+		}
+		return saveSubscriptionLicense(ctx, tx, respSub, req.License)
 	})
-
 	if err != nil {
 		return nil, err
 	}
 	return respSub, nil
+}
+
+func (a *accountSubscriptionStoreImpl) applySubscriptionUpdate(ctx context.Context, tx bun.Tx, req *types.SubscriptionUpdateReq, respSub *AccountSubscription) error {
+	var err error
+	var postPrice AccountPrice
+	var acctSub AccountSubscription
+
+	if req.ResourceID != types.SubscriptionFree {
+		priceQuery := tx.NewSelect().Model(&postPrice).
+			Where("sku_type = ?", req.SkuType).
+			Where("sku_kind = ?", types.SKUTimeSpan).
+			Where("resource_id = ?", req.ResourceID).
+			Where("sku_unit_type = ?", req.SkuUnitType)
+		priceQuery = filterSubscriptionPurchasePrice(priceQuery, req.SkuType)
+		err = priceQuery.Order("created_at desc").Limit(1).Scan(ctx, &postPrice)
+		if err != nil {
+			return errorx.HandleDBError(err,
+				errorx.Ctx().
+					Set("query_price_post_resource_id", req.ResourceID).
+					Set("unit_type", req.SkuUnitType))
+		}
+	}
+
+	err = tx.NewSelect().Model(&acctSub).
+		Where("user_uuid = ?", req.UserUUID).
+		Where("sku_type = ?", req.SkuType).
+		Scan(ctx, &acctSub)
+
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return errorx.HandleDBError(err, errorx.Ctx().Set("query_acct_user_sub", req.UserUUID))
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		// no subscription found
+		if req.ResourceID == types.SubscriptionFree {
+			respSub.UserUUID = req.UserUUID
+			respSub.SkuType = req.SkuType
+			respSub.ResourceID = req.ResourceID
+			respSub.Status = types.SubscriptionStatusCanceled
+			slog.Warn("no subscription found and no action required for create free subscription", slog.Any("req", req))
+			return nil
+		}
+
+		// build new subscription
+		return a.buildNewSubscription(ctx, tx, req, respSub, &postPrice)
+	}
+
+	if req.ResourceID == types.SubscriptionFree {
+		// close subscription
+		err = a.closeSubscription(ctx, tx, &acctSub)
+	} else if acctSub.Status != types.SubscriptionStatusActive && acctSub.LastPeriodEnd.Unix() < time.Now().Unix() {
+		// refresh expired subscription
+		err = a.refreshSubscription(ctx, tx, req, &acctSub, &postPrice)
+	} else {
+		// update in use subscription
+		err = a.updateInUseSubscription(ctx, tx, req, &postPrice, &acctSub)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	copySubscriptionValues(respSub, &acctSub)
+	return nil
 }
 
 func (a *accountSubscriptionStoreImpl) buildNewSubscription(ctx context.Context, tx bun.Tx,
@@ -191,14 +207,15 @@ func (a *accountSubscriptionStoreImpl) beginNewSubscription(ctx context.Context,
 		return errorx.HandleDBError(err, errorx.Ctx().Set("query_acct_user", req.UserUUID).Set("newSub", newSubRecord))
 	}
 
-	if float64(postPrice.SkuPrice) > (acctUser.CashBalance + acctUser.Balance) {
-		return errorx.HandleDBError(errorx.ErrInsufficientBalance,
+	charge := subscriptionCharge(postPrice)
+	if charge > (acctUser.CashBalance + acctUser.Balance) {
+		return errorx.InsufficientBalance(
 			errorx.Ctx().Set("balance", acctUser.CashBalance+acctUser.Balance).
-				Set("fee", postPrice.SkuPrice).Set("newSub", newSubRecord))
+				Set("fee", charge).Set("newSub", newSubRecord))
 	}
 
 	now := time.Now()
-	amountValue := 0 - float64(postPrice.SkuPrice)
+	amountValue := 0 - charge
 
 	err = a.generateAcctStatement(ctx, tx, req.EventUUID, acctUser.UserUUID, postPrice, now, amountValue, req.OpUserUUID)
 	if err != nil {
@@ -221,7 +238,7 @@ func (a *accountSubscriptionStoreImpl) beginNewSubscription(ctx context.Context,
 	sub.LastBillID = 0
 	sub.LastPeriodStart = periodStart
 	sub.LastPeriodEnd = periodEnd
-	sub.AmountPaidTotal += float64(postPrice.SkuPrice)
+	sub.AmountPaidTotal += charge
 	sub.AmountPaidCount += 1
 	sub.NextPriceID = postPrice.ID
 	sub.NextResourceID = postPrice.ResourceID
@@ -240,7 +257,7 @@ func (a *accountSubscriptionStoreImpl) beginNewSubscription(ctx context.Context,
 	subBill.SubID = sub.ID
 	subBill.EventUUID = req.EventUUID.String()
 	subBill.UserUUID = acctUser.UserUUID
-	subBill.AmountPaid = float64(postPrice.SkuPrice)
+	subBill.AmountPaid = charge
 	subBill.Status = types.BillingStatusPaid
 	subBill.Reason = types.BillingReasonSubscriptionCreate
 	subBill.PeriodStart = periodStart
@@ -326,7 +343,7 @@ func (a *accountSubscriptionStoreImpl) updateInUseSubscription(ctx context.Conte
 	}
 
 	if feeGap > 0 && feeGap > (acctUser.CashBalance+acctUser.Balance) {
-		return errorx.HandleDBError(errorx.ErrInsufficientBalance,
+		return errorx.InsufficientBalance(
 			errorx.Ctx().Set("balance", acctUser.CashBalance+acctUser.Balance).Set("fee", feeGap))
 	}
 
@@ -343,7 +360,7 @@ func (a *accountSubscriptionStoreImpl) updateInUseSubscription(ctx context.Conte
 	subBill.UserUUID = acctUser.UserUUID
 	subBill.AmountPaid = feeGap
 	subBill.Status = types.BillingStatusPaid
-	if feeGap > 0 || postPrice.SkuPrice >= prePrice.SkuPrice {
+	if feeGap > 0 || subscriptionCharge(postPrice) >= subscriptionCharge(&prePrice) {
 		subBill.Reason = types.BillingReasionSubscriptionUpgrade
 	} else {
 		subBill.Reason = types.BillingReasionSubscriptionDowngrade
@@ -540,11 +557,18 @@ func (a *accountSubscriptionStoreImpl) ListRenews(ctx context.Context) ([]Accoun
 	return subs, nil
 }
 
-func (a *accountSubscriptionStoreImpl) Renew(ctx context.Context, sub *AccountSubscription, eventUUID uuid.UUID) error {
+func (a *accountSubscriptionStoreImpl) Renew(ctx context.Context, sub *AccountSubscription, req types.SubscriptionRenewReq) error {
 	err := a.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var err error
 		var price AccountPrice
 		var acctUser AccountUser
+		proceed, err := lockSubscriptionRenewal(ctx, tx, sub, req.License)
+		if err != nil {
+			return err
+		}
+		if !proceed {
+			return ErrSubscriptionRenewalSkipped
+		}
 
 		err = tx.NewSelect().Model(&price).Where("id = ?", sub.NextPriceID).Scan(ctx, &price)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -553,7 +577,7 @@ func (a *accountSubscriptionStoreImpl) Renew(ctx context.Context, sub *AccountSu
 
 		if errors.Is(err, sql.ErrNoRows) {
 			// cancel due to lost price
-			return a.renewCancelSub(ctx, tx, sub, &price, types.BillingReasonLostPrice, eventUUID)
+			return a.renewCancelSub(ctx, tx, sub, &price, types.BillingReasonLostPrice, req.EventUUID)
 		}
 
 		err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", sub.UserUUID).Scan(ctx, &acctUser)
@@ -561,26 +585,27 @@ func (a *accountSubscriptionStoreImpl) Renew(ctx context.Context, sub *AccountSu
 			return fmt.Errorf("renew sub id %d to select account user uuid %s error: %w", sub.ID, sub.UserUUID, err)
 		}
 
-		if float64(price.SkuPrice) > (acctUser.CashBalance + acctUser.Balance) {
+		charge := subscriptionCharge(&price)
+		if charge > (acctUser.CashBalance + acctUser.Balance) {
 			// cancel due to insufficient balance
-			return a.renewCancelSub(ctx, tx, sub, &price, types.BillingReasonBalanceInsufficient, eventUUID)
+			return a.renewCancelSub(ctx, tx, sub, &price, types.BillingReasonBalanceInsufficient, req.EventUUID)
 		}
 
 		now := time.Now()
-		amountValue := 0 - float64(price.SkuPrice)
+		amountValue := 0 - charge
 
-		err = a.generateAcctStatement(ctx, tx, eventUUID, acctUser.UserUUID, &price,
+		err = a.generateAcctStatement(ctx, tx, req.EventUUID, acctUser.UserUUID, &price,
 			now, amountValue, string(types.BillingReasonSubscriptionCycle))
 		if err != nil {
 			return fmt.Errorf("renew sub id %d to deduct account fee error: %w", sub.ID, err)
 		}
 
-		err = a.renewBill(ctx, tx, sub, &price, eventUUID)
+		err = a.renewBill(ctx, tx, sub, &price, req.EventUUID)
 		if err != nil {
 			return fmt.Errorf("renew sub id %d to insert bill error: %w", sub.ID, err)
 		}
 
-		return nil
+		return saveSubscriptionLicense(ctx, tx, sub, req.License)
 	})
 
 	if err != nil {
@@ -600,7 +625,7 @@ func (a *accountSubscriptionStoreImpl) renewCancelSub(ctx context.Context, tx bu
 	subBill.EventUUID = eventUUID.String()
 	subBill.UserUUID = sub.UserUUID
 	if price != nil {
-		subBill.AmountPaid = float64(price.SkuPrice)
+		subBill.AmountPaid = subscriptionCharge(price)
 		subBill.Discount = price.Discount
 	}
 	subBill.Status = types.BillingStatusUnpaid
@@ -653,7 +678,7 @@ func (a *accountSubscriptionStoreImpl) renewBill(ctx context.Context, tx bun.Tx,
 	subBill.SubID = sub.ID
 	subBill.EventUUID = eventUUID.String()
 	subBill.UserUUID = sub.UserUUID
-	subBill.AmountPaid = float64(price.SkuPrice)
+	subBill.AmountPaid = subscriptionCharge(price)
 	subBill.Status = types.BillingStatusPaid
 	subBill.Reason = types.BillingReasonSubscriptionCycle
 	subBill.PeriodStart = periodStart
@@ -675,7 +700,7 @@ func (a *accountSubscriptionStoreImpl) renewBill(ctx context.Context, tx bun.Tx,
 	postLastBillID = subBill.ID
 	sub.LastPeriodStart = subBill.PeriodStart
 	sub.LastPeriodEnd = subBill.PeriodEnd
-	sub.AmountPaidTotal += float64(price.SkuPrice)
+	sub.AmountPaidTotal += subBill.AmountPaid
 	sub.AmountPaidCount += 1
 	res, err := tx.NewUpdate().Model(sub).WherePK().Exec(ctx)
 	err = assertAffectedOneRow(res, err)
@@ -735,7 +760,9 @@ func (a *accountSubscriptionStoreImpl) calculateFeeGap(prePrice AccountPrice, po
 	now time.Time, sub *AccountSubscription, postEndTime time.Time) (float64, error) {
 
 	feeGap := float64(0)
-	priceGap := float64(postPrice.SkuPrice - prePrice.SkuPrice)
+	preCharge := subscriptionCharge(&prePrice)
+	postCharge := subscriptionCharge(postPrice)
+	priceGap := postCharge - preCharge
 	if priceGap > 0 {
 		// increasing price
 		preStartStamp := sub.LastPeriodStart.Unix()
@@ -745,12 +772,15 @@ func (a *accountSubscriptionStoreImpl) calculateFeeGap(prePrice AccountPrice, po
 			return 0, errorx.ErrWrongTimeRange
 		}
 		// unconsumed fee of current valid period
-		unConsumedFee := float64(prePrice.SkuPrice) * (float64(preEndStamp-nowStamp) / float64(preEndStamp-preStartStamp))
+		unConsumedFee := preCharge * (float64(preEndStamp-nowStamp) / float64(preEndStamp-preStartStamp))
 
 		postEndStamp := postEndTime.Unix()
 		// will pay fee of new period
-		willPayFee := float64(postPrice.SkuPrice) * (float64(postEndStamp-nowStamp) / float64(postEndStamp-preStartStamp))
+		willPayFee := postCharge * (float64(postEndStamp-nowStamp) / float64(postEndStamp-preStartStamp))
 		feeGap = willPayFee - unConsumedFee
+		if postPrice.SkuType == types.SKUCSGLite {
+			feeGap = math.Round(feeGap)
+		}
 	}
 
 	return feeGap, nil

@@ -22,6 +22,8 @@ import (
 // interface so the Handler has no compile-time dependency on the handler
 // package — the handler package provides concrete adapters.
 type Deps struct {
+	// RetainRoutingBody selects requests requiring submitted routing provenance.
+	RetainRoutingBody func(string) bool
 	// ProxyExecutor executes a reverse proxy request to the upstream.
 	ProxyExecutor ProxyExecutor
 	// UsageRecorder records token usage for billing/metering.
@@ -52,7 +54,7 @@ type ProxyExecutor interface {
 
 // UsageRecorder records token usage for billing/metering.
 type UsageRecorder interface {
-	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
+	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error
 }
 
 // AdmissionFinalizer closes the capacity admission lease after the upstream
@@ -117,7 +119,6 @@ type SensitiveResult struct {
 // the upstream response completes.  It mirrors handler.runChatPostProcessAsync.
 type postProcessInput struct {
 	NSUUID          string
-	ApiKey          string
 	TokenID         int64
 	Model           *types.Model
 	TargetModelName string
@@ -270,14 +271,13 @@ func buildAssistantMessageParam(m map[string]any) openai.ChatCompletionMessagePa
 			OfString: param.NewOpt(content),
 		}
 	}
-	if toolCalls, ok := m["tool_calls"].([]any); ok && len(toolCalls) > 0 {
+	// tool_calls is []map[string]any as written by anthropicAssistantBlocksToChat;
+	// keep the assertion in sync with that writer or LLM logs silently lose
+	// the assistant tool calls.
+	if toolCalls, ok := m["tool_calls"].([]map[string]any); ok {
 		for _, tc := range toolCalls {
-			tcMap, ok := tc.(map[string]any)
-			if !ok {
-				continue
-			}
-			fn, _ := tcMap["function"].(map[string]any)
-			id, _ := tcMap["id"].(string)
+			fn, _ := tc["function"].(map[string]any)
+			id, _ := tc["id"].(string)
 			name, _ := fn["name"].(string)
 			args, _ := fn["arguments"].(string)
 			assistant.ToolCalls = append(assistant.ToolCalls, openai.ChatCompletionMessageToolCallUnionParam{

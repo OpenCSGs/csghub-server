@@ -20,6 +20,7 @@ func TestVllmVersionGate(t *testing.T) {
 		{"v0.11.2", true},
 		{"v0.9.2", false},
 		{"v0.28.0", true},
+		{"v0.31.0", true},
 		{"v0.24.0", true},
 		{"25.11-py3", false},
 		{"", false},
@@ -38,6 +39,7 @@ func TestSglangVersionGate(t *testing.T) {
 		want    bool
 	}{
 		{"v0.5.14", true},
+		{"v0.5.21", true},
 		{"v0.5.12", true},
 		{"v0.5.4", true},
 		{"v0.5.3", true},

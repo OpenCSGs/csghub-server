@@ -46,6 +46,36 @@ func TestResponsesTokenCounterPrefersUpstreamUsage(t *testing.T) {
 	require.Equal(t, int64(4), usage.ReasoningTokens)
 }
 
+func TestResponsesTokenCounterImageInputStaysTokenBilling(t *testing.T) {
+	// Image input must not stamp modal billing metadata: the responses path
+	// always bills by tokens, and upstream usage already includes image
+	// tokens in InputTokens.
+	counter := NewResponsesTokenCounter(&DumyTokenizer{})
+	counter.Request(&types.ResponsesRequest{
+		Model: "m",
+		Input: json.RawMessage(`[{"role":"user","content":[{"type":"input_image","image_url":"https://example.com/i.png"},{"type":"input_text","text":"describe"}]}]`),
+	})
+	counter.Response(&types.ResponsesResponse{
+		Usage: &types.ResponsesUsage{
+			InputTokens:  1330,
+			OutputTokens: 20,
+			TotalTokens:  1350,
+			InputTokensDetails: &types.ResponsesInputTokenDetails{
+				ImageTokens: 1300,
+				TextTokens:  30,
+			},
+		},
+	})
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, usage.DataType)
+	require.Equal(t, int64(0), usage.CompletionRC)
+	require.Equal(t, int64(1330), usage.PromptTokens)
+	require.Equal(t, int64(20), usage.CompletionTokens)
+	require.Equal(t, int64(1350), usage.TotalTokens)
+}
+
 func TestResponsesTokenCounterEstimatesNonStreamResponse(t *testing.T) {
 	counter := NewResponsesTokenCounter(&DumyTokenizer{})
 	counter.Request(&types.ResponsesRequest{

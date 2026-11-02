@@ -51,11 +51,11 @@ type UserComponent interface {
 	LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
 	ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error)
 	ListFinetunes(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
-	LikesSkills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error)
 	// ListDeploysByNamespace lists run deploys (e.g. inference) by owner namespace (org or user).
 	ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRequest, int, error)
 	// ListNotebooksByNamespace lists notebooks by owner namespace (org or user).
 	ListNotebooksByNamespace(ctx context.Context, req *types.OrgNotebooksReq) ([]types.NotebookRes, int, error)
+	LikesSkills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -816,7 +816,7 @@ func (c *userComponentImpl) ListDeploysByNamespace(ctx context.Context, req *typ
 }
 
 func (c *userComponentImpl) GetUserByName(ctx context.Context, userName string) (*database.User, error) {
-	user, err := c.userStore.FindByUsername(ctx, userName)
+	user, err := c.userStore.FindByUsername(ctx, userName, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for the presence of the user %s,error:%w", userName, err)
 	}

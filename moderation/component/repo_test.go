@@ -325,7 +325,7 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 	*repoToUpdate = *repo
 	repoToUpdate.SensitiveCheckStatus = types.SensitiveCheckFail
 	repoToUpdate.Private = true
-	mockRepoStore.EXPECT().UpdateRepo(mock.Anything, *repoToUpdate).Return(repoToUpdate, nil).Once()
+	mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(mock.Anything, repoToUpdate.ID, types.SensitiveCheckFail).Return(nil).Once()
 
 	// Use a channel to collect results concurrently without depending on call order
 	results := make(chan database.RepositoryFileCheck, 2)

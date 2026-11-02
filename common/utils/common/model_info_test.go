@@ -119,7 +119,7 @@ func TestGetModelInfo_Success(t *testing.T) {
 	files := []string{"file1", "file2"}
 	minContext := 128
 
-	got, err := GetModelInfo(files, minContext)
+	got, err := GetModelInfo(files, minContext, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestGetModelInfo_ValidZeroParams(t *testing.T) {
 	})
 	defer restore()
 
-	got, err := GetModelInfo([]string{"empty.safetensors"}, 128)
+	got, err := GetModelInfo([]string{"empty.safetensors"}, 128, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestGetModelInfo_MetadataError(t *testing.T) {
 	defer restore()
 
 	files := []string{"file1"}
-	_, err := GetModelInfo(files, 64)
+	_, err := GetModelInfo(files, 64, nil)
 	if err == nil || err.Error() != "failed to fetch metadata: mock error, url: file1" {
 		t.Errorf("expected fetch error, got %v", err)
 	}
@@ -194,7 +194,7 @@ func TestGetModelInfo_HeaderTooLarge(t *testing.T) {
 	defer restore()
 
 	files := []string{"file1"}
-	_, err := GetModelInfo(files, 64)
+	_, err := GetModelInfo(files, 64, nil)
 	if err == nil || !reflect.DeepEqual(err.Error(), "failed to fetch metadata: header size exceeds maximum allowed size: 1024000 bytes,header length: 1025000, url: file1") {
 		t.Errorf("expected header size error, got %v", err)
 	}
@@ -205,7 +205,7 @@ func TestGetModelInfo_EmptyFileList(t *testing.T) {
 	defer restore()
 
 	files := []string{}
-	got, err := GetModelInfo(files, 32)
+	got, err := GetModelInfo(files, 32, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestGetModelInfo_MultipleDtypes(t *testing.T) {
 	defer restore()
 
 	files := []string{"file1"}
-	got, err := GetModelInfo(files, 256)
+	got, err := GetModelInfo(files, 256, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestGetModelInfo_InvalidShape(t *testing.T) {
 	defer restore()
 
 	files := []string{"file1"}
-	got, err := GetModelInfo(files, 64)
+	got, err := GetModelInfo(files, 64, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestGetModelInfo_InvalidTensorData(t *testing.T) {
 	defer restore()
 
 	files := []string{"file1"}
-	got, err := GetModelInfo(files, 64)
+	got, err := GetModelInfo(files, 64, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -284,7 +284,7 @@ func TestGetModelInfo_EmptyTensors(t *testing.T) {
 	defer restore()
 
 	files := []string{"file1"}
-	got, err := GetModelInfo(files, 64)
+	got, err := GetModelInfo(files, 64, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestGetModelInfo_SingleFile(t *testing.T) {
 	files := []string{"file1"}
 	minContext := 512
 
-	got, err := GetModelInfo(files, minContext)
+	got, err := GetModelInfo(files, minContext, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -348,7 +348,7 @@ func TestGetModelInfo_LargeModel(t *testing.T) {
 	defer restore()
 
 	files := []string{"file1"}
-	got, err := GetModelInfo(files, 2048)
+	got, err := GetModelInfo(files, 2048, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

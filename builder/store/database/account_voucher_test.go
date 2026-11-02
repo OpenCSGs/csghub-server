@@ -20,7 +20,6 @@ func createTestVoucher(targetUUID string, total float64) *database.AccountVouche
 		BeginDate:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		EndDate:    time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC),
 		Status:     types.VoucherStatusPending,
-		Rules:      []types.VoucherRules{{ClusterIDs: []string{"cluster-1"}}},
 		Notes:      "test notes",
 		IssueUUID:  "admin-uuid",
 		IssueName:  "admin",

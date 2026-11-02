@@ -139,7 +139,6 @@ type Space struct {
 	Instances            []Instance           `json:"instances,omitempty"`
 	ClusterID            string               `json:"cluster_id"`
 	MinReplica           int                  `json:"min_replica,omitempty"`
-	RepoSize             int64                `json:"repo_size"`
 }
 
 type SpaceStatus struct {

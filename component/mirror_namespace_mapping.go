@@ -2,6 +2,8 @@ package component
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -35,18 +37,18 @@ func NewMirrorNamespaceMappingComponent(config *config.Config) (MirrorNamespaceM
 
 // Create validates and persists a namespace mapping with a canonical local target.
 func (c *mirrorNamespaceMappingComponentImpl) Create(ctx context.Context, req types.CreateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error) {
-	targetNamespace := strings.ToLower(strings.TrimSpace(req.TargetNamespace))
-	exists, err := c.namespaceStore.Exists(ctx, targetNamespace)
+	targetNamespace := req.TargetNamespace
+	namespace, err := c.namespaceStore.FindByPath(ctx, targetNamespace)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check target namespace existence, error: %w", err)
-	}
-	if !exists {
-		return nil, errorx.TargetNamespaceNotFound(targetNamespace)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errorx.TargetNamespaceNotFound(targetNamespace)
+		}
+		return nil, fmt.Errorf("failed to find target namespace, error: %w", err)
 	}
 
 	var mnm database.MirrorNamespaceMapping
 	mnm.SourceNamespace = req.SourceNamespace
-	mnm.TargetNamespace = targetNamespace
+	mnm.TargetNamespace = namespace.Path
 	if req.Enabled != nil {
 		mnm.Enabled = req.Enabled
 	}
@@ -77,20 +79,21 @@ func (c *mirrorNamespaceMappingComponentImpl) Index(ctx context.Context, search 
 func (c *mirrorNamespaceMappingComponentImpl) Update(ctx context.Context, req types.UpdateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error) {
 	var targetNamespace string
 	if req.TargetNamespace != nil {
-		targetNamespace = strings.ToLower(strings.TrimSpace(*req.TargetNamespace))
-		exists, err := c.namespaceStore.Exists(ctx, targetNamespace)
+		targetNamespace = strings.TrimSpace(*req.TargetNamespace)
+		namespace, err := c.namespaceStore.FindByPath(ctx, targetNamespace)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check target namespace existence, error: %w", err)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, errorx.TargetNamespaceNotFound(targetNamespace)
+			}
+			return nil, fmt.Errorf("failed to find target namespace, error: %w", err)
 		}
-		if !exists {
-			return nil, errorx.TargetNamespaceNotFound(targetNamespace)
-		}
+		targetNamespace = namespace.Path
 	}
 
 	var mnm database.MirrorNamespaceMapping
 	mnm.ID = req.ID
 	if req.SourceNamespace != nil {
-		mnm.SourceNamespace = *req.SourceNamespace
+		mnm.SourceNamespace = strings.TrimSpace(*req.SourceNamespace)
 	}
 	if req.TargetNamespace != nil {
 		mnm.TargetNamespace = targetNamespace

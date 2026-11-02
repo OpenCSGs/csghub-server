@@ -240,7 +240,7 @@
 
 - **错误代码:** `AGENT-ERR-23`
 - **错误名:** `agentTemplateSensitiveCheckCreateAgentBlocked`
-- **描述:**
+- **描述:** 
 
 ---
 
@@ -248,7 +248,7 @@
 
 - **错误代码:** `AGENT-ERR-24`
 - **错误名:** `agentTemplateSensitiveCheckMakePublicBlocked`
-- **描述:**
+- **描述:** 
 
 ---
 
@@ -256,7 +256,7 @@
 
 - **错误代码:** `AGENT-ERR-25`
 - **错误名:** `agentTemplateSensitiveCheckCreateAgentPending`
-- **描述:**
+- **描述:** 
 
 ---
 
@@ -264,7 +264,7 @@
 
 - **错误代码:** `AGENT-ERR-26`
 - **错误名:** `agentTemplateSensitiveCheckMakePublicPending`
-- **描述:**
+- **描述:** 
 
 ---
 
@@ -288,7 +288,7 @@
 
 - **错误代码:** `AGENT-ERR-29`
 - **错误名:** `csgclawSubdomainInvalid`
-- **描述:**
+- **描述:** 
 
 ---
 
@@ -425,6 +425,14 @@
 - **错误代码:** `AUTH-ERR-15`
 - **错误名:** `noTargetTransferPermission`
 - **描述:** 用户对目标命名空间没有写权限，无法将仓库转移到该命名空间。
+
+---
+
+### `AUTH-ERR-16`
+
+- **错误代码:** `AUTH-ERR-16`
+- **错误名:** `userEmailNotVerified`
+- **描述:** 邮箱地址未设置。请在进行此请求之前设置您的邮箱地址。
 
 ## Collection 错误
 
@@ -1672,7 +1680,7 @@
 
 - **错误代码:** `SERVERLESS-ERR-9`
 - **错误名:** `codeUpdateFailedErr`
-- **描述:**
+- **描述:** 
 
 ## Skill 错误
 
@@ -2113,3 +2121,4 @@
 - **错误代码:** `USER-ERR-21`
 - **错误名:** `tagIDsNotExist`
 - **描述:** 提供的一个或多个标签ID不存在，请确认所有标签ID均有效。
+

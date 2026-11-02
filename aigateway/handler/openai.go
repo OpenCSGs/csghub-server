@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"opencsg.com/csghub-server/aigateway/component/pii"
 	"opencsg.com/csghub-server/aigateway/component/router"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/component/availability"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
+	"opencsg.com/csghub-server/aigateway/handler/protocol"
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -97,7 +99,20 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (*OpenAIHandlerImpl, erro
 	storage, _ := component.NewStorage(config)
 	whitelistRule := database.NewRepositoryFileCheckRuleStore()
 	aiGenerationStore := database.NewAIGenerationStore()
-	handler := newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), audioadapter.NewRegistry(), config, storage, whitelistRule, aiGenerationStore)
+	handler := newOpenAIHandler(openAIHandlerDeps{
+		modelService:        modelService,
+		repoComp:            repoComp,
+		modComponent:        modComponent,
+		clusterComp:         clusterComp,
+		tokenCounterFactory: token.NewCounterFactory(),
+		t2iRegistry:         text2image.NewRegistry(),
+		t2vRegistry:         text2video.NewRegistry(),
+		audioRegistry:       audioadapter.NewRegistry(),
+		config:              config,
+		storage:             storage,
+		whitelistRule:       whitelistRule,
+		aiGenerationStore:   aiGenerationStore,
+	})
 
 	// Build the token plan quota checker once here so every protocol handler
 	// built from this instance shares it. Nil in editions without token plans,
@@ -135,36 +150,44 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (*OpenAIHandlerImpl, erro
 	return handler, nil
 }
 
-func newOpenAIHandler(
-	modelService component.OpenAIComponent,
-	repoComp apicomp.RepoComponent,
-	modComponent component.Moderation,
-	clusterComp apicomp.ClusterComponent,
-	tokenCounterFactory token.CounterFactory,
-	t2iRegistry *text2image.Registry,
-	t2vRegistry *text2video.Registry,
-	audioRegistry *audioadapter.Registry,
-	config *config.Config,
-	storage types.Storage,
-	whitelistRule database.RepositoryFileCheckRuleStore,
-	aiGenerationStore database.AIGenerationStore,
-) *OpenAIHandlerImpl {
+// openAIHandlerDeps bundles the constructor inputs of newOpenAIHandler as a
+// named, handler-layer-owned struct, so the signature stays stable as
+// gateway capabilities grow instead of accumulating positional parameters.
+// Edition-sensitive wiring (the PII rule source, for example) is assembled
+// by its own helper and never lands here.
+type openAIHandlerDeps struct {
+	modelService        component.OpenAIComponent
+	repoComp            apicomp.RepoComponent
+	modComponent        component.Moderation
+	clusterComp         apicomp.ClusterComponent
+	tokenCounterFactory token.CounterFactory
+	t2iRegistry         *text2image.Registry
+	t2vRegistry         *text2video.Registry
+	audioRegistry       *audioadapter.Registry
+	config              *config.Config
+	storage             types.Storage
+	whitelistRule       database.RepositoryFileCheckRuleStore
+	aiGenerationStore   database.AIGenerationStore
+}
+
+func newOpenAIHandler(deps openAIHandlerDeps) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
-		openaiComponent:            modelService,
-		repoComp:                   repoComp,
-		modComponent:               modComponent,
-		clusterComp:                clusterComp,
-		tokenCounterFactory:        tokenCounterFactory,
-		t2iRegistry:                t2iRegistry,
-		t2vRegistry:                t2vRegistry,
-		audioRegistry:              audioRegistry,
-		config:                     config,
-		storage:                    storage,
-		whitelistRule:              whitelistRule,
-		aiGenerationStore:          aiGenerationStore,
-		sensitivePolicy:            component.NewSensitivePolicy(modComponent, whitelistRule),
+		openaiComponent:            deps.modelService,
+		repoComp:                   deps.repoComp,
+		modComponent:               deps.modComponent,
+		clusterComp:                deps.clusterComp,
+		tokenCounterFactory:        deps.tokenCounterFactory,
+		t2iRegistry:                deps.t2iRegistry,
+		t2vRegistry:                deps.t2vRegistry,
+		audioRegistry:              deps.audioRegistry,
+		config:                     deps.config,
+		storage:                    deps.storage,
+		whitelistRule:              deps.whitelistRule,
+		aiGenerationStore:          deps.aiGenerationStore,
+		sensitivePolicy:            component.NewSensitivePolicy(deps.modComponent, deps.whitelistRule),
+		piiMasker:                  newPIIMasker(deps.config),
 		ocrRegistry:                ocradapter.NewRegistry(),
-		llmLogPublisher:            component.NewLLMLogPublisher(config.AIGateway.EnableLLMLogCompress),
+		llmLogPublisher:            component.NewLLMLogPublisher(deps.config.AIGateway.EnableLLMLogCompress),
 		sessionRouter:              router.NewSessionRouter(),
 		chatAttemptFailureReporter: noopChatAttemptFailureReporter{},
 	}
@@ -174,6 +197,9 @@ func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
 	// Stop the admission controller's background queue subscription before
 	// the process exits (idempotent; a no-op when queueing never started).
 	if h != nil {
+		if comp, ok := h.openaiComponent.(interface{ ShutdownAutoRouteCache() }); ok {
+			comp.ShutdownAutoRouteCache()
+		}
 		if comp, ok := h.openaiComponent.(interface{ ShutdownCapacityAdmission() }); ok {
 			comp.ShutdownCapacityAdmission()
 		}
@@ -225,6 +251,7 @@ type OpenAIHandlerImpl struct {
 	whitelistRule              database.RepositoryFileCheckRuleStore
 	aiGenerationStore          database.AIGenerationStore
 	sensitivePolicy            component.SensitivePolicy
+	piiMasker                  pii.PIIMasker
 	llmLogPublisher            component.LLMLogPublisher
 	sessionRouter              router.SessionRouter
 	availabilityManager        availability.AvailabilityManager
@@ -257,10 +284,6 @@ type OpenAIHandlerImpl struct {
 // @Router       /v1/models [get]
 func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	if len(nsUUID) < 1 {
-		nsUUID = httpbase.GetCurrentUserUUID(c)
-	}
 	// Validate llm_types parameter
 	llmTypes := c.QueryArray("llm_types")
 	for _, llmType := range llmTypes {
@@ -270,9 +293,9 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 		if !isValidListModelsLLMType(llmType) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": types.Error{
-					Code:    "invalid_request_error",
+					Code:    types.ErrCodeInvalidRequest,
 					Message: invalidLLMTypesErrorMessage(),
-					Type:    "invalid_request_error",
+					Type:    types.ErrTypeInvalidRequest,
 				}})
 			return
 		}
@@ -284,9 +307,9 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 		if parseErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": types.Error{
-					Code:    "invalid_request_error",
+					Code:    types.ErrCodeInvalidRequest,
 					Message: invalidHasAssociatedModelErrorMessage(),
-					Type:    "invalid_request_error",
+					Type:    types.ErrTypeInvalidRequest,
 				}})
 			return
 		}
@@ -301,7 +324,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.openaiComponent.ListModels(c.Request.Context(), nsUUID, types.ListModelsReq{
+	resp, err := h.openaiComponent.ListModels(c.Request.Context(), types.ListModelsReq{
 		ModelID:            c.Query("model_id"),
 		LLMTypes:           llmTypes,
 		Task:               c.Query("task"),
@@ -309,14 +332,15 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 		Per:                per,
 		Page:               page,
 		ModelScope:         types.ParseModelScope(httpbase.GetAPIKeyModelScope(c)),
+		Caller:             plan.ModelCallerFromGin(c),
 	})
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to get available models", "error", err.Error(), "current_user", currentUser)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": types.Error{
-				Code:    "internal_server_error",
+				Code:    types.ErrCodeInternalServer,
 				Message: "Failed to retrieve models",
-				Type:    "server_error",
+				Type:    types.ErrTypeServer,
 			}})
 		return
 	}
@@ -346,9 +370,9 @@ func parseListModelsPagination(c *gin.Context) (int, int, *types.Error) {
 	pageValue, hasPage := c.GetQuery("page")
 	if hasPer != hasPage {
 		return 0, 0, &types.Error{
-			Code:    "invalid_request_error",
+			Code:    types.ErrCodeInvalidRequest,
 			Message: "per and page must be provided together",
-			Type:    "invalid_request_error",
+			Type:    types.ErrTypeInvalidRequest,
 		}
 	}
 	if !hasPer {
@@ -359,9 +383,9 @@ func parseListModelsPagination(c *gin.Context) (int, int, *types.Error) {
 	page, pageErr := strconv.Atoi(pageValue)
 	if perErr != nil || pageErr != nil || per <= 0 || page <= 0 {
 		return 0, 0, &types.Error{
-			Code:    "invalid_request_error",
+			Code:    types.ErrCodeInvalidRequest,
 			Message: "Invalid pagination parameter. per and page must be positive integers",
-			Type:    "invalid_request_error",
+			Type:    types.ErrTypeInvalidRequest,
 		}
 	}
 	return per, page, nil
@@ -380,33 +404,40 @@ func parseListModelsPagination(c *gin.Context) (int, int, *types.Error) {
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/models/{model} [get]
 func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	if len(nsUUID) < 1 {
-		nsUUID = httpbase.GetCurrentUserUUID(c)
-	}
 	modelID := c.Param("model")
 	modelID = strings.TrimPrefix(modelID, "/")
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": types.Error{
-				Code:    "model_not_found",
+				Code:    types.ErrCodeModelNotFound,
 				Message: "model id can not be empty",
-				Type:    "invalid_request_error",
+				Type:    types.ErrTypeInvalidRequest,
 			}})
 		return
 	}
 
-	model, err := h.openaiComponent.GetModelByID(c.Request.Context(), nsUUID, modelID)
+	model, err := h.openaiComponent.GetModelByID(c.Request.Context(), &types.GetModelByIDReq{
+		Caller:  plan.ModelCallerFromGin(c),
+		ModelID: modelID,
+	})
 	if err != nil {
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to get model by id '%s',error:%w", modelID, err).Error())
+		slog.ErrorContext(c.Request.Context(), "failed to get model by id",
+			slog.String("model_id", modelID), slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": types.Error{
+				Code:    types.ErrCodeInternalServer,
+				Message: "Failed to retrieve model",
+				Type:    types.ErrTypeServer,
+			}})
 		return
 	}
 	if model == nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		// OpenAI reports an unknown model with 404 model_not_found.
+		c.JSON(http.StatusNotFound, gin.H{
 			"error": types.Error{
-				Code:    "model_not_found",
+				Code:    types.ErrCodeModelNotFound,
 				Message: fmt.Sprintf("model '%s' not found", modelID),
-				Type:    "invalid_request_error",
+				Type:    types.ErrTypeInvalidRequest,
 			}})
 		return
 	}
@@ -414,16 +445,51 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 	// A model outside the API key's model scope is reported as unknown, the
 	// same way a nonexistent one is, so the two are indistinguishable.
 	if scope := types.ParseModelScope(httpbase.GetAPIKeyModelScope(c)); len(scope) > 0 && !types.ModelInScope(scope, model.ID) {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusNotFound, gin.H{
 			"error": types.Error{
-				Code:    "model_not_found",
+				Code:    types.ErrCodeModelNotFound,
 				Message: fmt.Sprintf("model '%s' not found", modelID),
-				Type:    "invalid_request_error",
+				Type:    types.ErrTypeInvalidRequest,
 			}})
 		return
 	}
 
+	// The model catalogue is public, but a caller whose user tags restrict
+	// their upstream tier cannot use this model: report the same 403 as the
+	// inference path instead of hiding or pretending it does not exist.
+	if denyUpstreamPriorityIfUnreachable(c, model) {
+		return
+	}
+
 	c.PureJSON(http.StatusOK, model)
+}
+
+// denyUpstreamPriorityIfUnreachable writes the 403 upstream_priority_denied
+// response when the caller's channel priority admits none of the model's
+// enabled upstreams (i.e. every enabled upstream sits on a higher tier). It
+// returns true when the response was written. Models without any enabled
+// upstream are not a priority problem and pass through.
+func denyUpstreamPriorityIfUnreachable(c *gin.Context, model *types.Model) bool {
+	priority := callerUserPriority(plan.ModelCallerFromGin(c))
+	if priority == commonType.UnrestrictedUpstreamPriority {
+		return false
+	}
+	enabled := make([]commonType.UpstreamConfig, 0, len(model.Upstreams))
+	for _, upstream := range model.Upstreams {
+		if upstream.Enabled {
+			enabled = append(enabled, upstream)
+		}
+	}
+	if len(enabled) == 0 || len(router.EligibleUpstreamsForPriority(enabled, priority)) > 0 {
+		return false
+	}
+	c.JSON(http.StatusForbidden, gin.H{
+		"error": types.Error{
+			Code:    types.ErrCodeUpstreamPriorityDenied,
+			Message: fmt.Sprintf("caller priority does not admit any upstream of model '%s'", model.ID),
+			Type:    types.ErrTypePermission,
+		}})
+	return true
 }
 
 var _ openai.ChatCompletion
@@ -431,7 +497,6 @@ var _ openai.ChatCompletionChunk
 
 type chatPostProcessInput struct {
 	NSUUID          string
-	ApiKey          string
 	TokenID         int64
 	Model           *types.Model
 	TargetModelName string
@@ -515,6 +580,7 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 	username string,
 	modelID string,
 	p *types.RequestPlan,
+	clientProtocol types.Protocol,
 ) (*chatRetryResponseWriter, error) {
 	primaryStatusCode := primaryWriter.StatusCode()
 	primaryStreamStarted := primaryWriter.StreamStarted()
@@ -535,10 +601,7 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 
 	hasFallbacks := len(modelTarget.AttemptTargets) > 0
 	if !primaryRetryable || !hasFallbacks {
-		if replayErr := primaryWriter.ReplayBufferedResponse(); replayErr != nil {
-			slog.WarnContext(c.Request.Context(), "failed to replay buffered response", slog.Any("error", replayErr))
-		}
-		return primaryWriter, nil
+		return h.finishOrTryAnotherModel(c, chatCtx, modelTarget, chatReq, primaryWriter, username, p, clientProtocol), nil
 	}
 
 	firstFallbackURL := ""
@@ -564,7 +627,246 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 		}
 		return primaryWriter, nil
 	}
-	return retryWriter, nil
+	if retryWriter == nil {
+		return h.finishOrTryAnotherModel(c, chatCtx, modelTarget, chatReq, primaryWriter, username, p, clientProtocol), nil
+	}
+	return h.finishOrTryAnotherModel(c, chatCtx, modelTarget, chatReq, retryWriter, username, p, clientProtocol), nil
+}
+
+// chatFailureDeferredToAnotherModel reports whether a failed attempt must
+// stay buffered because the request still has a ranked model that could
+// serve it.  Committing the failure here would send the client a response
+// the gateway is about to replace.
+func chatFailureDeferredToAnotherModel(p *types.RequestPlan, writer *chatRetryResponseWriter) bool {
+	if writer == nil || p.AutoRouteAlternatesRemaining() == 0 {
+		return false
+	}
+	return shouldRetryChatAttemptWithAnotherModel(writer.StatusCode(), writer.StreamStarted())
+}
+
+// finishOrTryAnotherModel walks the models the ranking service held in
+// reserve when every upstream of the current model has failed.  Automatic
+// routing hides which model serves a turn, so a model that cannot serve it
+// is the gateway's to route around rather than an answer to return.
+//
+// It returns the writer holding the response the client is given, having
+// replayed whatever was still buffered.  The model target is mutated in
+// place, so everything the caller derives from it afterwards — usage
+// metering above all — is attributed to the model that actually served
+// the request.
+func (h *OpenAIHandlerImpl) finishOrTryAnotherModel(
+	c *gin.Context,
+	chatCtx *chatContext,
+	modelTarget *resolvedModelTarget,
+	chatReq *types.ChatCompletionRequest,
+	writer *chatRetryResponseWriter,
+	username string,
+	p *types.RequestPlan,
+	clientProtocol types.Protocol,
+) *chatRetryResponseWriter {
+	ctx := c.Request.Context()
+	for chatFailureDeferredToAnotherModel(p, writer) {
+		alternate := p.TakeAutoRouteAlternate()
+		if alternate == nil {
+			break
+		}
+		failedModel := modelTarget.Model.ID
+		failedStatus := writer.StatusCode()
+		if err := h.applyChatAlternateModel(c, chatCtx, modelTarget, chatReq, alternate.ModelID, p, clientProtocol); err != nil {
+			slog.WarnContext(ctx, "automatic routing could not use the next ranked model",
+				slog.String("failed_model", failedModel),
+				slog.String("next_model", alternate.ModelID),
+				slog.Any("error", err))
+			continue
+		}
+		slog.InfoContext(ctx, "retry chat request with the next ranked model",
+			slog.String("failed_model", failedModel),
+			slog.Int("failed_status", failedStatus),
+			slog.String("next_model", alternate.ModelID),
+			slog.Int("next_rank", alternate.Rank),
+			slog.String("user_name", username),
+			slog.Int("remaining_alternates", p.AutoRouteAlternatesRemaining()))
+
+		next, err := h.executeChatProxyAttempt(c, chatCtx.responseWriter, modelTarget, chatReq, p)
+		if err != nil {
+			if types.IsAdmissionDenied(err) {
+				break
+			}
+			slog.ErrorContext(ctx, "chat attempt against the next ranked model failed",
+				slog.String("model", alternate.ModelID), slog.Any("error", err))
+			break
+		}
+		writer = next
+		// Keep the request's routing decision aligned with the model that
+		// served this turn. Billing uses modelTarget below to identify the
+		// concrete model; the routing decision is not persisted in metering.
+		recordAutoRouteFallback(ctx, alternate)
+		h.reportChatAttemptResult(ctx, chatAttemptReportParams{
+			UpstreamID:     modelTarget.Upstream.ID,
+			Phase:          chatAttemptPhaseFallback,
+			RequestModelID: alternate.ModelID,
+			ModelName:      modelTarget.ModelName,
+			Provider:       modelTarget.Model.Provider,
+			Endpoint:       modelTarget.Upstream.URL,
+			Target:         modelTarget.Target,
+			StatusCode:     writer.StatusCode(),
+			Retryable:      shouldRetryChatAttempt(writer.StatusCode(), writer.StreamStarted()),
+			Model:          modelTarget.Model,
+		})
+		// The new model brings its own upstreams, so exhaust those before
+		// giving up on it, exactly as the first model's were exhausted.
+		if shouldRetryChatAttempt(writer.StatusCode(), writer.StreamStarted()) && len(modelTarget.AttemptTargets) > 0 {
+			retried, retryErr := h.retryChatWithFallback(c, chatCtx.responseWriter, modelTarget, chatReq, chatCtx.tokenCounter, chatCtx.logCapture, p)
+			if retryErr != nil {
+				if types.IsAdmissionDenied(retryErr) {
+					break
+				}
+				slog.ErrorContext(ctx, "fallback chat retry failed on the next ranked model", slog.Any("error", retryErr))
+				break
+			}
+			if retried != nil {
+				writer = retried
+			}
+		}
+	}
+	if replayErr := writer.ReplayBufferedResponse(); replayErr != nil {
+		slog.WarnContext(ctx, "failed to replay buffered response", slog.Any("error", replayErr))
+	}
+	return writer
+}
+
+// applyChatAlternateModel repoints an in-flight request at another model:
+// its target, upstream, auth headers, endpoint compatibility and the
+// per-attempt runtime the token counter and log capture carry.  It mirrors
+// applyChatFallbackTarget, which does the same for another upstream of the
+// same model.
+//
+// The plan phase decided balance, content safety and protocol routing
+// against the model it resolved, and those decisions do not automatically
+// hold for another one.  Rather than re-running the plan here, which would
+// mean a second moderation round trip and a second admission pass inside
+// an attempt, an alternate that would need a decision this request has not
+// made is refused: protocol routing is recomputed because it is a pure
+// function of the target, and the two policy gates are required to be
+// already satisfied. A per-model token plan quota is checked again for the
+// alternate. The effect is that fallback is skipped when the alternate is
+// ineligible.
+func (h *OpenAIHandlerImpl) applyChatAlternateModel(
+	c *gin.Context,
+	chatCtx *chatContext,
+	modelTarget *resolvedModelTarget,
+	chatReq *types.ChatCompletionRequest,
+	modelID string,
+	p *types.RequestPlan,
+	clientProtocol types.Protocol,
+) error {
+	resolved, err := h.resolveModelTarget(resolveModelTargetReq{C: c, ModelID: modelID, Headers: c.Request.Header})
+	if err != nil {
+		return err
+	}
+	if resolved == nil || resolved.Model == nil {
+		return fmt.Errorf("model %q resolved to no target", modelID)
+	}
+	if err := chatAlternateSatisfiesPlanGates(resolved, modelTarget, p); err != nil {
+		return err
+	}
+	if h.tokenPlanQuotaChecker != nil {
+		if nsUUID := httpbase.GetCurrentNamespaceUUID(c); nsUUID != "" {
+			if err := h.tokenPlanQuotaChecker.CheckTokenPlanQuota(c.Request.Context(), commonType.TokenPlanQuotaReq{
+				NsUUID: nsUUID, ModelID: resolved.Model.ID,
+			}); err != nil {
+				return fmt.Errorf("check token plan quota for alternate model %q: %w", resolved.Model.ID, err)
+			}
+		}
+	}
+	backendURL, err := chatAlternateBackendURL(resolved, clientProtocol)
+	if err != nil {
+		return err
+	}
+	*modelTarget = *resolved
+	*modelTarget = *withBackendURL(modelTarget, backendURL)
+	applyChatCompletionsEndpointCompatibility(c.Request.Context(), modelTarget)
+	chatReq.Model = modelTarget.ModelName
+	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
+		slog.WarnContext(c.Request.Context(), "invalid auth head for the next ranked model",
+			slog.String("model", modelTarget.ModelName), slog.Any("error", err))
+	}
+	updateChatAttemptRuntime(chatCtx.tokenCounter, chatCtx.logCapture, modelTarget)
+	return nil
+}
+
+// recordAutoRouteFallback repoints the routing decision this request carries
+// at the model that is now serving it, keeping its rank and benchmark
+// identifier together with the model they belong to. Fallbacks counts the
+// ranked models that failed before this one.
+func recordAutoRouteFallback(ctx context.Context, alternate *types.AutoRouteCandidate) {
+	decision := types.AutoRouteDecisionFromContext(ctx)
+	if decision == nil || alternate == nil {
+		return
+	}
+	decision.ModelID = alternate.ModelID
+	decision.BenchmarkID = alternate.BenchmarkID
+	decision.Rank = alternate.Rank
+	decision.Fallbacks++
+}
+
+// chatAlternateSatisfiesPlanGates refuses an alternate whose use would rest
+// on a plan-phase decision this request never made for it.
+//
+//   - Balance is checked per tenant, so a decision already taken covers any
+//     model; but a primary that skips the check leaves the request with no
+//     decision at all, which cannot be extended to a model that needs one.
+//   - Content safety is decided twice for a request, and both decisions are
+//     made before the first attempt: the plan phase checks the prompt, and
+//     the handler enables stream-time output moderation. Both were made for
+//     the primary model, so an alternate enrolled in checking is usable
+//     only when the primary was enrolled too — otherwise output moderation
+//     is switched off for a model that requires it — and only behind the
+//     same provider, since the whitelist targets are built from it.
+func chatAlternateSatisfiesPlanGates(alternate, primary *resolvedModelTarget, p *types.RequestPlan) error {
+	if !alternate.Model.SkipBalance() && (p == nil || !p.BalanceOK) {
+		return fmt.Errorf("model %q needs a balance check this request has not made", alternate.Model.ID)
+	}
+	if alternate.Model.NeedSensitiveCheck {
+		if !primary.Model.NeedSensitiveCheck {
+			return fmt.Errorf("model %q is enrolled in content-safety checking, which this request did not enable", alternate.Model.ID)
+		}
+		if alternate.Upstream.Provider != primary.Upstream.Provider {
+			return fmt.Errorf("model %q needs a content-safety check against provider %q, which this request has not made",
+				alternate.Model.ID, alternate.Upstream.Provider)
+		}
+	}
+	return nil
+}
+
+// chatAlternateBackendURL recomputes protocol routing for the alternate.
+// The plan's BackendURL belongs to the model it resolved, so reusing it
+// would send this protocol's body to an upstream that may not speak it;
+// a protocol the alternate does not serve at all is refused outright.
+func chatAlternateBackendURL(alternate *resolvedModelTarget, clientProtocol types.Protocol) (string, error) {
+	if strings.TrimSpace(string(clientProtocol)) == "" {
+		clientProtocol = types.ProtocolChat
+	}
+	decision, err := protocol.ResolveRouting(clientProtocol, protocol.RoutingTarget{
+		ModelID:            alternate.Model.ID,
+		Target:             alternate.Target,
+		CSGHubHosted:       alternate.Model.SvcName != "",
+		RuntimeFramework:   alternate.Model.RuntimeFramework,
+		ImageID:            alternate.Model.ImageID,
+		ProtocolOverride:   alternate.Upstream.MetadataProtocol(),
+		SupportedEndpoints: alternate.Upstream.SupportedEndpoints,
+		IsFullURL:          alternate.Upstream.IsFullURL,
+	})
+	if err != nil {
+		return "", err
+	}
+	if decision.Mode == protocol.ModeDisabled {
+		return "", fmt.Errorf("protocol %s is not available for model %q", clientProtocol, alternate.Model.ID)
+	}
+	if decision.BackendURL == "" {
+		return alternate.Target, nil
+	}
+	return decision.BackendURL, nil
 }
 
 // preComputeUsage synchronously calls counter.Usage() with a short timeout
@@ -632,7 +934,7 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 		}
 
 		if usage != nil && isSuccessfulStatus(input.StatusCode) {
-			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, usage, input.ApiKey, input.TokenID); err != nil {
+			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, usage, input.TokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 			}
 		}
@@ -665,15 +967,30 @@ func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResp
 	if err != nil {
 		return nil, err
 	}
+	// Only a request that asked the gateway to choose its model is capped:
+	// it cannot know which model will serve the turn, so an oversized
+	// max_tokens it could not have sized is the gateway's to correct. A
+	// request that named its model is left to the caller, who can size the
+	// field against the model they picked.
+	if p != nil && p.AutoRoute != nil {
+		body = types.CapMaxTokens(body, modelTarget.ModelName)
+	}
 	proxyToAPI := resolveProxyPathFromModelEndpoint(modelTarget.Model.Endpoint, modelTarget.ModelName)
-	rp, err := proxy.NewReverseProxy(modelTarget.Target)
+	observation := component.ObserveRouteCall(c.Request.Context(), types.RouteCallTarget{Model: modelTarget.Model.ID, UpstreamID: modelTarget.Upstream.ID, Protocol: "chat"}, body)
+	options := []proxy.ReverseProxyOption{proxy.WithResponseModifier(observation.Modify)}
+	if observation.Enabled() {
+		options = append(options, proxy.WithoutAcceptEncoding())
+	}
+	rp, err := proxy.NewReverseProxy(modelTarget.Target, options...)
 	if err != nil {
+		observation.Finish(err)
 		return nil, err
 	}
 	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 	c.Request.ContentLength = int64(len(body))
-	retryWriter := newChatRetryResponseWriter(w)
-	rp.ServeHTTP(retryWriter, c.Request, proxyToAPI, modelTarget.Host)
+	retryWriter := newChatRetryResponseWriterWithClientErrors(w, p.AutoRouteAlternatesRemaining() > 0)
+	proxyErr := rp.(proxy.ErrorReportingReverseProxy).ServeHTTPWithError(retryWriter, c.Request, proxyToAPI, modelTarget.Host)
+	observation.Finish(proxyErr)
 	return retryWriter, nil
 }
 
@@ -727,6 +1044,9 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 		// - on success or any non-retryable result, ReplayBufferedResponse becomes a no-op if the response
 		//   was already streamed/committed to downstream.
 		if isLastFallback || !retryable {
+			if chatFailureDeferredToAnotherModel(p, retryWriter) {
+				return retryWriter, nil
+			}
 			return retryWriter, retryWriter.ReplayBufferedResponse()
 		}
 	}

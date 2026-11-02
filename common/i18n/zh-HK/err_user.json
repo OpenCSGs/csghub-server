@@ -61,5 +61,32 @@
     },
     "error.USER-ERR-9": {
         "other": "驗證碼不能為空"
+    },
+    "error.USER-ERR-22": {
+        "other": "姓名或身份證號碼格式不正確"
+    },
+    "error.USER-ERR-23": {
+        "other": "認證記錄不存在"
+    },
+    "error.USER-ERR-24": {
+        "other": "已完成認證，或認證記錄已更新，請重新整理後重試"
+    },
+    "error.USER-ERR-25": {
+        "other": "請求過於頻繁，請稍後重試"
+    },
+    "error.USER-ERR-26": {
+        "other": "實名認證服務暫不可用"
+    },
+    "error.USER-ERR-27": {
+        "other": "認證資訊不被接受或流程已失效，請檢查後重試"
+    },
+    "error.USER-ERR-28": {
+        "other": "認證初始化已逾時，請重新發起"
+    },
+    "error.USER-ERR-29": {
+        "other": "認證結果待確認，請稍後重試"
+    },
+    "error.USER-ERR-30": {
+        "other": "認證未通過或已逾時，請重新發起"
     }
 }

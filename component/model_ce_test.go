@@ -29,8 +29,8 @@ func TestModelComponent_Deploy(t *testing.T) {
 		nil, nil,
 	)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-		UUID:     "user-uuid",
+		RoleAssignments: superAdminRoleAssignments(),
+		UUID:            "user-uuid",
 	}, nil)
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
 		&database.RuntimeFramework{}, nil,
@@ -82,7 +82,7 @@ func TestModelComponent_Deploy_OwnerNamespace_BillingUUIDError(t *testing.T) {
 	}, nil)
 	mc.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(1)).Return(nil, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(&database.RuntimeFramework{}, nil)
 	// Explicit OwnerNamespace: resolve billing UUID for "org1" fails (Deploy returns before FindByID)
@@ -117,8 +117,8 @@ func TestModelComponent_Deploy_InferenceType_DuplicateName(t *testing.T) {
 		},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-		UUID:     "user-uuid",
+		RoleAssignments: superAdminRoleAssignments(),
+		UUID:            "user-uuid",
 	}, nil)
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
 		&database.RuntimeFramework{}, nil,
@@ -157,8 +157,8 @@ func TestModelComponent_Deploy_InferenceType_NoDuplicate(t *testing.T) {
 		},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-		UUID:     "user-uuid",
+		RoleAssignments: superAdminRoleAssignments(),
+		UUID:            "user-uuid",
 	}, nil)
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
 		&database.RuntimeFramework{}, nil,

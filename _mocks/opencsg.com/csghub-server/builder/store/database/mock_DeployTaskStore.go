@@ -2544,6 +2544,231 @@ func (_c *MockDeployTaskStore_UpdateDeploy_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// UpdateDeployColumnsIfNotDeleted provides a mock function with given fields: ctx, deploy, columns
+func (_m *MockDeployTaskStore) UpdateDeployColumnsIfNotDeleted(ctx context.Context, deploy *database.Deploy, columns ...string) (bool, error) {
+	_va := make([]interface{}, len(columns))
+	for _i := range columns {
+		_va[_i] = columns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, deploy)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateDeployColumnsIfNotDeleted")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Deploy, ...string) (bool, error)); ok {
+		return rf(ctx, deploy, columns...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Deploy, ...string) bool); ok {
+		r0 = rf(ctx, deploy, columns...)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *database.Deploy, ...string) error); ok {
+		r1 = rf(ctx, deploy, columns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateDeployColumnsIfNotDeleted'
+type MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call struct {
+	*mock.Call
+}
+
+// UpdateDeployColumnsIfNotDeleted is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deploy *database.Deploy
+//   - columns ...string
+func (_e *MockDeployTaskStore_Expecter) UpdateDeployColumnsIfNotDeleted(ctx interface{}, deploy interface{}, columns ...interface{}) *MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call {
+	return &MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call{Call: _e.mock.On("UpdateDeployColumnsIfNotDeleted",
+		append([]interface{}{ctx, deploy}, columns...)...)}
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call) Run(run func(ctx context.Context, deploy *database.Deploy, columns ...string)) *MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]string, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(string)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*database.Deploy), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call) Return(_a0 bool, _a1 error) *MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call) RunAndReturn(run func(context.Context, *database.Deploy, ...string) (bool, error)) *MockDeployTaskStore_UpdateDeployColumnsIfNotDeleted_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateDeploySpec provides a mock function with given fields: ctx, deploy
+func (_m *MockDeployTaskStore) UpdateDeploySpec(ctx context.Context, deploy *database.Deploy) error {
+	ret := _m.Called(ctx, deploy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateDeploySpec")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Deploy) error); ok {
+		r0 = rf(ctx, deploy)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployTaskStore_UpdateDeploySpec_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateDeploySpec'
+type MockDeployTaskStore_UpdateDeploySpec_Call struct {
+	*mock.Call
+}
+
+// UpdateDeploySpec is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deploy *database.Deploy
+func (_e *MockDeployTaskStore_Expecter) UpdateDeploySpec(ctx interface{}, deploy interface{}) *MockDeployTaskStore_UpdateDeploySpec_Call {
+	return &MockDeployTaskStore_UpdateDeploySpec_Call{Call: _e.mock.On("UpdateDeploySpec", ctx, deploy)}
+}
+
+func (_c *MockDeployTaskStore_UpdateDeploySpec_Call) Run(run func(ctx context.Context, deploy *database.Deploy)) *MockDeployTaskStore_UpdateDeploySpec_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.Deploy))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_UpdateDeploySpec_Call) Return(_a0 error) *MockDeployTaskStore_UpdateDeploySpec_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_UpdateDeploySpec_Call) RunAndReturn(run func(context.Context, *database.Deploy) error) *MockDeployTaskStore_UpdateDeploySpec_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateDeployStatus provides a mock function with given fields: ctx, deployID, status
+func (_m *MockDeployTaskStore) UpdateDeployStatus(ctx context.Context, deployID int64, status int) error {
+	ret := _m.Called(ctx, deployID, status)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateDeployStatus")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int) error); ok {
+		r0 = rf(ctx, deployID, status)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployTaskStore_UpdateDeployStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateDeployStatus'
+type MockDeployTaskStore_UpdateDeployStatus_Call struct {
+	*mock.Call
+}
+
+// UpdateDeployStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deployID int64
+//   - status int
+func (_e *MockDeployTaskStore_Expecter) UpdateDeployStatus(ctx interface{}, deployID interface{}, status interface{}) *MockDeployTaskStore_UpdateDeployStatus_Call {
+	return &MockDeployTaskStore_UpdateDeployStatus_Call{Call: _e.mock.On("UpdateDeployStatus", ctx, deployID, status)}
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployStatus_Call) Run(run func(ctx context.Context, deployID int64, status int)) *MockDeployTaskStore_UpdateDeployStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployStatus_Call) Return(_a0 error) *MockDeployTaskStore_UpdateDeployStatus_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployStatus_Call) RunAndReturn(run func(context.Context, int64, int) error) *MockDeployTaskStore_UpdateDeployStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateDeployStatusCAS provides a mock function with given fields: ctx, deploy, expectedStatus
+func (_m *MockDeployTaskStore) UpdateDeployStatusCAS(ctx context.Context, deploy *database.Deploy, expectedStatus int) (bool, error) {
+	ret := _m.Called(ctx, deploy, expectedStatus)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateDeployStatusCAS")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Deploy, int) (bool, error)); ok {
+		return rf(ctx, deploy, expectedStatus)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Deploy, int) bool); ok {
+		r0 = rf(ctx, deploy, expectedStatus)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *database.Deploy, int) error); ok {
+		r1 = rf(ctx, deploy, expectedStatus)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_UpdateDeployStatusCAS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateDeployStatusCAS'
+type MockDeployTaskStore_UpdateDeployStatusCAS_Call struct {
+	*mock.Call
+}
+
+// UpdateDeployStatusCAS is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deploy *database.Deploy
+//   - expectedStatus int
+func (_e *MockDeployTaskStore_Expecter) UpdateDeployStatusCAS(ctx interface{}, deploy interface{}, expectedStatus interface{}) *MockDeployTaskStore_UpdateDeployStatusCAS_Call {
+	return &MockDeployTaskStore_UpdateDeployStatusCAS_Call{Call: _e.mock.On("UpdateDeployStatusCAS", ctx, deploy, expectedStatus)}
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployStatusCAS_Call) Run(run func(ctx context.Context, deploy *database.Deploy, expectedStatus int)) *MockDeployTaskStore_UpdateDeployStatusCAS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.Deploy), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployStatusCAS_Call) Return(_a0 bool, _a1 error) *MockDeployTaskStore_UpdateDeployStatusCAS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_UpdateDeployStatusCAS_Call) RunAndReturn(run func(context.Context, *database.Deploy, int) (bool, error)) *MockDeployTaskStore_UpdateDeployStatusCAS_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateDeployTask provides a mock function with given fields: ctx, deployTask
 func (_m *MockDeployTaskStore) UpdateDeployTask(ctx context.Context, deployTask *database.DeployTask) error {
 	ret := _m.Called(ctx, deployTask)

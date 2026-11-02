@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/common/i18n"
 )
 
+// ModifyAcceptLanguageMiddleware selects a loaded language resource for valid Accept-Language variants.
 func ModifyAcceptLanguageMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Check if the Accept-Language header is set
@@ -22,18 +23,16 @@ func ModifyAcceptLanguageMiddleware() gin.HandlerFunc {
 		if acceptLanguage == "" {
 			acceptLanguage = "en-US"
 		}
-		var lang language.Tag
+		lang := language.AmericanEnglish.String()
 		tags, _, err := language.ParseAcceptLanguage(acceptLanguage)
 		if err != nil {
 			slog.ErrorContext(c.Request.Context(), "parse Accept-Language header, LocalizedErrorMiddleware", slog.String("err", err.Error()))
-			lang = language.AmericanEnglish // default to English if parsing fails
-		} else {
-			lang, _, _ = i18n.Matcher.Match(tags...)
-			if lang == language.Und {
-				lang = language.AmericanEnglish // default to English if no match found
-			}
+		} else if i18n.Matcher != nil && len(i18n.SupportedLanguages) > 0 {
+			// The matched tag can contain locale extensions; its index selects the loaded resource.
+			_, index, _ := i18n.Matcher.Match(tags...)
+			lang = i18n.SupportedLanguages[index].String()
 		}
-		c.Request.Header.Set("Accept-Language", lang.String())
+		c.Request.Header.Set("Accept-Language", lang)
 		c.Next()
 	}
 }

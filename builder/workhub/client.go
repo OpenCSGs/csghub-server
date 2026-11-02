@@ -19,9 +19,9 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// workClientRescueStuckJobsAfter is the minimum running duration before River
-// considers a job eligible for stuck-job rescue.
-const workClientRescueStuckJobsAfter = MirrorLFSJobTimeout + (5 * time.Minute)
+// workClientRescueStuckJobsAfter is the shared rescue threshold for unleased jobs.
+// Leased jobs use their expiry and grace period independently of this threshold.
+const workClientRescueStuckJobsAfter = 10 * time.Minute
 
 const (
 	// defaultJobMaxAttempts allows one initial execution and three retries.
@@ -40,6 +40,8 @@ type JobClient interface {
 	Insert(ctx context.Context, args JobArgs, opts *InsertOpts) (int64, error)
 	// InsertTx enqueues a job atomically inside an existing database transaction.
 	InsertTx(ctx context.Context, tx *sql.Tx, args JobArgs, opts *InsertOpts) (int64, error)
+	// InsertManyTx enqueues a batch atomically using one business transaction.
+	InsertManyTx(ctx context.Context, tx *sql.Tx, params []InsertManyParams) ([]int64, error)
 	// JobCancelTx cancels a job atomically inside an existing database transaction.
 	JobCancelTx(ctx context.Context, tx *sql.Tx, jobID int64) error
 }
@@ -58,6 +60,12 @@ type WorkClient interface {
 
 // JobArgs is the River job payload contract accepted by workhub queue clients.
 type JobArgs = river.JobArgs
+
+// InsertManyParams pairs each batch payload with its enqueue options.
+type InsertManyParams struct {
+	Args JobArgs
+	Opts *InsertOpts
+}
 
 // InsertOpts mirrors river.InsertOpts so callers do not need to import River
 // when they only enqueue workhub jobs.
@@ -136,6 +144,7 @@ type workClient struct {
 func NewJobClient(_ context.Context, db *bun.DB) (JobClient, error) {
 	client, err := river.NewClient(riverdatabasesql.New(db.DB), &river.Config{
 		SkipUnknownJobCheck: true,
+		Sequences:           river.SequenceConfig{AcceptNewJobs: true},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create workhub client: %w", err)
@@ -188,6 +197,29 @@ func (c *jobClient) InsertTx(ctx context.Context, tx *sql.Tx, args JobArgs, opts
 	return result.Job.ID, nil
 }
 
+// InsertManyTx lets River lock all sequence groups in one stable order.
+func (c *jobClient) InsertManyTx(ctx context.Context, tx *sql.Tx, params []InsertManyParams) ([]int64, error) {
+	if len(params) == 0 {
+		return nil, nil
+	}
+	if tx == nil {
+		return nil, fmt.Errorf("batch enqueue requires a business transaction")
+	}
+	batch := make([]river.InsertManyParams, len(params))
+	for i, param := range params {
+		batch[i] = river.InsertManyParams{Args: param.Args, InsertOpts: param.Opts.riverInsertOpts()}
+	}
+	results, err := c.client.InsertManyTx(ctx, tx, batch)
+	if err != nil {
+		return nil, fmt.Errorf("insert workhub batch in transaction: %w", err)
+	}
+	ids := make([]int64, len(results))
+	for i, result := range results {
+		ids[i] = result.Job.ID
+	}
+	return ids, nil
+}
+
 // JobCancelTx cancels a job with River in an existing database/sql transaction.
 func (c *jobClient) JobCancelTx(ctx context.Context, tx *sql.Tx, jobID int64) error {
 	if _, err := c.client.JobCancelTx(ctx, tx, jobID); err != nil {
@@ -199,9 +231,9 @@ func (c *jobClient) JobCancelTx(ctx context.Context, tx *sql.Tx, jobID int64) er
 	return nil
 }
 
-// RemoveQueue stops one queue producer on this client and waits for claimed work to exit.
+// RemoveQueue cooperatively pauses local claims and waits for their results before removing the producer.
 func (c *workClient) RemoveQueue(ctx context.Context, queue string) error {
-	return c.client.Queues().Remove(ctx, queue)
+	return c.client.Queues().Remove(ctx, queue, &river.QueueRemoveOpts{PauseRunning: true})
 }
 
 // AddQueue starts one queue producer on this client.

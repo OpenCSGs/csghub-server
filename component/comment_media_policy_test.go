@@ -23,7 +23,7 @@ const (
 
 func newTestPolicy(t *testing.T, enabled bool, images SensitiveComponent, media MediaModerationComponent) CommentMediaPolicy {
 	t.Helper()
-	return NewCommentMediaPolicy(enabled, policyBucket, policyEndpoint, 3, images, media)
+	return NewCommentMediaPolicy(enabled, policyBucket, policyEndpoint, "", 3, images, media)
 }
 
 func TestCommentMediaPolicy_DisabledReturnsPass(t *testing.T) {
@@ -192,7 +192,7 @@ func TestCommentMediaPolicy_AllPass(t *testing.T) {
 }
 
 func TestCommentMediaPolicy_TooManyRefsErrors(t *testing.T) {
-	policy := NewCommentMediaPolicy(true, policyBucket, policyEndpoint, 1, nil, nil)
+	policy := NewCommentMediaPolicy(true, policyBucket, policyEndpoint, "", 1, nil, nil)
 	content := `<audio src="` + policyAudioURL + `"></audio><video src="` + policyVideoURL + `"></video>`
 	decision, err := policy.Check(context.Background(), content)
 	require.Error(t, err)
@@ -209,7 +209,7 @@ func TestCommentMediaPolicy_ExternalAudioRejected(t *testing.T) {
 func TestCommentMediaPolicy_ImageLimitCheckedBeforeExternalCalls(t *testing.T) {
 	images := mockcomponent.NewMockSensitiveComponent(t)
 	media := mockcomponent.NewMockMediaModerationComponent(t)
-	policy := newCommentMediaPolicy(true, true, policyBucket, policyEndpoint, 1, 1, 2, images, media)
+	policy := newCommentMediaPolicy(true, true, policyBucket, policyEndpoint, "", 1, 1, 2, images, media)
 	content := `![a](` + policyImageURL + `)![b](https://opencsg-public-resource.cdn.example.com/image/44444444-4444-4444-8444-444444444444.png)`
 
 	decision, err := policy.Check(context.Background(), content)
@@ -222,7 +222,7 @@ func TestCommentMediaPolicy_ImageLimitCheckedBeforeExternalCalls(t *testing.T) {
 func TestCommentMediaPolicy_TotalLimitCheckedBeforeExternalCalls(t *testing.T) {
 	images := mockcomponent.NewMockSensitiveComponent(t)
 	media := mockcomponent.NewMockMediaModerationComponent(t)
-	policy := newCommentMediaPolicy(true, true, policyBucket, policyEndpoint, 2, 2, 1, images, media)
+	policy := newCommentMediaPolicy(true, true, policyBucket, policyEndpoint, "", 2, 2, 1, images, media)
 	content := `![a](` + policyImageURL + `)<audio src="` + policyAudioURL + `"></audio>`
 
 	decision, err := policy.Check(context.Background(), content)
@@ -258,7 +258,7 @@ func TestCommentMediaPolicy_CheckUpdateAllowsApprovedAudio(t *testing.T) {
 }
 
 func TestCommentMediaPolicy_ValidationErrorIsIdentifiable(t *testing.T) {
-	policy := newCommentMediaPolicy(true, true, policyBucket, policyEndpoint, 1, 1, 1, nil, nil)
+	policy := newCommentMediaPolicy(true, true, policyBucket, policyEndpoint, "", 1, 1, 1, nil, nil)
 	content := `<audio src="` + policyAudioURL + `"></audio><video src="` + policyVideoURL + `"></video>`
 
 	decision, err := policy.Check(context.Background(), content)

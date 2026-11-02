@@ -28,6 +28,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	sharedcomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/mirror/cache"
 	"opencsg.com/csghub-server/mirror/hook"
 	"opencsg.com/csghub-server/mirror/reposyncer"
@@ -146,6 +147,7 @@ func (p *mirrorTaskByteProgress) addObjectBytes(ctx context.Context, oid string,
 	if uploadedBytes > remaining {
 		uploadedBytes = remaining
 	}
+	sharedcomponent.MirrorMetricsAddPart(ctx, oid, objectSize, uploadedBytes)
 	p.objectBytes[oid] = credited + uploadedBytes
 	p.uploadedBytes += uploadedBytes
 	if p.uploadedBytes > p.totalBytes {
@@ -205,12 +207,20 @@ func NewLfsSyncWorker(config *config.Config) (*LfsSyncWorker, error) {
 	w.mirrorTaskStore = database.NewMirrorTaskStore()
 	w.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	w.config = config
-	w.ossClient, err = s3.NewMinio(config)
+	var storageOptions []s3.ClientOption
+	if config.Mirror.Metrics.Enabled {
+		transport, err := minio.DefaultTransport(config.S3.EnableSSL)
+		if err != nil {
+			return nil, fmt.Errorf("initializing S3 metrics transport: %w", err)
+		}
+		storageOptions = append(storageOptions, s3.WithTransport(sharedcomponent.MirrorMetricsUploadTransport(transport)))
+	}
+	w.ossClient, err = s3.NewMinio(config, storageOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("initializing minio: %w", err)
 	}
 
-	w.ossCore, err = s3.NewMinioCore(config)
+	w.ossCore, err = s3.NewMinioCore(config, storageOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("initializing minio core: %w", err)
 	}
@@ -256,6 +266,7 @@ func NewLfsSyncWorker(config *config.Config) (*LfsSyncWorker, error) {
 // SyncLFS refreshes LFS metadata for the synced commit, then downloads missing
 // objects and publishes the repository head.
 func (w *LfsSyncWorker) SyncLFS(ctx context.Context, mt *database.MirrorTask) error {
+	sharedcomponent.MirrorMetricsOperation(ctx, "scan_lfs")
 	ctx = w.withLFSContext(ctx, mt)
 	if err := w.refreshLfsMetaObjects(ctx, mt); err != nil {
 		return err
@@ -408,6 +419,7 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 		}
 	}
 
+	sharedcomponent.MirrorMetricsOperation(ctx, "publish")
 	// Publish the synced commit and trigger the git push callback so
 	// downstream handlers run. Shared with the repo-sync no-LFS fast path.
 	namespace, name, err := common.GetNamespaceAndNameFromPath(repo.Path)
@@ -430,6 +442,7 @@ func (w *LfsSyncWorker) getSyncPointers(
 	ctx context.Context,
 	mt *database.MirrorTask,
 ) ([]*types.Pointer, error) {
+	sharedcomponent.MirrorMetricsOperation(ctx, "check_objects")
 	var pointers []*types.Pointer
 	// Query all lfsMetaObjects to generate the &types.Pointer slice
 	lfsMetaObjects, err := w.lfsMetaObjectStore.FindByRepoID(ctx, mt.Mirror.Repository.ID)
@@ -448,15 +461,18 @@ func (w *LfsSyncWorker) getSyncPointers(
 	)
 
 	if len(lfsMetaObjects) == 0 {
+		sharedcomponent.MirrorMetricsInitProgress(ctx, 0, 0, 0, 0)
 		loggerFromLFSContext(ctx).InfoContext(ctx, "no lfs files to sync, finish sync lfs")
 		return pointers, nil
 	}
 
 	var (
-		existingOIDs []string
-		missingOIDs  []string
+		existingOIDs              []string
+		missingOIDs               []string
+		totalBytes, completeBytes int64
 	)
 	for _, lfsMetaObject := range lfsMetaObjects {
+		totalBytes += max(lfsMetaObject.Size, 0)
 		objectKey := common.BuildLfsPath(repo.ID, lfsMetaObject.Oid, repo.Migrated)
 		exists, err := w.CheckIfLFSFileExists(ctx, objectKey, lfsMetaObject.Size)
 		if err != nil {
@@ -469,6 +485,7 @@ func (w *LfsSyncWorker) getSyncPointers(
 			return pointers, fmt.Errorf("failed to check if lfs file exists: %w", err)
 		}
 		if exists {
+			completeBytes += max(lfsMetaObject.Size, 0)
 			existingOIDs = append(existingOIDs, lfsMetaObject.Oid)
 		} else {
 			missingOIDs = append(missingOIDs, lfsMetaObject.Oid)
@@ -493,6 +510,8 @@ func (w *LfsSyncWorker) getSyncPointers(
 		)
 		return pointers, fmt.Errorf("failed to update lfs meta objects: %w", err)
 	}
+
+	sharedcomponent.MirrorMetricsInitProgress(ctx, totalBytes, completeBytes, len(lfsMetaObjects), len(existingOIDs))
 
 	if len(pointers) == 0 {
 		loggerFromLFSContext(ctx).InfoContext(ctx, "no lfs files to sync, finish sync lfs")
@@ -570,6 +589,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 		default:
 		}
 
+		sharedcomponent.MirrorMetricsOperation(ctx, "resolve_urls")
 		pointers, err := w.GetLFSDownloadURLs(
 			ctx, mirror.SourceUrl, repo.DefaultBranch, mirror.Username, mirror.AccessToken, pointers,
 		)
@@ -590,6 +610,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 			default:
 			}
 
+			sharedcomponent.MirrorMetricsOperation(ctx, "transfer")
 			err := w.downloadAndUploadLFSFile(ctx, repo, pointer, progress)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
@@ -653,6 +674,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	}
 
 	if exists {
+		sharedcomponent.MirrorMetricsCompleteObject(ctx, pointer.Oid, pointer.Size)
 		return nil
 	}
 
@@ -666,17 +688,18 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	if w.config.Mirror.PartSize <= 0 {
 		return fmt.Errorf("LFS multipart part size must be positive: %d", w.config.Mirror.PartSize)
 	}
-	partSize := int64(w.config.Mirror.PartSize) * 1024 * 1024
-	if pointer.Size/partSize > int64(maxPartNum) {
-		partSize = pointer.Size / int64(maxPartNum)
-	}
+	partSize := common.LfsPartSize(w.config.Mirror.PartSize, pointer.Size)
+	// The cache key encodes the effective partSize so a change in the partSize
+	// computation forces a fresh upload instead of resuming one whose existing
+	// parts were uploaded with different byte boundaries.
+	partSizeKey := strconv.FormatInt(partSize, 10)
 	repoPath := ctx.Value(rk).(string)
 
 	if pointer.Size <= partSize {
 		return w.downloadAndUploadSmallFile(ctx, repo, pointer, objectKey)
 	}
 
-	uploadID, err = w.syncCache.GetUploadID(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+	uploadID, err = w.syncCache.GetUploadID(ctx, repo.ID, pointer.Oid, partSizeKey)
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			loggerFromLFSContext(ctx).InfoContext(ctx, "upload lfs cache miss",
@@ -706,7 +729,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 			return fmt.Errorf("failed to create new multipart upload: %w", err)
 		}
 
-		err = w.syncCache.CacheUploadID(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), uploadID)
+		err = w.syncCache.CacheUploadID(ctx, repo.ID, pointer.Oid, partSizeKey, uploadID)
 		if err != nil {
 			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to cache upload id",
@@ -735,19 +758,21 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		return fmt.Errorf("failed to upload object: %w", err)
 	}
 
+	sharedcomponent.MirrorMetricsOperation(ctx, "verify_object")
 	info, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to stat object %s: %w", objectKey, err)
 	}
 
 	if info.Size != pointer.Size {
+		sharedcomponent.MirrorMetricsResetObject(ctx, pointer.Oid)
 		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"object size mismatch",
 			slog.Any("objectKey", objectKey),
 			slog.Any("expectedSize", pointer.Size),
 			slog.Any("actualSize", info.Size),
 		)
-		err := w.syncCache.DeleteUploadID(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+		err := w.syncCache.DeleteUploadID(ctx, repo.ID, pointer.Oid, partSizeKey)
 		if err != nil {
 			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to delete upload id",
@@ -758,7 +783,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		}
 
 		// delete the object if upload failed
-		err = w.syncCache.DeleteLfsPartCache(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+		err = w.syncCache.DeleteLfsPartCache(ctx, repo.ID, pointer.Oid, partSizeKey)
 		if err != nil {
 			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to delete lfs part cache",
@@ -768,7 +793,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		}
 
 		// Reset lfs upload progress
-		err = w.syncCache.CacheLfsSyncFileProgress(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), 0)
+		err = w.syncCache.CacheLfsSyncFileProgress(ctx, repo.ID, pointer.Oid, partSizeKey, 0)
 		if err != nil {
 			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to reset lfs upload progress",
@@ -792,6 +817,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 			repoPath, pointer.Oid, info.Size, pointer.Size)
 	}
 
+	sharedcomponent.MirrorMetricsCompleteObject(ctx, pointer.Oid, pointer.Size)
 	lmo.Existing = true
 	_, err = w.lfsMetaObjectStore.UpdateOrCreate(ctx, lmo)
 	if err != nil {
@@ -805,7 +831,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	}
 
 	// delete all cache if upload success
-	err = w.syncCache.DeleteLfsSyncFileCache(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+	err = w.syncCache.DeleteLfsSyncFileCache(ctx, repo.ID, pointer.Oid, partSizeKey)
 	if err != nil {
 		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to delete all cache",
@@ -827,6 +853,26 @@ func acquireUploadSlot(ctx context.Context, slots <-chan struct{}) error {
 	}
 }
 
+// listAllObjectParts aggregates every uploaded part for a multipart upload,
+// following S3/MinIO pagination. A single ListObjectParts call returns at most
+// 1000 parts, so uploads that ever exceed that cap would otherwise be reported
+// as incomplete and never complete.
+func (w *LfsSyncWorker) listAllObjectParts(ctx context.Context, objectKey, uploadID string) (minio.ListObjectPartsResult, error) {
+	var result minio.ListObjectPartsResult
+	var partNumberMarker int
+	for {
+		page, err := w.ossCore.ListObjectParts(ctx, w.config.S3.Bucket, objectKey, uploadID, partNumberMarker, 0)
+		if err != nil {
+			return result, err
+		}
+		result.ObjectParts = append(result.ObjectParts, page.ObjectParts...)
+		if !page.IsTruncated {
+			return result, nil
+		}
+		partNumberMarker = page.NextPartNumberMarker
+	}
+}
+
 func (w *LfsSyncWorker) multipartUploadWithRetry(
 	ctx context.Context,
 	partSize int64,
@@ -842,6 +888,9 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	if partSize <= 0 {
 		return fmt.Errorf("LFS multipart part size must be positive: %d", partSize)
 	}
+	// The cache key encodes the effective partSize so a partSize change forces a
+	// fresh upload instead of resuming one with mismatched part boundaries.
+	partSizeKey := strconv.FormatInt(partSize, 10)
 
 	var parts []minio.CompletePart
 	eg, egCtx := errgroup.WithContext(ctx)
@@ -861,7 +910,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	partNumber0 := 1
 	totalParts := int(math.Ceil(float64(totalSize) / float64(partSize)))
 
-	uploadedParts, err := w.ossCore.ListObjectParts(ctx, w.config.S3.Bucket, objectKey, uploadID, 0, 0)
+	uploadedParts, err := w.listAllObjectParts(ctx, objectKey, uploadID)
 	if err != nil {
 		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to list object parts",
@@ -901,7 +950,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 
 	// Refresh cache progress
 	progress := float64(len(uploadedParts.ObjectParts)) / float64(totalParts) * 100
-	err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), int(progress))
+	err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoID, pointer.Oid, partSizeKey, int(progress))
 	if err != nil {
 		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to cache progress",
@@ -938,7 +987,7 @@ scheduleParts:
 				}
 
 				synced, _ := w.syncCache.IsLfsPartSynced(
-					ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber,
+					ctx, repoID, pointer.Oid, partSizeKey, partNumber,
 				)
 				if synced {
 					return nil
@@ -987,7 +1036,7 @@ scheduleParts:
 				)
 
 				// Cache the part uploaded
-				err = w.syncCache.CacheLfsSyncAddPart(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber)
+				err = w.syncCache.CacheLfsSyncAddPart(ctx, repoID, pointer.Oid, partSizeKey, partNumber)
 				if err != nil {
 					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to add part to cache",
@@ -999,7 +1048,7 @@ scheduleParts:
 				}
 
 				// Count progress
-				uploadedPartCount, err := w.syncCache.LfsPartSyncedCount(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+				uploadedPartCount, err := w.syncCache.LfsPartSyncedCount(ctx, repoID, pointer.Oid, partSizeKey)
 				if err != nil {
 					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to count uploaded parts",
@@ -1009,7 +1058,7 @@ scheduleParts:
 					)
 				}
 				progress := float64(uploadedPartCount) / float64(totalParts) * 100
-				err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), int(progress))
+				err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoID, pointer.Oid, partSizeKey, int(progress))
 				if err != nil {
 					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to cache progress",
@@ -1038,7 +1087,7 @@ scheduleParts:
 		return fmt.Errorf("failed to download and upload lfs file: %w", err)
 	}
 
-	result, err := w.ossCore.ListObjectParts(ctx, w.config.S3.Bucket, objectKey, uploadID, 0, 0)
+	result, err := w.listAllObjectParts(ctx, objectKey, uploadID)
 	if err != nil {
 		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to list object parts",
@@ -1052,7 +1101,7 @@ scheduleParts:
 	if len(result.ObjectParts) != totalParts {
 		// If the number of parts in OSS is more than the parts we caculated, should delete the uploadID and retry the upload
 		if len(result.ObjectParts) > totalParts {
-			err := w.syncCache.DeleteUploadID(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+			err := w.syncCache.DeleteUploadID(ctx, repoID, pointer.Oid, partSizeKey)
 			if err != nil {
 				loggerFromLFSContext(ctx).ErrorContext(ctx,
 					"failed to delete upload id",
@@ -1072,7 +1121,7 @@ scheduleParts:
 			_, ok := partNumberMapping[partNumber]
 			if !ok {
 				loggerFromLFSContext(ctx).ErrorContext(ctx, "part number missing", slog.Any("partNumber", partNumber), slog.Any("oid", pointer.Oid))
-				err := w.syncCache.DeleteSpecificLfsPartCache(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber)
+				err := w.syncCache.DeleteSpecificLfsPartCache(ctx, repoID, pointer.Oid, partSizeKey, partNumber)
 				if err != nil {
 					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to delete specific lfs part cache",
@@ -1152,6 +1201,7 @@ func (w *LfsSyncWorker) downloadAndUploadSmallFile(
 		return fmt.Errorf("failed to put object: %w", err)
 	}
 
+	sharedcomponent.MirrorMetricsOperation(ctx, "verify_object")
 	info, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to stat object %s: %w", objectKey, err)
@@ -1167,6 +1217,7 @@ func (w *LfsSyncWorker) downloadAndUploadSmallFile(
 			pointer.Oid, info.Size, pointer.Size)
 	}
 
+	sharedcomponent.MirrorMetricsCompleteObject(ctx, pointer.Oid, pointer.Size)
 	lmo := database.LfsMetaObject{
 		Size:         pointer.Size,
 		Oid:          pointer.Oid,
@@ -1342,6 +1393,7 @@ func (w *LfsSyncWorker) downloadRange(
 		return nil, &unexpectedHTTPStatusError{statusCode: resp.StatusCode}
 	}
 
+	resp.Body = sharedcomponent.MirrorMetricsWrapBody(ctx, resp.Body)
 	return resp, nil
 }
 

@@ -94,23 +94,33 @@ func TestCodeHandler_CreateMirrorAuthInvalid(t *testing.T) {
 	})
 }
 
-// TestCodeHandler_CreateMirrorSourceBadRequest verifies malformed mirror source URLs return a bad request.
+// TestCodeHandler_CreateMirrorSourceBadRequest verifies both generic and dedicated source URL errors return HTTP 400.
 func TestCodeHandler_CreateMirrorSourceBadRequest(t *testing.T) {
-	tester := NewCodeTester(t).WithHandleFunc(func(h *CodeHandler) gin.HandlerFunc {
-		return h.Create
-	})
-	tester.WithUser()
+	for _, tc := range []struct {
+		name string
+		err  error
+		code string
+	}{
+		{"generic request error", errorx.BadRequest(fmt.Errorf("invalid source git clone url"), errorx.Ctx()), "REQ-ERR-0"},
+		{"source URL error", errorx.MirrorSourceURLInvalid(fmt.Errorf("invalid source git clone url"), errorx.Ctx()), "MIRROR-ERR-8"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tester := NewCodeTester(t).WithHandleFunc(func(h *CodeHandler) gin.HandlerFunc {
+				return h.Create
+			})
+			tester.WithUser()
 
-	req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
-	badRequestErr := errorx.BadRequest(fmt.Errorf("invalid source git clone url"), errorx.Ctx())
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
-	tester.mocks.code.EXPECT().Create(tester.Ctx(), req).Return(nil, badRequestErr)
-	tester.WithBody(t, req).Execute()
+			req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+			tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+			tester.mocks.code.EXPECT().Create(tester.Ctx(), req).Return(nil, tc.err)
+			tester.WithBody(t, req).Execute()
 
-	tester.ResponseEqSimple(t, 400, httpbase.R{
-		Code: "REQ-ERR-0",
-		Msg:  "REQ-ERR-0: invalid source git clone url",
-	})
+			tester.ResponseEqSimple(t, 400, httpbase.R{
+				Code: tc.code,
+				Msg:  tc.code + ": invalid source git clone url",
+			})
+		})
+	}
 }
 
 func TestCodeHandler_Index(t *testing.T) {

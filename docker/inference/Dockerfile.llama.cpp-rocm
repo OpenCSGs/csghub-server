@@ -20,7 +20,6 @@ RUN for sourceFile in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/
         build-essential \
         cmake \
         git \
-        libcurl4-openssl-dev \
         libgomp1 \
         libssl-dev \
         python3 \
@@ -28,10 +27,10 @@ RUN for sourceFile in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/
-RUN git clone --depth 1 -b b9787 https://github.com/ggml-org/llama.cpp.git \
+RUN git clone --depth 1 -b b11785 https://gitee.com/xzgan/llama.cpp.git \
     && cd llama.cpp \
     && HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
-        cmake -S . -B build -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx803,gfx900,gfx906,gfx908,gfx90a,gfx942,gfx1010,gfx1030,gfx1032,gfx1100,gfx1101,gfx1102 -DLLAMA_CURL=ON -DBUILD_SHARED_LIBS=off -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        cmake -S . -B build -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx803,gfx900,gfx906,gfx908,gfx90a,gfx942,gfx1010,gfx1030,gfx1032,gfx1100,gfx1101,gfx1102 -DBUILD_SHARED_LIBS=off -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     && cmake --build build --config Release --target llama-cli llama-server -j$(nproc)
 
 FROM --platform=${ROCM_IMAGE_PLATFORM} docker.m.daocloud.io/rocm/pytorch:rocm7.2.2_ubuntu22.04_py3.10_pytorch_release_2.10.0 AS base

@@ -1,0 +1,55 @@
+# Use the Ubuntu 22.04 image with CANN 8.0.rc1
+# More versions can be found at https://hub.docker.com/r/cosdt/cann/tags
+FROM image.sourcefind.cn:5000/dcu/admin/base/pytorch:2.4.1-ubuntu22.04-dtk25.04-py3.10-fixpy
+
+# Define environments
+ENV DEBIAN_FRONTEND=noninteractive
+ENV SHELL=/bin/bash
+ENV JUPYTERHUB_SERVICE_PREFIX=/proxy/
+ENV GRADIO_ROOT_PATH=/proxy/7860/
+ENV TZ=Asia/Shanghai
+ENV NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1
+ENV HF_HOME=/workspace/.cache
+
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    apt-utils \
+    wget curl vim \
+    git git-lfs \
+    supervisor \
+    unzip
+# set timezone
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get install -y tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && dpkg-reconfigure -f noninteractive tzdata
+    
+# alias python='python3'
+#RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+
+# Install the appropriate torch version 
+RUN pip install --no-cache-dir jupyterlab jupyter-server-proxy==4.4.0 fastapi==0.112.2
+WORKDIR /etc/csghub
+RUN git clone --depth 1 https://developer.sourcefind.cn/codes/OpenDAS/llama-factory.git --single-branch -b master LLaMA-Factory
+RUN cd LLaMA-Factory && pip uninstall -y vllm && pip install --no-cache-dir -e ".[torch,metrics]"
+
+# setup supervisord
+RUN mkdir -p /var/log/supervisord
+COPY llama-factory/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY llama-factory/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+COPY llama-factory/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+#use dark mode
+RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+	    echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+	    mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
+	    echo '{"codeCellConfig":{"lineNumbers":true }}' >   /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+RUN pip install https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.12.0-py3-none-any.whl --force-reinstall --no-deps
+
+RUN pip install gradio-client==1.5.4 pydantic==2.10.6 --force-reinstall --no-deps
+# Create a working directory
+WORKDIR /workspace/
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+EXPOSE 8000

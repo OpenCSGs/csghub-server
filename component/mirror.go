@@ -5,14 +5,23 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
-	"slices"
+	"math"
+	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
+	"github.com/google/uuid"
+
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/rebac"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
@@ -23,25 +32,26 @@ import (
 )
 
 type mirrorComponentImpl struct {
-	repoComp            RepoComponent
-	accessTokenStore    database.AccessTokenStore
-	modelStore          database.ModelStore
-	datasetStore        database.DatasetStore
-	codeStore           database.CodeStore
-	repoStore           database.RepoStore
-	mirrorStore         database.MirrorStore
-	mirrorRepoStore     database.MirrorRepoStore
-	mirrorSourceStore   database.MirrorSourceStore
-	syncVersionStore    database.SyncVersionStore
-	mirrorTaskJobStore  database.MirrorTaskJobStore
-	mirrorJobClient     workhub.JobClient
-	mirrorRepoJobClient database.MirrorJobClient
-	namespaceStore      database.NamespaceStore
-	userStore           database.UserStore
-	orgStore            database.OrgStore
-	memberStore         database.MemberStore
-	rebac               rebac.Authorizer
-	config              *config.Config
+	repoComp                    RepoComponent
+	createRepoForAuthorizedUser authorizedRepoCreator
+	accessTokenStore            database.AccessTokenStore
+	modelStore                  database.ModelStore
+	datasetStore                database.DatasetStore
+	codeStore                   database.CodeStore
+	repoStore                   database.RepoStore
+	mirrorStore                 database.MirrorStore
+	mirrorRepoStore             database.MirrorRepoStore
+	mirrorSourceStore           database.MirrorSourceStore
+	syncVersionStore            database.SyncVersionStore
+	mirrorTaskJobStore          database.MirrorTaskJobStore
+	mirrorJobClient             workhub.JobClient
+	mirrorRepoJobClient         database.MirrorJobClient
+	namespaceStore              database.NamespaceStore
+	userStore                   database.UserStore
+	orgStore                    database.OrgStore
+	memberStore                 database.MemberStore
+	rebac                       rebac.Authorizer
+	config                      *config.Config
 	// syncCache removes LFS sync cache after mirror deletion.
 	syncCacheMu                 sync.Mutex
 	syncCache                   mirrorcache.Cache
@@ -49,6 +59,13 @@ type mirrorComponentImpl struct {
 	// mirrorMetadataClientFactory creates source-specific clients used to import MCP and skill metadata.
 	mirrorMetadataClientFactory mirrorMetadataClientFactory
 }
+
+type authorizedRepoCreateRequest struct {
+	UserID int64
+	Repo   types.CreateRepoReq
+}
+
+type authorizedRepoCreator func(context.Context, authorizedRepoCreateRequest) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error)
 
 type MirrorComponent interface {
 	// CreateMirror creates a mirror configuration for an existing repository.
@@ -72,7 +89,6 @@ type MirrorComponent interface {
 	Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error)
 	Index(ctx context.Context, per, page int, filter types.MirrorFilter) ([]types.Mirror, int, error)
 	Statistics(ctx context.Context) ([]types.MirrorStatusCount, error)
-	BatchCreate(ctx context.Context, req types.BatchCreateMirrorReq) error
 	Schedule(ctx context.Context) error
 	PublicModelRepo(ctx context.Context) error
 	Delete(ctx context.Context, id int64) error
@@ -318,6 +334,7 @@ func (m *mirrorComponentImpl) buildMirrorSyncSummaries(mirrors []database.Mirror
 	return items
 }
 
+// NewMirrorComponent shares its River producer with mirror records and namespace permission Stores.
 func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	var err error
 	c := &mirrorComponentImpl{}
@@ -327,8 +344,7 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 		return nil, fmt.Errorf("fail to create repo component,error:%w", err)
 	}
 	c.repoComp = repoComponent
-	// Mirror targets are standalone organizations and must not claim the hierarchy root slot.
-	c.orgStore = database.NewOrgStore(false, nil)
+	c.createRepoForAuthorizedUser = repoComponent.createRepoForAuthorizedUser
 	c.rebac = repoComponent.rebac
 	c.accessTokenStore = database.NewAccessTokenStore()
 	c.modelStore = database.NewModelStore()
@@ -344,7 +360,10 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	c.mirrorJobClient = jobClient
 	c.mirrorRepoJobClient = mirrorRepoJobClient
 	c.mirrorTaskJobStore = database.NewMirrorTaskJobStore()
-	c.mirrorRepoStore = database.NewMirrorRepoStore(mirrorRepoJobClient)
+	tupleJobs := workhub.NewRebacTupleJobClient(jobClient)
+	// Mirror targets are standalone organizations and must not claim the hierarchy root slot.
+	c.orgStore = database.NewOrgStoreWithJobClients(false, nil, nil, tupleJobs)
+	c.mirrorRepoStore = database.NewMirrorRepoStoreWithJobClients(database.GetDB(), mirrorRepoJobClient, tupleJobs)
 	c.mirrorSourceStore = database.NewMirrorSourceStore()
 	c.syncVersionStore = database.NewSyncVersionStore()
 	c.namespaceStore = database.NewNamespaceStore()
@@ -358,8 +377,8 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 
 // mapNamespaceAndName resolves a remote namespace to its mapped target. Only a
 // missing mapping uses the caller-selected fallback; store failures propagate.
-func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace, fallbackNamespace string) (string, error) {
-	n, err := m.mirrorNamespaceMappingStore.FindBySourceNamespace(context.Background(), sourceNamespace)
+func (m *mirrorComponentImpl) mapNamespaceAndName(ctx context.Context, sourceNamespace, fallbackNamespace string) (string, error) {
+	n, err := m.mirrorNamespaceMappingStore.FindBySourceNamespace(ctx, sourceNamespace)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("failed to find mirror namespace mapping: %w", err)
 	}
@@ -735,9 +754,9 @@ func (m *mirrorComponentImpl) UpdateMirror(ctx context.Context, req types.Update
 	return mirror, nil
 }
 
-// SyncMirror validates access to an existing mirror repository and enqueues a new repo sync task.
+// SyncMirror honors request authorization or existing user permissions before enqueuing a repository sync task.
 func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, req types.SyncMirrorReq) error {
-	user, err := m.userStore.FindByUsername(ctx, req.CurrentUser)
+	user, err := m.userStore.FindByUsername(ctx, req.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return errors.New("user does not exist")
 	}
@@ -745,7 +764,7 @@ func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, req types.SyncMirr
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	if !user.CanAdmin() {
+	if !(types.IsAdminAuthorized(ctx) || user.CanAdmin()) {
 		canWrite, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanWrite)
 		if err != nil {
 			return fmt.Errorf("failed to check permission to sync mirror: %w", err)
@@ -785,7 +804,7 @@ func (m *mirrorComponentImpl) DeleteMirror(ctx context.Context, req types.Delete
 		return fmt.Errorf("failed to delete mirror, error: %w", err)
 	}
 	syncCache := ensureRepoSyncCache(ctx, &m.syncCacheMu, &m.syncCache, m.config)
-	deleteRepoSyncCache(ctx, syncCache, repo.ID, strconv.Itoa(m.config.Mirror.PartSize))
+	deleteRepoSyncCache(ctx, syncCache, repo.ID)
 	return nil
 }
 
@@ -899,82 +918,19 @@ func (m *mirrorComponentImpl) Statistics(ctx context.Context) ([]types.MirrorSta
 	return scs, nil
 }
 
-// BatchCreate normalizes mirror sources and updates existing mirrors with provided credentials.
-func (m *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCreateMirrorReq) error {
-	var (
-		toBeUpdatedMirrors []database.Mirror
-		toBeCreatedMirrors []database.Mirror
-		sourceURLs         []string
-		existingSourceURLs []string
-	)
-	sourceURLMirrorMapping := make(map[string]types.MirrorReq)
-	for i, mirror := range req.Mirrors {
-		sourceURL, username, accessToken, err := normalizeMirrorSource(
-			mirror.SourceURL, mirror.Username, mirror.AccessToken,
-		)
-		if err != nil {
-			return fmt.Errorf("mirror index %d: %w", i, err)
-		}
-		mirror.SourceURL = sourceURL
-		mirror.Username = username
-		mirror.AccessToken = accessToken
-		req.Mirrors[i] = mirror
-		sourceURLMirrorMapping[mirror.SourceURL] = mirror
-		sourceURLs = append(sourceURLs, mirror.SourceURL)
-	}
-	existingMirrors, err := m.mirrorStore.FindBySourceURLs(ctx, sourceURLs)
-	if err != nil {
-		return fmt.Errorf("failed to get mirrors: %v", err)
-	}
-	for _, eMirror := range existingMirrors {
-		if mirror, ok := sourceURLMirrorMapping[eMirror.SourceUrl]; ok {
-			if mirror.Priority == 0 {
-				mirror.Priority = int8(types.LowMirrorPriority)
-			}
-			eMirror.Priority = types.MirrorPriority(mirror.Priority)
-			eMirror.RemoteUpdatedAt = mirror.UpdatedAt
-			if mirror.Username != "" {
-				eMirror.Username = mirror.Username
-				eMirror.AccessToken = mirror.AccessToken
-			}
-			toBeUpdatedMirrors = append(toBeUpdatedMirrors, eMirror)
-		}
-		existingSourceURLs = append(existingSourceURLs, eMirror.SourceUrl)
-	}
-	for _, mirror := range req.Mirrors {
-		if mirror.Priority == 0 {
-			mirror.Priority = int8(types.LowMirrorPriority)
-		}
-		if !slices.Contains(existingSourceURLs, mirror.SourceURL) {
-			dbMirror := database.Mirror{
-				SourceUrl:       mirror.SourceURL,
-				Username:        mirror.Username,
-				AccessToken:     mirror.AccessToken,
-				Priority:        types.MirrorPriority(mirror.Priority),
-				RemoteUpdatedAt: mirror.UpdatedAt,
-				RepositoryID:    0,
-				Status:          types.MirrorQueued,
-				MirrorSourceID:  mirror.SourceID,
-			}
-			toBeCreatedMirrors = append(toBeCreatedMirrors, dbMirror)
+// inferMirrorRepositoryTypeFromPath classifies the provider path convention
+// used by both new batch ingress and the legacy scheduler.
+func inferMirrorRepositoryTypeFromPath(sourcePath string) types.RepositoryType {
+	segments := strings.Split(strings.Trim(sourcePath, "/"), "/")
+	if len(segments) >= 3 {
+		switch strings.ToLower(segments[0]) {
+		case "datasets":
+			return types.DatasetRepo
+		case "codes":
+			return types.CodeRepo
 		}
 	}
-
-	if len(toBeUpdatedMirrors) > 0 {
-		err = m.mirrorStore.BatchUpdate(ctx, toBeUpdatedMirrors)
-		if err != nil {
-			return fmt.Errorf("failed to batch update mirrors: %v", err)
-		}
-	}
-
-	if len(toBeCreatedMirrors) > 0 {
-		err = m.mirrorStore.BatchCreate(ctx, toBeCreatedMirrors)
-		if err != nil {
-			return fmt.Errorf("failed to batch create mirrors: %v", err)
-		}
-	}
-
-	return nil
+	return types.ModelRepo
 }
 
 func (m *mirrorComponentImpl) Delete(ctx context.Context, id int64) error {
@@ -986,7 +942,7 @@ func (m *mirrorComponentImpl) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("failed to delete mirror: %w", err)
 	}
 	syncCache := ensureRepoSyncCache(ctx, &m.syncCacheMu, &m.syncCache, m.config)
-	deleteRepoSyncCache(ctx, syncCache, mirror.RepositoryID, strconv.Itoa(m.config.Mirror.PartSize))
+	deleteRepoSyncCache(ctx, syncCache, mirror.RepositoryID)
 	return nil
 }
 
@@ -1016,11 +972,602 @@ func ensureRepoSyncCache(ctx context.Context, mu *sync.Mutex, syncCache *mirrorc
 }
 
 // deleteRepoSyncCache removes LFS cache for a repository after its mirror task is stopped or deleted.
-func deleteRepoSyncCache(ctx context.Context, syncCache mirrorcache.Cache, repoID int64, partSize string) {
+func deleteRepoSyncCache(ctx context.Context, syncCache mirrorcache.Cache, repoID int64) {
 	if syncCache == nil || repoID == 0 {
 		return
 	}
-	if err := syncCache.DeleteRepoSyncCache(ctx, repoID, partSize); err != nil {
+	if err := syncCache.DeleteRepoSyncCache(ctx, repoID); err != nil {
 		slog.WarnContext(ctx, "failed to delete mirror repo sync cache", slog.Any("error", err), slog.Int64("repo_id", repoID))
 	}
+}
+
+// MirrorMetricsComponent reads snapshots and caches aggregate SQL queue counts.
+type MirrorMetricsComponent struct {
+	enabled    bool
+	read       func(context.Context) (*cache.MirrorMetricsReadSnapshot, error)
+	queues     func(context.Context) (types.MirrorMetricsQueues, error)
+	saveQueues func(context.Context, *types.MirrorMetricsControl) error
+}
+
+// NewMirrorMetricsComponent creates readers without a background collector.
+func NewMirrorMetricsComponent(cfg *config.Config) *MirrorMetricsComponent {
+	result := &MirrorMetricsComponent{enabled: cfg.Mirror.Metrics.Enabled}
+	if result.enabled {
+		store := cache.NewMirrorMetricsStoreFromConfig(cfg)
+		result.read, result.saveQueues = store.Read, store.PublishControl
+		result.queues = database.NewMirrorStore().QueueCounts
+	}
+	return result
+}
+
+// Get loads queue counts only when their short Redis cache expires.
+func (c *MirrorMetricsComponent) Get(ctx context.Context, q types.MirrorMetricsQuery) (*types.MirrorMetricsResponse, error) {
+	if !c.enabled {
+		result := metricsResponse(time.Now().UnixMilli(), q)
+		result.Status = "disabled"
+		return result, nil
+	}
+	snapshot, err := c.read(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if snapshot.Control == nil {
+		c.loadQueues(ctx, snapshot)
+	}
+	return aggregateMirrorMetrics(snapshot, q), nil
+}
+
+// loadQueues tolerates duplicate queries and cache overwrites across API replicas.
+func (c *MirrorMetricsComponent) loadQueues(ctx context.Context, snapshot *cache.MirrorMetricsReadSnapshot) {
+	started := time.Now()
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second)
+	queues, err := c.queues(queryCtx)
+	cancel()
+	if err != nil {
+		snapshot.Partial = true
+		return
+	}
+	snapshot.Control = &types.MirrorMetricsControl{SchemaVersion: cache.MirrorMetricsSchemaVersion, SampledAtMS: started.UnixMilli(), Queues: queues}
+	writeCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+	if err := c.saveQueues(writeCtx, snapshot.Control); err != nil {
+		snapshot.Partial = true
+	}
+}
+
+// metricsResponse initializes arrays and the current-snapshot expiration limits.
+func metricsResponse(now int64, q types.MirrorMetricsQuery) *types.MirrorMetricsResponse {
+	return &types.MirrorMetricsResponse{SchemaVersion: cache.MirrorMetricsSchemaVersion, ServerTimeMS: now, RefreshAfterMS: 1000, Status: "ok",
+		FreshnessLimitsMS: types.MirrorMetricsFreshnessLimits{Snapshot: mirrorMetricsSnapshotFreshness.Milliseconds(), Speed: mirrorMetricsSpeedFreshness.Milliseconds(), Queue: cache.MirrorMetricsQueueRetention.Milliseconds()},
+		LFSWorkers:        []types.MirrorMetricsLFSWorker{},
+		Instances:         types.MirrorMetricsInstancePage{Page: q.InstancePage, Per: q.InstancePer, Items: []types.MirrorMetricsInstance{}}, Tasks: types.MirrorMetricsTaskPage{Page: q.Page, Per: q.Per, Items: []types.MirrorMetricsTask{}}}
+}
+
+// aggregateMirrorMetrics builds global totals before filtering the display tables.
+func aggregateMirrorMetrics(snapshot *cache.MirrorMetricsReadSnapshot, q types.MirrorMetricsQuery) *types.MirrorMetricsResponse {
+	response := metricsResponse(snapshot.NowMS, q)
+	until := snapshot.NowMS + mirrorMetricsSnapshotFreshness.Milliseconds()
+	overview := &types.MirrorMetricsOverview{Freshness: "unavailable", CountsValidUntilMS: types.MirrorMetricsStageDeadlines{Repo: until, LFS: until}, OnlineInstances: &types.MirrorMetricsStageCounts{}, BusyInstances: &types.MirrorMetricsStageCounts{}, ExecutingTasks: &types.MirrorMetricsStageCounts{}}
+	response.Overview = overview
+	if snapshot.Control != nil {
+		overview.SampledAtMS = metricsPointer(snapshot.Control.SampledAtMS)
+		overview.Queues = &snapshot.Control.Queues
+		overview.Freshness = metricsFreshness(snapshot.NowMS, overview.SampledAtMS, cache.MirrorMetricsQueueRetention.Milliseconds())
+	}
+	instances := make([]types.MirrorMetricsInstance, 0, len(snapshot.Instances))
+	tasks := make([]types.MirrorMetricsTask, 0)
+	for _, raw := range snapshot.Instances {
+		instance, current := metricsWorkerSnapshot(raw, snapshot.NowMS)
+		if instance.Service == "lfs" {
+			response.LFSWorkers = append(response.LFSWorkers, types.MirrorMetricsLFSWorker{
+				InstanceID: instance.InstanceID, Name: instance.Name, RuntimeState: instance.RuntimeState,
+				SampledAtMS: instance.SampledAtMS, DownloadBPS: instance.DownloadBPS, UploadBPS: instance.UploadBPS,
+			})
+		}
+		if len(current) > 0 {
+			metricsIncrement(overview.BusyInstances, instance.Service)
+		}
+		if instance.Freshness == "fresh" && (instance.RuntimeState == "ready" || instance.RuntimeState == "stopping") {
+			metricsCountWorker(overview, instance, snapshot.NowMS)
+		}
+		for _, task := range current {
+			metricsIncrement(overview.ExecutingTasks, task.Stage)
+			if metricsInstanceSelected(q, instance) && (q.TaskID == "" || q.TaskID == task.TaskID) {
+				tasks = append(tasks, task)
+			}
+		}
+		instances = append(instances, instance)
+	}
+	overview.Throughput = metricsThroughput(instances, snapshot.NowMS)
+	selected := make([]types.MirrorMetricsInstance, 0, len(instances))
+	for _, instance := range instances {
+		if metricsInstanceSelected(q, instance) {
+			selected = append(selected, instance)
+		}
+	}
+	sort.Slice(response.LFSWorkers, func(i, j int) bool { return response.LFSWorkers[i].InstanceID < response.LFSWorkers[j].InstanceID })
+	sort.Slice(selected, func(i, j int) bool { return selected[i].InstanceID < selected[j].InstanceID })
+	sort.Slice(tasks, func(i, j int) bool {
+		if tasks[i].TaskID == tasks[j].TaskID {
+			return *tasks[i].InstanceID < *tasks[j].InstanceID
+		}
+		return tasks[i].TaskID < tasks[j].TaskID
+	})
+	response.Instances.Total, response.Tasks.Total = len(selected), len(tasks)
+	response.Instances.Items = metricsPage(selected, q.InstancePage, q.InstancePer)
+	response.Tasks.Items = metricsPage(tasks, q.Page, q.Per)
+	if snapshot.Partial || snapshot.Control == nil {
+		response.Status = "partial"
+	}
+	return response
+}
+
+// metricsWorkerSnapshot uses one sample timestamp for liveness and execution state.
+func metricsWorkerSnapshot(raw types.MirrorMetricsSnapshot, now int64) (types.MirrorMetricsInstance, []types.MirrorMetricsTask) {
+	instance := raw.Instance
+	instance.Freshness = metricsFreshness(now, instance.SampledAtMS, mirrorMetricsSnapshotFreshness.Milliseconds())
+	live := instance.Freshness == "fresh" && (instance.RuntimeState == "ready" || instance.RuntimeState == "stopping")
+	speedFresh := live && instance.Service == "lfs" && metricsFreshness(now, instance.SampledAtMS, mirrorMetricsSpeedFreshness.Milliseconds()) == "fresh"
+	if !speedFresh {
+		instance.DownloadBPS = nil
+		instance.UploadBPS = nil
+	}
+	instance.ExecutingTasks = 0
+	tasks := make([]types.MirrorMetricsTask, 0)
+	if !live {
+		return instance, tasks
+	}
+	for _, task := range raw.Executions {
+		task.InstanceID = metricsPointer(instance.InstanceID)
+		task.Stage = instance.Service
+		task.SampledAtMS = instance.SampledAtMS
+		task.Freshness = "fresh"
+		if !speedFresh {
+			task.DownloadBPS = nil
+			task.UploadBPS = nil
+		}
+		tasks = append(tasks, task)
+	}
+	instance.ExecutingTasks = len(tasks)
+	return instance, tasks
+}
+
+// metricsCountWorker counts presence and bounds each service by its oldest snapshot.
+func metricsCountWorker(overview *types.MirrorMetricsOverview, instance types.MirrorMetricsInstance, now int64) {
+	if instance.RuntimeState == "ready" {
+		metricsIncrement(overview.OnlineInstances, instance.Service)
+	}
+	until := min(now, *instance.SampledAtMS) + mirrorMetricsSnapshotFreshness.Milliseconds()
+	if instance.Service == "repo" {
+		overview.CountsValidUntilMS.Repo = min(overview.CountsValidUntilMS.Repo, until)
+	}
+	if instance.Service == "lfs" {
+		overview.CountsValidUntilMS.LFS = min(overview.CountsValidUntilMS.LFS, until)
+	}
+}
+
+// metricsThroughput sums each direction only when all participating LFS rates are known.
+// An empty set keeps observed zero totals; unknown contributions remain unknown.
+func metricsThroughput(instances []types.MirrorMetricsInstance, now int64) *types.MirrorMetricsThroughput {
+	result := &types.MirrorMetricsThroughput{SampledAtMS: metricsPointer(now),
+		ClusterDownloadBPS: metricsPointer(0.0), ClusterUploadBPS: metricsPointer(0.0)}
+	for _, instance := range instances {
+		if instance.Service != "lfs" || instance.Freshness != "fresh" || (instance.RuntimeState != "ready" && instance.RuntimeState != "stopping") {
+			continue
+		}
+		result.ClusterDownloadBPS = metricsAddRate(result.ClusterDownloadBPS, instance.DownloadBPS)
+		result.ClusterUploadBPS = metricsAddRate(result.ClusterUploadBPS, instance.UploadBPS)
+		if instance.SampledAtMS != nil && *instance.SampledAtMS < *result.SampledAtMS {
+			result.SampledAtMS = instance.SampledAtMS
+		}
+	}
+	return result
+}
+
+// metricsInstanceSelected applies display filters without changing aggregate totals.
+func metricsInstanceSelected(q types.MirrorMetricsQuery, instance types.MirrorMetricsInstance) bool {
+	return (q.Service == "all" || q.Service == instance.Service) && (q.InstanceID == "" || q.InstanceID == instance.InstanceID)
+}
+
+// metricsFreshness applies an age bound without calibrating worker clocks.
+func metricsFreshness(now int64, at *int64, limit int64) string {
+	if at == nil {
+		return "unavailable"
+	}
+	if now-*at > limit || *at > now+1000 {
+		return "stale"
+	}
+	return "fresh"
+}
+
+// metricsAddRate propagates unknown or invalid contributions without reviving an unknown sum.
+func metricsAddRate(sum, value *float64) *float64 {
+	if sum == nil || value == nil || *value < 0 || math.IsNaN(*value) || math.IsInf(*value, 0) {
+		return nil
+	}
+	return metricsPointer(*sum + *value)
+}
+
+// metricsIncrement updates the matching service count only.
+func metricsIncrement(counts *types.MirrorMetricsStageCounts, stage string) {
+	if stage == "repo" {
+		counts.Repo++
+	}
+	if stage == "lfs" {
+		counts.LFS++
+	}
+}
+
+// metricsPage avoids overflowing integer multiplication for attacker-supplied pages.
+func metricsPage[T any](items []T, page, per int) []T {
+	if per <= 0 || page <= 0 || len(items) == 0 || page-1 > len(items)/per {
+		return []T{}
+	}
+	start := (page - 1) * per
+	return items[start:min(start+per, len(items))]
+}
+
+// metricsPointer preserves nullable scalar values in responses.
+func metricsPointer[T any](value T) *T { return &value }
+
+const (
+	// mirrorMetricsSampleInterval is shared by Repo and LFS workers.
+	mirrorMetricsSampleInterval = time.Second
+	// mirrorMetricsSnapshotFreshness bounds worker presence and current execution state.
+	mirrorMetricsSnapshotFreshness = 10 * time.Second
+	// mirrorMetricsSpeedFreshness hides outdated rates sooner than worker presence.
+	mirrorMetricsSpeedFreshness = 3 * time.Second
+	// mirrorMetricsPublishTimeout keeps Redis failure outside business execution.
+	mirrorMetricsPublishTimeout = 200 * time.Millisecond
+)
+
+// mirrorMetricsExecutionKey attaches byte accounting to an existing work context.
+type mirrorMetricsExecutionKey struct{}
+
+// mirrorMetricsExecution holds only current work, byte counters and verified LFS progress.
+type mirrorMetricsExecution struct {
+	reporter              *MirrorMetricsReporter
+	task                  types.MirrorMetricsTask
+	bytes                 atomic.Int64
+	uploadedBytes         atomic.Int64
+	previousBytes         int64
+	previousUploadedBytes int64
+	previousSample        time.Time
+	completeBytes         int64
+	partBytes             int64
+	objects               map[string]int64
+	complete              map[string]bool
+	totalBytes            int64
+	filesDone             int
+	filesTotal            int
+	progressKnown         bool
+}
+
+// MirrorMetricsReporter maintains in-memory observations and one bounded timer loop.
+type MirrorMetricsReporter struct {
+	mu                    sync.Mutex
+	store                 *cache.MirrorMetricsStore
+	instance              types.MirrorMetricsInstance
+	executions            map[*mirrorMetricsExecution]bool
+	totalBytes            atomic.Int64
+	totalUploadedBytes    atomic.Int64
+	previousBytes         int64
+	previousUploadedBytes int64
+	lastSample            time.Time
+	stop                  chan struct{}
+	done                  chan struct{}
+	stopOnce              sync.Once
+}
+
+// NewMirrorMetricsReporter starts sampling; disabled metrics leave work unchanged.
+func NewMirrorMetricsReporter(cfg *config.Config, service string) *MirrorMetricsReporter {
+	if !cfg.Mirror.Metrics.Enabled {
+		return nil
+	}
+	return newMirrorMetricsReporter(cache.NewMirrorMetricsStoreFromConfig(cfg), cfg, service)
+}
+
+// newMirrorMetricsReporter accepts a Redis adapter for focused integration tests.
+func newMirrorMetricsReporter(store *cache.MirrorMetricsStore, cfg *config.Config, service string) *MirrorMetricsReporter {
+	now := time.Now()
+	normal := max(cfg.Mirror.WorkerNumber, 1)
+	workerConfig := types.MirrorMetricsWorkerConfig{WorkerNumber: cfg.Mirror.WorkerNumber, NormalWorkers: normal, UrgentWorkers: workhub.UrgentMaxWorkers(normal)}
+	if service == "lfs" {
+		workerConfig.LFSConcurrency = metricsPointer(cfg.Mirror.LfsConcurrency)
+		workerConfig.PartSizeBytes = metricsPointer(strconv.FormatInt(int64(cfg.Mirror.PartSize)*1024*1024, 10))
+	}
+	r := &MirrorMetricsReporter{store: store, instance: types.MirrorMetricsInstance{InstanceID: uuid.NewString(), Name: cfg.UniqueServiceName, Service: service, StartedAtMS: now.UnixMilli(), RuntimeState: "starting", Config: workerConfig}, executions: make(map[*mirrorMetricsExecution]bool), lastSample: now, stop: make(chan struct{}), done: make(chan struct{})}
+	go r.run()
+	return r
+}
+
+// SetState copies the existing process lifecycle; publication waits for the timer.
+func (r *MirrorMetricsReporter) SetState(state string) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	r.instance.RuntimeState = state
+	r.mu.Unlock()
+}
+
+// Stop requests one final stopped snapshot and waits within the shutdown budget.
+func (r *MirrorMetricsReporter) Stop(ctx context.Context) {
+	if r == nil {
+		return
+	}
+	r.stopOnce.Do(func() { close(r.stop) })
+	select {
+	case <-r.done:
+	case <-ctx.Done():
+	}
+}
+
+// Track attaches instrumentation without publishing a claimed or queued task.
+// MirrorMetricsRunning adds it only after the worker's ordinary execution checks succeed.
+func (r *MirrorMetricsReporter) Track(ctx context.Context, task types.MirrorMetricsTask) (context.Context, func()) {
+	if r == nil {
+		return ctx, func() {}
+	}
+	task.InstanceID = metricsPointer(r.instance.InstanceID)
+	entry := &mirrorMetricsExecution{reporter: r, task: task, objects: make(map[string]int64), complete: make(map[string]bool), previousSample: time.Now()}
+	var once sync.Once
+	release := func() { once.Do(func() { r.mu.Lock(); delete(r.executions, entry); r.mu.Unlock() }) }
+	return context.WithValue(ctx, mirrorMetricsExecutionKey{}, entry), release
+}
+
+// MirrorMetricsRunning records the already validated work without maintaining a second task state machine.
+func MirrorMetricsRunning(ctx context.Context, task types.MirrorMetricsTask) {
+	entry, _ := ctx.Value(mirrorMetricsExecutionKey{}).(*mirrorMetricsExecution)
+	if entry == nil {
+		return
+	}
+	r := entry.reporter
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry.task.RepoPath = task.RepoPath
+	entry.task.StartedAtMS = task.StartedAtMS
+	now := time.Now()
+	entry.task.ExecutionStartedAtMS = metricsPointer(now.UnixMilli())
+	entry.previousSample = now
+	entry.task.Operation = metricsPointer("prepare")
+	r.executions[entry] = true
+}
+
+// MirrorMetricsOperation copies a display label for the current work phase.
+func MirrorMetricsOperation(ctx context.Context, operation string) {
+	entry, _ := ctx.Value(mirrorMetricsExecutionKey{}).(*mirrorMetricsExecution)
+	if entry == nil {
+		return
+	}
+	entry.reporter.mu.Lock()
+	entry.task.Operation = metricsPointer(operation)
+	entry.reporter.mu.Unlock()
+}
+
+// MirrorMetricsWrapBody counts delivered upstream bytes, including reads returning bytes together with an error.
+func MirrorMetricsWrapBody(ctx context.Context, body io.ReadCloser) io.ReadCloser {
+	entry, _ := ctx.Value(mirrorMetricsExecutionKey{}).(*mirrorMetricsExecution)
+	if entry == nil || body == nil {
+		return body
+	}
+	return &mirrorMetricsDownloadBody{ReadCloser: body, execution: entry}
+}
+
+// mirrorMetricsDownloadBody preserves the wrapped stream's error and close semantics.
+type mirrorMetricsDownloadBody struct {
+	io.ReadCloser
+	execution *mirrorMetricsExecution
+}
+
+// Read does no allocation, Redis work, or mutex acquisition on the transfer hot path.
+func (b *mirrorMetricsDownloadBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if n > 0 {
+		b.execution.bytes.Add(int64(n))
+		b.execution.reporter.totalBytes.Add(int64(n))
+	}
+	return n, err
+}
+
+// MirrorMetricsInitProgress records totals only after object discovery and storage verification complete.
+func MirrorMetricsInitProgress(ctx context.Context, total, complete int64, filesTotal, filesDone int) {
+	entry, _ := ctx.Value(mirrorMetricsExecutionKey{}).(*mirrorMetricsExecution)
+	if entry == nil {
+		return
+	}
+	r := entry.reporter
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry.totalBytes = max(total, 0)
+	entry.completeBytes = min(max(complete, 0), entry.totalBytes)
+	entry.filesTotal = filesTotal
+	entry.filesDone = filesDone
+	entry.progressKnown = true
+}
+
+// MirrorMetricsAddPart credits bounded, confirmed uploaded bytes without counting network retries twice.
+func MirrorMetricsAddPart(ctx context.Context, oid string, size, delta int64) {
+	entry, _ := ctx.Value(mirrorMetricsExecutionKey{}).(*mirrorMetricsExecution)
+	if entry == nil || delta <= 0 || size <= 0 {
+		return
+	}
+	r := entry.reporter
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if entry.complete[oid] {
+		return
+	}
+	amount := min(delta, size-entry.objects[oid])
+	if amount <= 0 {
+		return
+	}
+	entry.objects[oid] += amount
+	entry.partBytes += amount
+}
+
+// MirrorMetricsCompleteObject moves confirmed parts into the verified whole-object total exactly once.
+func MirrorMetricsCompleteObject(ctx context.Context, oid string, size int64) {
+	entry, _ := ctx.Value(mirrorMetricsExecutionKey{}).(*mirrorMetricsExecution)
+	if entry == nil || size < 0 {
+		return
+	}
+	r := entry.reporter
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if entry.complete[oid] {
+		return
+	}
+	entry.complete[oid] = true
+	entry.partBytes -= entry.objects[oid]
+	delete(entry.objects, oid)
+	entry.completeBytes = min(entry.totalBytes, entry.completeBytes+size)
+	entry.filesDone = min(entry.filesTotal, entry.filesDone+1)
+}
+
+// MirrorMetricsResetObject removes parts invalidated by a failed final object verification.
+func MirrorMetricsResetObject(ctx context.Context, oid string) {
+	entry, _ := ctx.Value(mirrorMetricsExecutionKey{}).(*mirrorMetricsExecution)
+	if entry == nil {
+		return
+	}
+	r := entry.reporter
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry.partBytes -= entry.objects[oid]
+	delete(entry.objects, oid)
+}
+
+// run samples and writes once per second; failed writes are replaced on the next tick.
+func (r *MirrorMetricsReporter) run() {
+	defer close(r.done)
+	defer r.store.Close()
+	ticker := time.NewTicker(mirrorMetricsSampleInterval)
+	defer ticker.Stop()
+	var lastLog time.Time
+	for {
+		stopping := false
+		select {
+		case <-ticker.C:
+		case <-r.stop:
+			stopping = true
+		}
+		if stopping {
+			r.SetState("stopped")
+		}
+		snapshot := r.capture(time.Now())
+		ctx, cancel := context.WithTimeout(context.Background(), mirrorMetricsPublishTimeout)
+		err := r.store.PublishSnapshot(ctx, snapshot)
+		cancel()
+		if err != nil && time.Since(lastLog) > 30*time.Second {
+			slog.Warn("mirror metrics snapshot unavailable", slog.String("service", r.instance.Service), slog.Any("error", err))
+			lastLog = time.Now()
+		}
+		if stopping {
+			return
+		}
+	}
+}
+
+// capture copies current work under the mutex and computes byte deltas using monotonic time.
+func (r *MirrorMetricsReporter) capture(now time.Time) types.MirrorMetricsSnapshot {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.instance.SampledAtMS = metricsPointer(now.UnixMilli())
+	r.instance.ExecutingTasks = len(r.executions)
+	duration := now.Sub(r.lastSample).Seconds()
+	if r.instance.Service == "lfs" && duration > 0 {
+		down, up := r.totalBytes.Load(), r.totalUploadedBytes.Load()
+		r.instance.DownloadBPS = metricsPointer(float64(down-r.previousBytes) / duration)
+		r.instance.UploadBPS = metricsPointer(float64(up-r.previousUploadedBytes) / duration)
+		r.instance.DownloadedBytes = metricsPointer(strconv.FormatInt(down, 10))
+		r.instance.UploadedBytes = metricsPointer(strconv.FormatInt(up, 10))
+		r.previousBytes, r.previousUploadedBytes = down, up
+	}
+	tasks := make([]types.MirrorMetricsTask, 0, len(r.executions))
+	for entry := range r.executions {
+		tasks = append(tasks, r.captureExecution(entry, now))
+	}
+	r.lastSample = now
+	if r.instance.RuntimeState == "stopped" {
+		tasks = []types.MirrorMetricsTask{}
+		r.instance.ExecutingTasks = 0
+	}
+	return types.MirrorMetricsSnapshot{SchemaVersion: cache.MirrorMetricsSchemaVersion, Instance: r.instance, Executions: tasks}
+}
+
+// captureExecution copies only currently running work and its LFS measurements.
+func (r *MirrorMetricsReporter) captureExecution(entry *mirrorMetricsExecution, now time.Time) types.MirrorMetricsTask {
+	task := entry.task
+	if task.Stage != "lfs" {
+		return task
+	}
+	down, up := entry.bytes.Load(), entry.uploadedBytes.Load()
+	task.DownloadedBytes, task.UploadedBytes = metricsPointer(strconv.FormatInt(down, 10)), metricsPointer(strconv.FormatInt(up, 10))
+	if seconds := now.Sub(entry.previousSample).Seconds(); seconds > 0 {
+		task.DownloadBPS = metricsPointer(float64(down-entry.previousBytes) / seconds)
+		task.UploadBPS = metricsPointer(float64(up-entry.previousUploadedBytes) / seconds)
+	}
+	entry.previousBytes, entry.previousUploadedBytes, entry.previousSample = down, up, now
+	if entry.progressKnown {
+		task.LFS = &types.MirrorMetricsLFS{TotalBytes: metricsPointer(strconv.FormatInt(entry.totalBytes, 10)), CompleteBytes: metricsPointer(strconv.FormatInt(entry.completeBytes, 10)), ConfirmedPartBytes: metricsPointer(strconv.FormatInt(entry.partBytes, 10)), FilesDone: metricsPointer(entry.filesDone), FilesTotal: metricsPointer(entry.filesTotal)}
+		if entry.totalBytes > 0 {
+			ceiling := 100.0
+			if entry.filesDone < entry.filesTotal {
+				ceiling = 99
+			}
+			task.LFS.ProgressPercent = metricsPointer(min(ceiling, float64(entry.completeBytes+entry.partBytes)/float64(entry.totalBytes)*100))
+		}
+	}
+	return task
+}
+
+// MirrorMetricsUploadTransport observes S3 PUT request bodies after SDK buffering and hashing.
+// It counts bytes consumed by HTTP transport, including failed attempts and
+// retries, rather than acknowledged object size or local buffer reads. Headers,
+// TLS framing and TCP retransmissions are outside this application-level metric.
+func MirrorMetricsUploadTransport(base http.RoundTripper) http.RoundTripper {
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return &mirrorMetricsUploadTransport{base: base}
+}
+
+// mirrorMetricsUploadTransport instruments only LFS execution object uploads.
+type mirrorMetricsUploadTransport struct{ base http.RoundTripper }
+
+// RoundTrip preserves request ownership and instruments replayed request bodies.
+func (t *mirrorMetricsUploadTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	entry, _ := request.Context().Value(mirrorMetricsExecutionKey{}).(*mirrorMetricsExecution)
+	if entry == nil || entry.task.Stage != "lfs" || request.Method != http.MethodPut || request.Body == nil || request.Header.Get("X-Amz-Copy-Source") != "" {
+		return t.base.RoundTrip(request)
+	}
+	cloned := request.Clone(request.Context())
+	cloned.Body = &mirrorMetricsUploadBody{ReadCloser: request.Body, execution: entry}
+	if request.GetBody != nil {
+		cloned.GetBody = func() (io.ReadCloser, error) {
+			body, err := request.GetBody()
+			if err != nil {
+				return nil, err
+			}
+			return &mirrorMetricsUploadBody{ReadCloser: body, execution: entry}, nil
+		}
+	}
+	return t.base.RoundTrip(cloned)
+}
+
+// mirrorMetricsUploadBody keeps upstream download accounting independent from outbound reads.
+type mirrorMetricsUploadBody struct {
+	io.ReadCloser
+	execution *mirrorMetricsExecution
+}
+
+// Read records partial failed sends without blocking the transfer on Redis or locks.
+func (b *mirrorMetricsUploadBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if n > 0 {
+		b.execution.uploadedBytes.Add(int64(n))
+		b.execution.reporter.totalUploadedBytes.Add(int64(n))
+	}
+	return n, err
 }

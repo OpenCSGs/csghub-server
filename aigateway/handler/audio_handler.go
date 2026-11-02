@@ -89,13 +89,13 @@ func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 	form, err := c.MultipartForm()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "invalid multipart form: " + err.Error(), Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "invalid multipart form: " + err.Error(), Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, err
 	}
 	if form == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "request must be multipart/form-data", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "request must be multipart/form-data", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("request must be multipart/form-data")
 	}
@@ -103,13 +103,13 @@ func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 	modelID := strings.TrimSpace(firstMultipartValue(form, "model"))
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Model cannot be empty", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: types.MsgModelEmpty, Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("model cannot be empty")
 	}
 	if len(form.File["file"]) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "File cannot be empty", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "File cannot be empty", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("file cannot be empty")
 	}
@@ -122,7 +122,6 @@ func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 		Model:         modelID,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     isStream,
 		Headers:       c.Request.Header,
@@ -135,7 +134,6 @@ func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 func (h *audioPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	requestID := commontrace.GetTraceIDInGinContext(c)
 
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -186,7 +184,9 @@ func (h *audioPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
+			Code: types.ErrCodeInternal, Message: types.MsgInternalError, Type: types.ErrTypeServer,
+		}})
 		return nil
 	}
 
@@ -243,7 +243,7 @@ func (h *audioPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 
 		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
 			}
 		}

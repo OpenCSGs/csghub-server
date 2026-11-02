@@ -21,8 +21,8 @@ const (
 	MirrorLFSUrgentQueue = "mirror_lfs_urgent"
 	// MirrorRepoJobTimeout is the maximum runtime allowed for one repository mirror job.
 	MirrorRepoJobTimeout = 30 * time.Minute
-	// MirrorLFSJobTimeout is the maximum runtime allowed for one Git LFS mirror job.
-	MirrorLFSJobTimeout = 2 * time.Hour
+	// MirrorLFSJobTimeout limits one Git LFS mirror job attempt to five days.
+	MirrorLFSJobTimeout = 120 * time.Hour
 )
 
 type MirrorArgs struct {

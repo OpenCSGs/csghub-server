@@ -60,6 +60,7 @@ type AccountBill struct {
 	UnitType          types.SkuUnitType `bun:",notnull,default:''" json:"unit_type"`
 	ClusterID         string            `bun:",notnull,default:''" json:"cluster_id"`
 	HardwareType      string            `bun:",notnull,default:''" json:"hardware_type"`
+	PeriodID          int64             `bun:",notnull,default:0" json:"period_id"`
 	times
 }
 
@@ -131,6 +132,10 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 	q = q.Where("account_bill.bill_date >= ? and account_bill.bill_date <= ?", req.StartDate, req.EndDate).
 		Where("account_bill.user_uuid = ?", req.TargetUUID).
 		Where("account_bill.scene = ?", req.Scene)
+
+	if req.PeriodID > -1 {
+		q = q.Where("account_bill.period_id = ?", req.PeriodID)
+	}
 
 	if len(req.InstanceName) > 0 {
 		q = q.Where("LOWER(customer_id) LIKE ?", "%"+strings.ToLower(req.InstanceName)+"%")
@@ -212,6 +217,12 @@ func (s *accountBillStoreImpl) ListBillsDetailByUserID(ctx context.Context, req 
 	}
 
 	q = q.Where("unit_type = ?", req.UnitType)
+	if req.TokenID > -1 {
+		q = q.Where("token_id = ?", req.TokenID)
+	}
+	if req.PeriodID > -1 {
+		q = q.Where("period_id = ?", req.PeriodID)
+	}
 
 	count, err := q.Count(ctx)
 	if err != nil {

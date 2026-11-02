@@ -9,4 +9,4 @@ import (
 
 // CE has no metrics middleware and no admission queue, so there is no queue
 // wait to record.
-func recordQueueWait(_ *gin.Context, _ *types.RequestMetadata) {}
+func recordAdmissionQueueMetrics(_ *gin.Context, _ *types.RequestMetadata) {}

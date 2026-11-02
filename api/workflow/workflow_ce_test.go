@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/testsuite"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
@@ -13,10 +14,27 @@ import (
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	mock_callback "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/callback"
 	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/api/workflow/activity"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
 )
+
+// TestRegisterPendingModelPublicationSchedule keeps automatic publication out of CE.
+func TestRegisterPendingModelPublicationSchedule(t *testing.T) {
+	testPendingModelPublicationSchedule(t, false)
+}
+
+// TestRegisterCronWorkerSkipsPendingModelPublication preserves the original CE worker scope.
+func TestRegisterCronWorkerSkipsPendingModelPublication(t *testing.T) {
+	suite := testsuite.WorkflowTestSuite{}
+	cronWorker := &publicationWorkflowRecorder{TestWorkflowEnvironment: suite.NewTestWorkflowEnvironment()}
+	temporalClient := mock_temporal.NewMockClient(t)
+	temporalClient.EXPECT().NewWorker(workflow.CronJobQueueName, mock.Anything).Return(cronWorker)
+	workflow.RegisterCronWorker(&config.Config{}, temporalClient, &activity.Activities{})
+	require.False(t, cronWorker.publicationRegistered)
+	require.False(t, cronWorker.publicationActivityRegistered)
+}
 
 type workflowTester struct {
 	env       *testsuite.TestWorkflowEnvironment

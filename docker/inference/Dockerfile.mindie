@@ -1,0 +1,18 @@
+#FROM ascendhub.huawei.com/public-ascendhub/mindie:1.0.RC2-800I-A2-aarch64
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/public/mindie-base:1.0.RC2
+
+#ATTENTION: need copy /usr/local/bin/npu-smi and /usr/local/Ascend/driver to local
+COPY local/driver /usr/local/Ascend/driver
+COPY local/npu-smi /usr/local/bin/
+COPY ./mindie/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+RUN pip install --no-cache-dir csghub-sdk==0.4.3 transformers==4.33.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip config --user set global.progress_bar off
+
+RUN curl -L -o /usr/local/bin/tini https://gitee.com/xzgan/tini/releases/download/v0.19.0/tini-arm64 && chmod +x /usr/local/bin/tini
+
+WORKDIR /workspace/
+EXPOSE 8000
+ENTRYPOINT ["tini", "--"]
+CMD ["/etc/csghub/serve.sh"]

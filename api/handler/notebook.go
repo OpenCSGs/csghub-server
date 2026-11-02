@@ -388,6 +388,7 @@ func (h *NotebookHandler) Logs(ctx *gin.Context) {
 		CurrentUser:  currentUser,
 		ID:           id,
 		InstanceName: instance,
+		Since:        ctx.Query("since"),
 	}
 
 	ctx.Writer.Header().Set("Content-Type", "text/event-stream")

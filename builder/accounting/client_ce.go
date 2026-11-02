@@ -34,6 +34,10 @@ func (ac *accountingClientImpl) PresentAccountingUser(userID string, req types.A
 	return nil, nil
 }
 
+func (ac *accountingClientImpl) PresentNewRegisterUser(userID string, req types.NewUserPresentReq) (any, error) {
+	return nil, nil
+}
+
 func (ac *accountingClientImpl) CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (any, error) {
 	return nil, nil
 }
@@ -110,6 +114,38 @@ func (ac *accountingClientImpl) GetOrderDetailByID(currentUser string, id int64)
 	return nil, nil
 }
 
+func (ac *accountingClientImpl) CreateVoucher(req types.CreateVoucherReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListVouchers(req types.VoucherFilter) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) GetVoucher(currentUser string, id int64) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) UpdateVoucher(req types.UpdateVoucherReq, id int64) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) RevokeVoucher(currentUser string, id int64) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) GetVoucherDashboardForNS(req types.VoucherDashboardReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) GetVoucherBillForNS(req types.VoucherBillReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListVouchersForNS(req types.VoucherNamespaceFilter) (any, error) {
+	return nil, nil
+}
+
 func (ac *accountingClientImpl) GetVoucherDashboard(req types.VoucherDashboardReq) (any, error) {
 	return nil, nil
 }
@@ -159,6 +195,18 @@ func (ac *accountingClientImpl) ListPlansForNS(req types.AcctTokenPlanNSListReq)
 }
 
 func (ac *accountingClientImpl) ListHistoryForNS(req types.AcctTokenPlanHistoryReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListPeriodsForNS(req types.AcctTokenPlanPeriodsReq) (*types.AcctTokenPlanPeriodsResp, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListInstancesForAdmin(req types.AcctTokenPlanInstanceListReq) (*types.AcctTokenPlanInstanceListResp, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListPeriodsForInstance(req types.AcctTokenPlanInstancePeriodsReq) (*types.AcctTokenPlanPeriodsResp, error) {
 	return nil, nil
 }
 

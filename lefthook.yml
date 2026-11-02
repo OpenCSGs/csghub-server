@@ -1,0 +1,22 @@
+pre-push:
+  skip:
+    - ref: main
+  commands:
+    lint-ce:
+      glob: "*.go"
+      run: make lint GO_TAGS=ce
+    lint-ee:
+      glob: "*.go"
+      run: make lint GO_TAGS=ee
+    lint-saas:
+      glob: "*.go"
+      run: make lint GO_TAGS=saas
+    gin-lint-ce:
+      glob: "*.go"
+      run: go run linters/gincontext/main.go -tags="ce"
+    gin-lint-ee:
+      glob: "*.go"
+      run: go run linters/gincontext/main.go -tags="ee"
+    gin-lint-saas:
+      glob: "*.go"
+      run: go run linters/gincontext/main.go -tags="saas"

@@ -565,6 +565,55 @@ func (_c *MockAgentOrchestratorStore_CompleteResumeOperation_Call) RunAndReturn(
 	return _c
 }
 
+// ConsumeGuestUsage provides a mock function with given fields: ctx, instanceID, guestActorID, maxCount
+func (_m *MockAgentOrchestratorStore) ConsumeGuestUsage(ctx context.Context, instanceID int64, guestActorID string, maxCount *int64) error {
+	ret := _m.Called(ctx, instanceID, guestActorID, maxCount)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConsumeGuestUsage")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, *int64) error); ok {
+		r0 = rf(ctx, instanceID, guestActorID, maxCount)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentOrchestratorStore_ConsumeGuestUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConsumeGuestUsage'
+type MockAgentOrchestratorStore_ConsumeGuestUsage_Call struct {
+	*mock.Call
+}
+
+// ConsumeGuestUsage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - instanceID int64
+//   - guestActorID string
+//   - maxCount *int64
+func (_e *MockAgentOrchestratorStore_Expecter) ConsumeGuestUsage(ctx interface{}, instanceID interface{}, guestActorID interface{}, maxCount interface{}) *MockAgentOrchestratorStore_ConsumeGuestUsage_Call {
+	return &MockAgentOrchestratorStore_ConsumeGuestUsage_Call{Call: _e.mock.On("ConsumeGuestUsage", ctx, instanceID, guestActorID, maxCount)}
+}
+
+func (_c *MockAgentOrchestratorStore_ConsumeGuestUsage_Call) Run(run func(ctx context.Context, instanceID int64, guestActorID string, maxCount *int64)) *MockAgentOrchestratorStore_ConsumeGuestUsage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(*int64))
+	})
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_ConsumeGuestUsage_Call) Return(_a0 error) *MockAgentOrchestratorStore_ConsumeGuestUsage_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_ConsumeGuestUsage_Call) RunAndReturn(run func(context.Context, int64, string, *int64) error) *MockAgentOrchestratorStore_ConsumeGuestUsage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FailDeleteOperation provides a mock function with given fields: ctx, operationID, message
 func (_m *MockAgentOrchestratorStore) FailDeleteOperation(ctx context.Context, operationID int64, message string) error {
 	ret := _m.Called(ctx, operationID, message)

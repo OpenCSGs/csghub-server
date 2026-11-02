@@ -76,3 +76,7 @@ categories:
     scope: skill
     show_name: 任务
     enabled: true
+  - name: user
+    scope: user
+    show_name: 用户标签
+    enabled: true

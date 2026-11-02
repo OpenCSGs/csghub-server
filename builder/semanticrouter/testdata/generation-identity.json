@@ -1,0 +1,38 @@
+[
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{},\"context_controls\":[]}",
+    "sha256": "b23ba7d49bbaf88cf0741232ac823d81c514f2b38dc53da4a6d73a97281d8f4b"
+  },
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{\"x\":null},\"context_controls\":[]}",
+    "sha256": "633ae7139d589cc18a56ee867017630280fda72da6a2c55117534a8fef711854"
+  },
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{\"x\":false},\"context_controls\":[]}",
+    "sha256": "1bdbf78869c5337a686f50f5a4864f8a319f26f0cca5a1972beaab1ee5a5fb65"
+  },
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{\"x\":0},\"context_controls\":[]}",
+    "sha256": "f25fff25198df904cca69b1bd0f6f1f10ab0e7d93a1bac98ef43c096546c96fa"
+  },
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{\"x\":1.0},\"context_controls\":[]}",
+    "sha256": "a691e2b98c41cd951beeb0100f194beef1eec4b48a598a1bff68fe5336fbff8f"
+  },
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{\"x\":1e0},\"context_controls\":[]}",
+    "sha256": "a691e2b98c41cd951beeb0100f194beef1eec4b48a598a1bff68fe5336fbff8f"
+  },
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{\"x\":9007199254740993},\"context_controls\":[]}",
+    "sha256": "872c62c51baa0ca08a29133b738c2ad533388598d1b52985f1c2f63ae83a2cc0"
+  },
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{\"x\":-0.00100,\"z\":\"中文é😊\"},\"context_controls\":[]}",
+    "sha256": "cb692c339d5dfc9cb734506728785a52625e8bb30dd345cc1ab79b0f46732d2b"
+  },
+  {
+    "raw": "{\"schema_version\":\"generation-config/1\",\"protocol\":\"openai_chat\",\"value_stage\":\"submitted\",\"parameters\":{\"x\":{\"b\":2,\"a\":[1,null,false]}},\"context_controls\":[]}",
+    "sha256": "19a744850bfa8f2dabc062ada9e7f4e2a117cf8476e556939a35dcdffbce58fd"
+  }
+]

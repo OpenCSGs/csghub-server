@@ -191,6 +191,7 @@ func TestInternalHandler_PostReceive(t *testing.T) {
 	tester.mocks.workflow.EXPECT().ExecuteWorkflow(
 		tester.Ctx(), client.StartWorkflowOptions{
 			TaskQueue: workflow.HandlePushQueueName,
+			ID:        "post-receive-model-u-r-bar",
 		}, mock.Anything,
 		&types.GiteaCallbackPushReq{Ref: "ref/heads/main"},
 	).Return(

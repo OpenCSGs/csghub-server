@@ -331,6 +331,40 @@ func TestAccountStatementDailySummaryStore_ListByUserAndSku_FiltersAndPaging(t *
 	require.Len(t, results, 1)
 }
 
+func TestAccountStatementDailySummaryStore_ListByUserAndSku_ExcludesApiScenes(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountStatementDailySummaryStoreWithDB(db)
+
+	jul1 := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	// one compute scene + the two API (serverless token) scenes the consumption
+	// report must exclude
+	seed := []database.AccountStatementDailySummary{
+		{BillDate: jul1, UserUUID: "user-a", SkuID: 1, Scene: types.SceneModelInference, CustomerID: "inst-1", TotalValue: 10, TotalCount: 1, MinID: 10, MinCreatedAt: jul1},
+		{BillDate: jul1, UserUUID: "user-a", SkuID: 2, Scene: types.SceneModelServerless, CustomerID: "inst-2", TotalValue: 20, TotalCount: 1, MinID: 20, MinCreatedAt: jul1},
+		{BillDate: jul1, UserUUID: "user-a", SkuID: 3, Scene: types.SceneMultiModalServerless, CustomerID: "inst-3", TotalValue: 30, TotalCount: 1, MinID: 30, MinCreatedAt: jul1},
+	}
+	for _, s := range seed {
+		_, err := db.Core.NewInsert().Model(&s).Exec(ctx)
+		require.Nil(t, err)
+	}
+
+	// no scene filter -> API scenes (15/16) excluded, only the compute scene remains
+	results, total, err := store.ListByUserAndSku(ctx, types.ActStatementsReq{
+		StartTime: "2026-07-01",
+		EndTime:   "2026-08-01",
+		Per:       10,
+		Page:      1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, results, 1)
+	require.Equal(t, types.SceneModelInference, results[0].Scene)
+	require.Equal(t, 10.0, results[0].TotalValue)
+}
+
 func TestAccountStatementDailySummaryStore_UpsertSummaryAndCheckpoint(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/notification/component"
@@ -25,11 +26,16 @@ func NewNotifierMessageHandlerWithMock(nmc component.NotificationComponent) *Not
 	}
 }
 
-// TestGetUnreadCount tests the GetUnreadCount handler function.
+// isOrdinaryNotificationUserContext matches the authenticated user without administrator authorization.
+func isOrdinaryNotificationUserContext(ctx context.Context) bool {
+	return ctx != nil && ctx.Value(httpbase.CurrentUserUUIDCtxVar) == "test" && !types.IsAdminAuthorized(ctx)
+}
+
+// TestGetUnreadCount verifies ordinary user identity is preserved when counting unread notifications.
 func TestGetUnreadCount(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
-	nmc.EXPECT().GetUnreadCount(context.Background(), "test").Return(10, nil)
+	nmc.EXPECT().GetUnreadCount(mock.MatchedBy(isOrdinaryNotificationUserContext), "test").Return(10, nil)
 	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/notifications/unread", nil)
@@ -50,6 +56,7 @@ func TestGetUnreadCount(t *testing.T) {
 	}
 }
 
+// TestListNotifications verifies ordinary user identity is preserved when listing notifications.
 func TestListNotifications(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
@@ -57,8 +64,8 @@ func TestListNotifications(t *testing.T) {
 		Page:     1,
 		PageSize: 10,
 	}
-	nmc.EXPECT().ListNotifications(context.Background(), "test", req).Return([]types.Notifications{}, 0, nil)
-	nmc.EXPECT().GetUnreadCount(context.Background(), "test").Return(0, nil)
+	nmc.EXPECT().ListNotifications(mock.MatchedBy(isOrdinaryNotificationUserContext), "test", req).Return([]types.Notifications{}, 0, nil)
+	nmc.EXPECT().GetUnreadCount(mock.MatchedBy(isOrdinaryNotificationUserContext), "test").Return(0, nil)
 	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	reqObj, _ := http.NewRequest("GET", fmt.Sprintf("/notifications?page=%d&page_size=%d", req.Page, req.PageSize), nil)
@@ -76,13 +83,14 @@ func TestListNotifications(t *testing.T) {
 	}
 }
 
+// TestMarkAsRead verifies ordinary user identity is preserved when marking notifications as read.
 func TestMarkAsRead(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
 	req := types.BatchNotificationOperationReq{
 		MarkAll: true,
 	}
-	nmc.EXPECT().MarkAsRead(context.Background(), "test", req).Return(nil)
+	nmc.EXPECT().MarkAsRead(mock.MatchedBy(isOrdinaryNotificationUserContext), "test", req).Return(nil)
 	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	body, _ := json.Marshal(req)
@@ -97,6 +105,7 @@ func TestMarkAsRead(t *testing.T) {
 	}
 }
 
+// TestUpdateNotificationSetting verifies ordinary user identity is preserved when updating notification settings.
 func TestUpdateNotificationSetting(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
@@ -122,7 +131,7 @@ func TestUpdateNotificationSetting(t *testing.T) {
 	endTime, _ := time.ParseInLocation("15:04", req.DoNotDisturbEnd, location)
 	expectedReq.DoNotDisturbEndTime = time.Date(2000, 1, 1, endTime.Hour(), endTime.Minute(), 0, 0, time.UTC)
 
-	nmc.EXPECT().NotificationsSetting(context.Background(), "test", expectedReq, location).Return(nil)
+	nmc.EXPECT().NotificationsSetting(mock.MatchedBy(isOrdinaryNotificationUserContext), "test", expectedReq, location).Return(nil)
 	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	body, _ := json.Marshal(req)
@@ -137,13 +146,14 @@ func TestUpdateNotificationSetting(t *testing.T) {
 	}
 }
 
+// TestPollNewNotifications verifies ordinary user identity is preserved when polling new notifications.
 func TestPollNewNotifications(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
 	limit := 5
 	t.Logf("Testing with limit: %d", limit)
 	location, _ := time.LoadLocation("Asia/Shanghai")
-	nmc.EXPECT().PollNewNotifications(context.Background(), "test", limit, location).Return(&types.NewNotifications{}, nil)
+	nmc.EXPECT().PollNewNotifications(mock.MatchedBy(isOrdinaryNotificationUserContext), "test", limit, location).Return(&types.NewNotifications{}, nil)
 	handler := NewNotifierMessageHandlerWithMock(nmc)
 
 	router := gin.Default()
@@ -170,11 +180,12 @@ func TestPollNewNotifications(t *testing.T) {
 	}
 }
 
+// TestGetNotificationSetting verifies ordinary user identity is preserved when reading notification settings.
 func TestGetNotificationSetting(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
 	location, _ := time.LoadLocation("Asia/Shanghai")
-	nmc.EXPECT().GetNotificationSetting(context.Background(), "test", location).Return(&types.NotificationSetting{}, nil)
+	nmc.EXPECT().GetNotificationSetting(mock.MatchedBy(isOrdinaryNotificationUserContext), "test", location).Return(&types.NotificationSetting{}, nil)
 	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	reqObj, _ := http.NewRequest("GET", "/notifications/setting?timezone=Asia/Shanghai", nil)
@@ -243,13 +254,14 @@ func TestSendMessage_Success(t *testing.T) {
 	mockNMC.AssertExpectations(t)
 }
 
+// TestMarkAsUnread verifies ordinary user identity is preserved when marking notifications as unread.
 func TestMarkAsUnread(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
 	req := types.BatchNotificationOperationReq{
 		MarkAll: true,
 	}
-	nmc.EXPECT().MarkAsUnread(context.Background(), "test", req).Return(nil)
+	nmc.EXPECT().MarkAsUnread(mock.MatchedBy(isOrdinaryNotificationUserContext), "test", req).Return(nil)
 	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	body, _ := json.Marshal(req)
@@ -265,13 +277,14 @@ func TestMarkAsUnread(t *testing.T) {
 	}
 }
 
+// TestDeleteNotifications verifies ordinary user identity is preserved when deleting notifications.
 func TestDeleteNotifications(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
 	req := types.BatchNotificationOperationReq{
 		MarkAll: true,
 	}
-	nmc.EXPECT().DeleteNotifications(context.Background(), "test", req).Return(nil)
+	nmc.EXPECT().DeleteNotifications(mock.MatchedBy(isOrdinaryNotificationUserContext), "test", req).Return(nil)
 	handler := NewNotifierMessageHandlerWithMock(nmc)
 
 	w := httptest.NewRecorder()

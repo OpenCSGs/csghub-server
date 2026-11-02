@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"reflect"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -29,9 +28,6 @@ func NewAccountingEventComponent() AccountingEventComponent {
 
 func (a *accountingEventComponentImpl) AddNewAccountingEvent(ctx context.Context, event *types.MeteringEvent, isDuplicated bool) error {
 	_, err := a.ae.GetByEventID(ctx, event.Uuid)
-	if err != nil {
-		slog.ErrorContext(ctx, "get event by id failed", slog.Any("error", err))
-	}
 	if errors.Is(err, sql.ErrNoRows) {
 		body := make(map[string]string)
 		elem := reflect.ValueOf(event).Elem()

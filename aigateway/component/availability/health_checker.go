@@ -973,9 +973,6 @@ func (h *healthCheckerImpl) updateHealthState(ctx context.Context, result *types
 		UpstreamID:      result.UpstreamID,
 		CreateIfMissing: true,
 		Mutate: func(state *database.AIGatewayUpstreamHealthState) error {
-			if state == nil {
-				return errors.New("mutate health state: nil state")
-			}
 			oldHealthState = state.HealthState
 			if !state.LastCheckAt.IsZero() && !result.Timestamp.After(state.LastCheckAt) {
 				persistedLastCheckedAt = state.LastCheckAt
@@ -1007,11 +1004,6 @@ func (h *healthCheckerImpl) updateHealthState(ctx context.Context, result *types
 		}
 		slog.ErrorContext(ctx, "Failed to mutate health state",
 			"error", err,
-			"upstream_id", result.UpstreamID)
-		return false
-	}
-	if existingState == nil {
-		slog.ErrorContext(ctx, "Mutate health state returned nil without error",
 			"upstream_id", result.UpstreamID)
 		return false
 	}
@@ -1072,9 +1064,6 @@ func (h *healthCheckerImpl) updateMultimodalHealthState(
 		UpstreamID:      result.UpstreamID,
 		CreateIfMissing: true,
 		Mutate: func(state *database.AIGatewayUpstreamHealthState) error {
-			if state == nil {
-				return errors.New("mutate multimodal health state: nil state")
-			}
 			oldHealthState = state.HealthState
 			current, _, err := readMultimodalHealthState(state.Metadata)
 			if err != nil {
@@ -1113,11 +1102,6 @@ func (h *healthCheckerImpl) updateMultimodalHealthState(
 		}
 		slog.Log(ctx, logLevel, "Failed to mutate multimodal health state",
 			"error", err,
-			"upstream_id", result.UpstreamID)
-		return multimodalHealthState{}, false
-	}
-	if existingState == nil {
-		slog.ErrorContext(ctx, "Mutate multimodal health state returned nil without error",
 			"upstream_id", result.UpstreamID)
 		return multimodalHealthState{}, false
 	}
@@ -1178,16 +1162,6 @@ func (h *healthCheckerImpl) publishHealthState(
 	result *types.HealthCheckResult,
 	existingState *database.AIGatewayUpstreamHealthState,
 ) {
-	if existingState == nil {
-		slog.WarnContext(ctx, "Skip publishing nil health state",
-			"upstream_id", func() int64 {
-				if result != nil {
-					return result.UpstreamID
-				}
-				return 0
-			}())
-		return
-	}
 	status := &types.ProviderHealthStatus{
 		UpstreamID:          existingState.UpstreamID,
 		HealthState:         types.HealthState(existingState.HealthState),
@@ -1198,7 +1172,7 @@ func (h *healthCheckerImpl) publishHealthState(
 	}
 	_ = h.stateCache.SetHealthState(ctx, status, healthStateCacheTTL)
 	// Update Prometheus metrics
-	if prom.AIGatewayUpstreamHealthState != nil && result != nil {
+	if prom.AIGatewayUpstreamHealthState != nil {
 		prom.AIGatewayUpstreamHealthState.WithLabelValues(
 			strconv.FormatInt(result.UpstreamID, 10),
 			result.ModelName,
@@ -1227,9 +1201,6 @@ func (h *healthCheckerImpl) persistHealthStateForPolicy(
 	result *types.HealthCheckResult,
 	policy types.SampleExecutionPolicy,
 ) (multimodalHealthState, bool) {
-	if result == nil {
-		return multimodalHealthState{}, false
-	}
 	if len(h.persistenceShards) == 0 {
 		return h.updateHealthStateForPolicy(ctx, result, policy)
 	}
@@ -1263,9 +1234,6 @@ func (h *healthCheckerImpl) persistHealthStateAsync(
 	result *types.HealthCheckResult,
 	policy types.SampleExecutionPolicy,
 ) {
-	if result == nil {
-		return
-	}
 	if len(h.persistenceShards) == 0 {
 		h.updateHealthStateForPolicy(ctx, result, policy)
 		return

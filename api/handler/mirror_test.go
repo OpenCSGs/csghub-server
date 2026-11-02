@@ -1,14 +1,26 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -123,6 +135,7 @@ func TestMirrorHandler_CreateMirrorRepoAutoCreateOrganizationDefaultsEnabled(t *
 	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.MatchedBy(func(req types.CreateMirrorRepoReq) bool {
 		return req.CurrentUser == "u" &&
 			req.AutoCreateOrganization == nil &&
+			req.Private != nil && !*req.Private &&
 			req.AllowAutoCreateOrganization
 	})).Return(&database.Mirror{}, nil)
 	tester.WithBody(t, &types.CreateMirrorRepoReq{
@@ -135,6 +148,43 @@ func TestMirrorHandler_CreateMirrorRepoAutoCreateOrganizationDefaultsEnabled(t *
 	}).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+// TestMirrorHandler_CreateMirrorRepoVisibilityDefaults checks public defaults and explicit visibility for every repository type.
+func TestMirrorHandler_CreateMirrorRepoVisibilityDefaults(t *testing.T) {
+	for _, repoType := range []types.RepositoryType{
+		types.ModelRepo, types.DatasetRepo, types.CodeRepo, types.SpaceRepo,
+		types.PromptRepo, types.MCPServerRepo, types.SkillRepo, types.TemplateRepo,
+	} {
+		for _, tc := range []struct {
+			name    string
+			private *bool
+		}{
+			{name: "omitted"},
+			{name: "explicit_private", private: new(true)},
+			{name: "explicit_public", private: new(false)},
+		} {
+			t.Run(string(repoType)+"/"+tc.name, func(t *testing.T) {
+				tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
+					return h.CreateMirrorRepo
+				})
+				tester.WithUser()
+				tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.MatchedBy(func(req types.CreateMirrorRepoReq) bool {
+					if req.RepoType != repoType {
+						return false
+					}
+					wantPrivate := tc.private != nil && *tc.private
+					return req.Private != nil && *req.Private == wantPrivate
+				})).Return(&database.Mirror{}, nil)
+				tester.WithBody(t, &types.CreateMirrorRepoReq{
+					SourceNamespace: "ns", SourceName: "source", RepoType: repoType,
+					SourceGitCloneUrl: "https://opencsg.com/ns/source.git",
+					ForkNamespace:     "target-ns", ForkName: "target-name", Private: tc.private,
+				}).Execute()
+				tester.ResponseEq(t, 200, tester.OKText, nil)
+			})
+		}
+	}
 }
 
 // TestMirrorHandler_CreateMirrorRepoIgnoresMCPServerAttributes verifies callers cannot inject internal MCP metadata through JSON.
@@ -193,7 +243,7 @@ func TestMirrorHandler_CreateMirrorRepoRequiresForkTarget(t *testing.T) {
 				"source_namespace": "ns",
 				"source_name":      "sn",
 				"mirror_source_id": 1,
-				"repo_type":        types.ModelRepo,
+				"repo_type":        types.DatasetRepo,
 				"source_url":       "url",
 				"fork_namespace":   "target-ns",
 			},
@@ -235,17 +285,68 @@ func TestMirrorHandler_SourceRepoAuthInvalid(t *testing.T) {
 		tester.ResponseEqSimple(t, 400, want)
 	})
 
-	t.Run("BatchCreate", func(t *testing.T) {
-		tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
-			return h.BatchCreate
+}
+
+// TestMirrorHandler_CreateMirrorRepoPrioritizesSourceURL verifies malformed paths are reported even when derived source fields are missing.
+func TestMirrorHandler_CreateMirrorRepoPrioritizesSourceURL(t *testing.T) {
+	for _, tc := range []struct {
+		sourceURL string
+		message   string
+	}{
+		{"https://xx.com/name.git", "source git clone url must include a namespace and repository"},
+		{"https://xx.com/ns/.git", "source git clone url must not contain empty namespace or repository path segments"},
+		{"https://xx.com/ns//repo.git", "source git clone url must not contain empty namespace or repository path segments"},
+	} {
+		t.Run(tc.sourceURL, func(t *testing.T) {
+			tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
+				return h.CreateMirrorRepo
+			})
+			tester.WithUser().WithBody(t, map[string]any{
+				"source_url":     tc.sourceURL,
+				"repo_type":      types.ModelRepo,
+				"fork_namespace": "target-ns",
+				"fork_name":      "target-name",
+			}).Execute()
+			tester.ResponseEqSimple(t, 400, gin.H{
+				"code": "MIRROR-ERR-8",
+				"msg":  "MIRROR-ERR-8: " + tc.message,
+			})
 		})
-		tester.WithBody(t, &types.BatchCreateMirrorReq{})
-		tester.mocks.mirror.EXPECT().BatchCreate(tester.Ctx(), mock.Anything).Return(authErr)
+	}
+}
 
-		tester.Execute()
-
-		tester.ResponseEqSimple(t, 400, want)
-	})
+// TestMirrorHandler_CreateMirrorRepoPreservesBindingErrors verifies URL validation does not bypass required fields or mask JSON decoding errors.
+func TestMirrorHandler_CreateMirrorRepoPreservesBindingErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    map[string]any
+		message string
+	}{
+		{
+			name:    "valid URL with missing source fields",
+			body:    map[string]any{"source_url": "https://xx.com/ns/repo.git", "repo_type": types.ModelRepo},
+			message: "CreateMirrorRepoReq.SourceNamespace",
+		},
+		{
+			name:    "missing URL",
+			body:    map[string]any{"source_namespace": "ns", "source_name": "repo", "repo_type": types.ModelRepo},
+			message: "CreateMirrorRepoReq.SourceGitCloneUrl",
+		},
+		{
+			name:    "wrong JSON field type with invalid URL",
+			body:    map[string]any{"source_url": "https://xx.com/name.git", "source_namespace": 123},
+			message: "cannot unmarshal number",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
+				return h.CreateMirrorRepo
+			})
+			tester.WithUser().WithBody(t, tc.body).Execute()
+			tester.ResponseEqCode(t, 400)
+			require.Contains(t, tester.Response().Body.String(), tc.message)
+		})
+	}
 }
 
 func TestMirrorHandler_CreateMirrorRepoBadRequest(t *testing.T) {
@@ -319,23 +420,6 @@ func TestMirrorHandler_CreateMirrorRepoTargetNotFound(t *testing.T) {
 	tester.ResponseEqSimple(t, 404, gin.H{
 		"code": "REPO-ERR-3",
 		"msg":  "REPO-ERR-3: target repository does not exist",
-	})
-}
-
-// TestMirrorHandler_BatchMirrorSourceBadRequest verifies malformed batch source URLs return a bad request.
-func TestMirrorHandler_BatchMirrorSourceBadRequest(t *testing.T) {
-	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
-		return h.BatchCreate
-	})
-	tester.WithBody(t, &types.BatchCreateMirrorReq{})
-	badRequestErr := errorx.BadRequest(errors.New("invalid source git clone url"), errorx.Ctx())
-	tester.mocks.mirror.EXPECT().BatchCreate(tester.Ctx(), mock.Anything).Return(badRequestErr)
-
-	tester.Execute()
-
-	tester.ResponseEqSimple(t, 400, gin.H{
-		"code": "REQ-ERR-0",
-		"msg":  "REQ-ERR-0: invalid source git clone url",
 	})
 }
 
@@ -421,4 +505,149 @@ func TestMirrorHandler_Statistics(t *testing.T) {
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, []types.MirrorStatusCount{{Count: 5}})
+}
+
+// TestParseMirrorMetricsQuery validates filters without losing large database IDs.
+func TestParseMirrorMetricsQuery(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		q, err := parseMirrorMetricsQuery(url.Values{})
+		require.NoError(t, err)
+		require.Equal(t, types.MirrorMetricsQuery{Service: "all", Page: 1, Per: 20, InstancePage: 1, InstancePer: 20}, q)
+	})
+	t.Run("explicit filters", func(t *testing.T) {
+		values, err := url.ParseQuery("service=lfs&instance_id=f6d030fa-7ef1-49db-b31f-45318c74f903&task_id=9007199254740993&page=2&per=100&instance_page=3&instance_per=1")
+		require.NoError(t, err)
+		q, err := parseMirrorMetricsQuery(values)
+		require.NoError(t, err)
+		require.Equal(t, "9007199254740993", q.TaskID)
+		require.Equal(t, "lfs", q.Service)
+		require.Equal(t, 2, q.Page)
+		require.Equal(t, 100, q.Per)
+		require.Equal(t, 3, q.InstancePage)
+		require.Equal(t, 1, q.InstancePer)
+	})
+	for _, raw := range []string{
+		"current_user=admin&current_user_uuid=f6d030fa-7ef1-49db-b31f-45318c74f903",
+		"include_history=true&since_ms=10&task_state=claimed",
+		"extra=&extra=ignored", "unknown_parameter=value",
+	} {
+		t.Run("ignores "+raw, func(t *testing.T) {
+			values, err := url.ParseQuery(raw)
+			require.NoError(t, err)
+			values.Set("service", "lfs")
+			values.Set("page", "2")
+			q, err := parseMirrorMetricsQuery(values)
+			require.NoError(t, err)
+			require.Equal(t, types.MirrorMetricsQuery{Service: "lfs", Page: 2, Per: 20, InstancePage: 1, InstancePer: 20}, q)
+		})
+	}
+	for _, raw := range []string{
+		"service=other", "service=repo&service=lfs", "service=", "page=1&page=2",
+		"page=0&current_user=admin&extra=value",
+		"instance_id=worker-1", "task_id=0", "task_id=01", "task_id=-1", "task_id=9223372036854775808",
+		"page=0", "per=101", "instance_page=-1", "instance_per=0", "page=1.5",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			values, err := url.ParseQuery(raw)
+			require.NoError(t, err)
+			_, err = parseMirrorMetricsQuery(values)
+			require.Error(t, err)
+		})
+	}
+}
+
+// TestMirrorMetricsHandlerResponses checks timeout propagation and safe failure responses.
+func TestMirrorMetricsHandlerResponses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name, query string
+		readError   error
+		wantStatus  int
+		wantCalls   int
+	}{
+		{name: "snapshot", wantStatus: 200, wantCalls: 1},
+		{name: "authentication and unrelated parameters", query: "?current_user=admin&current_user_uuid=user-id&extra=&extra=value", wantStatus: 200, wantCalls: 1},
+		{name: "encoded unrelated values", query: "?extra=%25ZZ&extra=a%26b&current_user=admin", wantStatus: 200, wantCalls: 1},
+		{name: "invalid value escape", query: "?per=%ZZ", wantStatus: 400},
+		{name: "incomplete escape", query: "?per=%", wantStatus: 400},
+		{name: "mixed duplicate with invalid escape", query: "?service=repo&service=%ZZ", wantStatus: 400},
+		{name: "invalid parameter name escape", query: "?%ZZ=value", wantStatus: 400},
+		{name: "invalid unrelated value escape", query: "?extra=%ZZ&service=lfs", wantStatus: 400},
+		{name: "encoded duplicate parameter name", query: "?service=repo&%73ervice=lfs", wantStatus: 400},
+		{name: "invalid query", query: "?per=101", wantStatus: 400},
+		{name: "cache failure", readError: errors.New("redis://private:secret@host"), wantStatus: 503, wantCalls: 1},
+		{name: "timeout", readError: context.DeadlineExceeded, wantStatus: 503, wantCalls: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			h := MirrorMetricsHandler{read: func(ctx context.Context, query types.MirrorMetricsQuery) (*types.MirrorMetricsResponse, error) {
+				calls++
+				deadline, ok := ctx.Deadline()
+				require.True(t, ok)
+				require.LessOrEqual(t, time.Until(deadline), 2*time.Second)
+				return &types.MirrorMetricsResponse{SchemaVersion: 2, Status: "partial", ServerTimeMS: 1792022400000}, tc.readError
+			}}
+			engine := gin.New()
+			engine.GET("/metrics", h.Get)
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics"+tc.query, nil))
+			require.Equal(t, tc.wantStatus, response.Code)
+			require.Equal(t, tc.wantCalls, calls)
+			require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
+			require.NotContains(t, response.Body.String(), "secret")
+			if tc.wantStatus == http.StatusOK {
+				var body struct {
+					Data types.MirrorMetricsResponse `json:"data"`
+				}
+				require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+				require.Equal(t, "partial", body.Data.Status)
+				require.Equal(t, 2, body.Data.SchemaVersion)
+			}
+		})
+	}
+}
+
+// TestMirrorMetricsHandlerInstanceUUIDForms matches equivalent UUID forms through the real snapshot filter.
+func TestMirrorMetricsHandlerInstanceUUIDForms(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	server := miniredis.RunT(t)
+	cfg := &config.Config{}
+	cfg.Redis.Endpoint = server.Addr()
+	cfg.Mirror.Metrics.Enabled = true
+	cfg.Mirror.Metrics.Scope = "uuid-forms"
+	store := cache.NewMirrorMetricsStoreFromConfig(cfg)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	ctx := context.Background()
+	now := time.Now().UnixMilli()
+	const id = "f6d030fa-7ef1-49db-b31f-45318c74f903"
+	for i, instanceID := range []string{id, "9e1a1212-7488-4fe5-a271-21171970348c"} {
+		require.NoError(t, store.PublishSnapshot(ctx, types.MirrorMetricsSnapshot{
+			SchemaVersion: cache.MirrorMetricsSchemaVersion,
+			Instance:      types.MirrorMetricsInstance{InstanceID: instanceID, Service: "lfs", RuntimeState: "ready", SampledAtMS: &now},
+			Executions:    []types.MirrorMetricsTask{{TaskID: strconv.Itoa(i + 1)}},
+		}))
+	}
+	require.NoError(t, store.PublishControl(ctx, &types.MirrorMetricsControl{SchemaVersion: cache.MirrorMetricsSchemaVersion, SampledAtMS: now}))
+	engine := gin.New()
+	engine.GET("/metrics", NewMirrorMetricsHandler(cfg).Get)
+	for _, input := range []string{id, strings.ToUpper(id), strings.ReplaceAll(id, "-", ""), "urn:uuid:" + id, "{" + id + "}"} {
+		t.Run(input, func(t *testing.T) {
+			query := url.Values{"instance_id": {input}}
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics?"+query.Encode(), nil))
+			require.Equal(t, http.StatusOK, response.Code)
+			var body struct {
+				Data types.MirrorMetricsResponse `json:"data"`
+			}
+			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+			require.Equal(t, 1, body.Data.Instances.Total)
+			require.Len(t, body.Data.Instances.Items, 1)
+			require.Equal(t, id, body.Data.Instances.Items[0].InstanceID)
+			require.Equal(t, 1, body.Data.Tasks.Total)
+			require.Len(t, body.Data.Tasks.Items, 1)
+			require.Equal(t, "1", body.Data.Tasks.Items[0].TaskID)
+			require.Equal(t, id, *body.Data.Tasks.Items[0].InstanceID)
+			require.Equal(t, 2, body.Data.Overview.OnlineInstances.LFS)
+		})
+	}
 }

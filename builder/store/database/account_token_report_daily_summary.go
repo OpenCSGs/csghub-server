@@ -113,6 +113,7 @@ SELECT
 FROM account_statements
 WHERE created_at >= ? AND created_at < ?
   AND scene IN (?, ?)
+  AND (token_plan_period_id IS NULL OR token_plan_period_id <= 0)
 GROUP BY user_uuid, COALESCE(token_id, 0), COALESCE(resource_id, ''), COALESCE(provider, ''),
   COALESCE(upstream_id, 0), scene, COALESCE(data_type, ''), COALESCE(resolution, '')
 ON CONFLICT (stat_date, ns_uuid, token_id, resource_id, provider, upstream_id, scene, data_type, resolution)

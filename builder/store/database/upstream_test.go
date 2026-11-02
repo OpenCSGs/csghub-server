@@ -380,8 +380,8 @@ func TestDeployTaskStore_GetDeployByIDWithRelations(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a repository.
-	repoStore := database.NewRepoStoreWithDB(db)
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:           "namespace/test-deploy-rel-repo",
 		GitPath:        "namespace/test-deploy-rel-repo",
 		Name:           "test-deploy-rel-repo",
@@ -389,7 +389,7 @@ func TestDeployTaskStore_GetDeployByIDWithRelations(t *testing.T) {
 		RepositoryType: types.ModelRepo,
 		UserID:         user.ID,
 		DefaultBranch:  "main",
-	})
+	}))
 	require.NoError(t, err)
 
 	// Create a deploy referencing the user and repo.

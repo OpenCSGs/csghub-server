@@ -13,10 +13,13 @@ import (
 
 // fakeJobClient records workhub enqueue arguments for mirror adapter tests.
 type fakeJobClient struct {
-	tx     *sql.Tx
-	args   JobArgs
-	opts   *InsertOpts
-	called bool
+	batch      []InsertManyParams
+	batchCalls int
+	err        error
+	tx         *sql.Tx
+	args       JobArgs
+	opts       *InsertOpts
+	called     bool
 }
 
 // Insert records non-transactional enqueue arguments.
@@ -34,6 +37,23 @@ func (c *fakeJobClient) InsertTx(ctx context.Context, tx *sql.Tx, args JobArgs, 
 	c.opts = opts
 	c.called = true
 	return 123, nil
+}
+
+// InsertManyTx records a single transactional batch.
+func (c *fakeJobClient) InsertManyTx(ctx context.Context, tx *sql.Tx, params []InsertManyParams) ([]int64, error) {
+	c.tx = tx
+	c.called = true
+	c.batch = params
+	c.batchCalls++
+	ids := make([]int64, len(params))
+	for i, param := range params {
+		c.args, c.opts = param.Args, param.Opts
+		ids[i] = int64(123 + i)
+	}
+	if c.err != nil {
+		return nil, c.err
+	}
+	return ids, nil
 }
 
 // JobCancelTx records no data because mirror adapter tests only enqueue jobs.

@@ -77,6 +77,12 @@ func (p *paraviewClientImpl) GetOAuthToken(ctx context.Context, code, state stri
 	return &token, nil
 }
 
+// BuildAuthorizationURL is not supported for paraview, whose sign-in flow is
+// built by the frontend and does not mandate PKCE.
+func (p *paraviewClientImpl) BuildAuthorizationURL(ctx context.Context, state string) (string, string, error) {
+	return "", "", fmt.Errorf("BuildAuthorizationURL is not supported by paraview sso client")
+}
+
 func (p *paraviewClientImpl) GetUserInfo(ctx context.Context, accessToken string) (*SSOUserInfo, error) {
 	endpoint := fmt.Sprintf("%s/esc-sso/oauth2.0/profile?access_token=%s", p.endpoint, accessToken)
 	resp, err := http.Get(endpoint)

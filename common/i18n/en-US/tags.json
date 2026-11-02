@@ -89,6 +89,9 @@
   "Tag.I18nKey.relation-extraction": {
     "other": "relation extraction"
   },
+  "Tag.I18nKey.typed-decisions": {
+    "other": "typed decisions"
+  },
   "Tag.I18nKey.auto-speech-recognition": {
     "other": "auto speech recognition"
   },

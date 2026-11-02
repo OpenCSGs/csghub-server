@@ -91,11 +91,11 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	jobClient := &fakeMirrorRepoJobClient{}
 	cancelClient := &fakeMirrorJobCancelClient{}
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           "test/requeue",
 		GitPath:        "models_test/requeue",
@@ -105,7 +105,7 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 		Private:        false,
 		RepositoryType: types.ModelRepo,
 		SyncStatus:     types.SyncStatusCompleted,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -219,10 +219,10 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackWhenJobInsertFails(t *tes
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	jobClient := &fakeMirrorRepoJobClient{err: errors.New("insert job failed")}
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           "test/requeue-rollback",
 		GitPath:        "models_test/requeue-rollback",
@@ -232,7 +232,7 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackWhenJobInsertFails(t *tes
 		Private:        false,
 		RepositoryType: types.ModelRepo,
 		SyncStatus:     types.SyncStatusCompleted,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -370,9 +370,9 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus(t *testing.T) {
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/repo",
 		GitPath:       "test/repo.git",
@@ -381,7 +381,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus(t *testing.T) {
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusPending,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -426,9 +426,9 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_MultipleSyncStatuses(t *t
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/repo2",
 		GitPath:       "test/repo2.git",
@@ -437,7 +437,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_MultipleSyncStatuses(t *t
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusPending,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -503,9 +503,9 @@ func TestMirrorTaskStore_PauseIsIdempotentForNonRunningStatuses(t *testing.T) {
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           "test/pause-idempotent",
 		GitPath:        "test/pause-idempotent.git",
@@ -514,7 +514,7 @@ func TestMirrorTaskStore_PauseIsIdempotentForNonRunningStatuses(t *testing.T) {
 		DefaultBranch:  "main",
 		RepositoryType: types.ModelRepo,
 		SyncStatus:     types.SyncStatusPending,
-	})
+	}))
 	require.NoError(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -591,9 +591,9 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_FailedStatus(t *testing.T
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/repo3",
 		GitPath:       "test/repo3.git",
@@ -602,7 +602,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_FailedStatus(t *testing.T
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -640,9 +640,9 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusRejectsStaleCurrentTask(t 
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/stale-current",
 		GitPath:       "test/stale-current.git",
@@ -651,7 +651,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusRejectsStaleCurrentTask(t 
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -704,9 +704,9 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusRejectsCanceledTask(t *tes
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/canceled-race",
 		GitPath:       "test/canceled-race.git",
@@ -715,7 +715,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusRejectsCanceledTask(t *tes
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -772,9 +772,9 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSynchronizesMirrorAndR
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/cancel-sync",
 		GitPath:       "test/cancel-sync.git",
@@ -783,7 +783,7 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSynchronizesMirrorAndR
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -841,9 +841,9 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSupportsSoftDeletedRep
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/cancel-soft-deleted",
 		GitPath:       "test/cancel-soft-deleted.git",
@@ -852,7 +852,7 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSupportsSoftDeletedRep
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.NoError(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -908,9 +908,9 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelKeepsFinishedTask(t *t
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/cancel-finished",
 		GitPath:       "test/cancel-finished.git",
@@ -919,7 +919,7 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelKeepsFinishedTask(t *t
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusCompleted,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -972,10 +972,10 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDCancelsRiverJobsInTx(t *testing.T) 
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	cancelClient := &fakeMirrorJobCancelClient{}
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/cancel-jobs",
 		GitPath:       "test/cancel-jobs.git",
@@ -984,7 +984,7 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDCancelsRiverJobsInTx(t *testing.T) 
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -1024,10 +1024,10 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDRollsBackWhenRiverCancelFails(t *te
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	cancelClient := &fakeMirrorJobCancelClient{err: errors.New("river cancel failed")}
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/cancel-rollback",
 		GitPath:       "test/cancel-rollback.git",
@@ -1036,7 +1036,7 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDRollsBackWhenRiverCancelFails(t *te
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -1078,9 +1078,9 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_UpdatesMirrorAndRepoFromS
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/repo4",
 		GitPath:       "test/repo4.git",
@@ -1089,7 +1089,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_UpdatesMirrorAndRepoFromS
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusPending,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -1129,9 +1129,9 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusReturnsMirrorRepository(t 
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/repo-relation",
 		GitPath:       "test/repo-relation.git",
@@ -1140,7 +1140,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusReturnsMirrorRepository(t 
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusFailed,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -1247,9 +1247,9 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusClearsErrorOnSuccess(t *te
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           "test/repo-clear-error",
 		GitPath:        "test/repo-clear-error.git",
@@ -1259,7 +1259,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusClearsErrorOnSuccess(t *te
 		Private:        false,
 		RepositoryType: types.ModelRepo,
 		SyncStatus:     types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -1307,10 +1307,10 @@ func TestMirrorTaskStore_CompleteRepoSyncAndInsertLFSJobCommitsRepoResultAndJob(
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	jobClient := &fakeMirrorLFSJobClient{}
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/repo7",
 		GitPath:       "test/repo7.git",
@@ -1319,7 +1319,7 @@ func TestMirrorTaskStore_CompleteRepoSyncAndInsertLFSJobCommitsRepoResultAndJob(
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -1382,9 +1382,9 @@ func TestMirrorTaskStore_CompleteRepoSyncWithoutLFSFinishesTaskWithoutLFSJob(t *
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/repo9",
 		GitPath:       "test/repo9.git",
@@ -1393,7 +1393,7 @@ func TestMirrorTaskStore_CompleteRepoSyncWithoutLFSFinishesTaskWithoutLFSJob(t *
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -1449,10 +1449,10 @@ func TestMirrorTaskStore_CompleteRepoSyncAndInsertLFSJobRollsBackRepoResultOnJob
 
 	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
 	mirrorStore := database.NewMirrorStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	jobClient := &fakeMirrorLFSJobClient{err: errors.New("insert lfs job failed")}
 
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:        1,
 		Path:          "test/repo8",
 		GitPath:       "test/repo8.git",
@@ -1461,7 +1461,7 @@ func TestMirrorTaskStore_CompleteRepoSyncAndInsertLFSJobRollsBackRepoResultOnJob
 		DefaultBranch: "main",
 		Private:       false,
 		SyncStatus:    types.SyncStatusInProgress,
-	})
+	}))
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
@@ -1614,11 +1614,11 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRefreshesMCPMetadata(t *testing.T)
 	defer db.Close()
 	ctx := context.TODO()
 
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID: 1, Path: "test/mcp-refresh", GitPath: "mcpservers_test/mcp-refresh", Name: "mcp-refresh",
 		Nickname: "Old MCP", Description: "old description", License: "old-license", Readme: "old readme",
 		DefaultBranch: "main", StarCount: 1, RepositoryType: types.MCPServerRepo, SyncStatus: types.SyncStatusCompleted,
-	})
+	}))
 	require.NoError(t, err)
 	mcpStore := database.NewMCPServerStoreWithDB(db)
 	server, err := mcpStore.Create(ctx, database.MCPServer{
@@ -1665,7 +1665,7 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRefreshesMCPMetadata(t *testing.T)
 	require.NoError(t, err)
 	require.NotZero(t, task.ID)
 
-	storedRepo, err := database.NewRepoStoreWithDB(db).FindById(ctx, repo.ID)
+	storedRepo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).FindById(ctx, repo.ID)
 	require.NoError(t, err)
 	require.Equal(t, "Fresh MCP", storedRepo.Nickname)
 	require.Equal(t, "fresh description", storedRepo.Description)
@@ -1703,11 +1703,11 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackSkillMetadata(t *testing.
 	ctx := context.TODO()
 
 	oldUpdatedAt := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID: 1, Path: "test/skill-refresh", GitPath: "skills_test/skill-refresh", Name: "skill-refresh",
 		Nickname: "Old Skill", Description: "old description", License: "old-license", Readme: "old readme",
 		DefaultBranch: "main", RepositoryType: types.SkillRepo, SyncStatus: types.SyncStatusCompleted,
-	})
+	}))
 	require.NoError(t, err)
 	_, err = database.NewSkillStoreWithDB(db).Create(ctx, database.Skill{RepositoryID: repo.ID, LastUpdatedAt: oldUpdatedAt})
 	require.NoError(t, err)
@@ -1733,7 +1733,7 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackSkillMetadata(t *testing.
 	})
 	require.ErrorContains(t, err, "insert job failed")
 
-	storedRepo, err := database.NewRepoStoreWithDB(db).FindById(ctx, repo.ID)
+	storedRepo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).FindById(ctx, repo.ID)
 	require.NoError(t, err)
 	require.Equal(t, "Old Skill", storedRepo.Nickname)
 	require.Equal(t, "old description", storedRepo.Description)
@@ -1743,4 +1743,55 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackSkillMetadata(t *testing.
 	storedSkill, err := database.NewSkillStoreWithDB(db).ByRepoID(ctx, repo.ID)
 	require.NoError(t, err)
 	require.True(t, storedSkill.LastUpdatedAt.Equal(oldUpdatedAt))
+}
+
+func TestMirrorTaskStore_AutomaticRequeuePreservesActiveTask(t *testing.T) {
+	for _, tc := range []struct{ active, terminal types.MirrorTaskStatus }{
+		{types.MirrorQueued, types.MirrorCanceled},
+		{types.MirrorRepoSyncStart, types.MirrorRepoSyncFatal},
+		{types.MirrorRepoSyncFinished, types.MirrorLfsIncomplete},
+		{types.MirrorLfsSyncStart, types.MirrorLfsSyncFinished},
+		{types.MirrorRepoSyncFailed, types.MirrorRepoTooLarge},
+		{types.MirrorLfsSyncFailed, types.MirrorLfsSyncFatal},
+	} {
+		status := tc.active
+		t.Run(string(status), func(t *testing.T) {
+			db := tests.InitTestDB()
+			defer db.Close()
+			ctx := context.Background()
+			store := database.NewMirrorTaskJobStoreWithDB(db)
+			mirrors := database.NewMirrorStoreWithDB(db)
+			repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{Path: "test/automatic", RepositoryType: types.ModelRepo, SyncStatus: types.SyncStatusInProgress}))
+			require.NoError(t, err)
+			mirror, err := mirrors.Create(ctx, &database.Mirror{RepositoryID: repo.ID, SourceUrl: "https://example.com/test/automatic.git"})
+			require.NoError(t, err)
+			task, err := store.Create(ctx, database.MirrorTask{MirrorID: mirror.ID, Status: status, RepoJobID: 101, LFSJobID: 202})
+			require.NoError(t, err)
+			require.NoError(t, store.SetMirrorCurrentTaskID(ctx, task))
+			before, err := mirrors.FindByID(ctx, mirror.ID)
+			require.NoError(t, err)
+			jobs := &fakeMirrorRepoJobClient{}
+			cancel := &fakeMirrorJobCancelClient{}
+			input := database.RequeueMirrorRepoTaskInput{MirrorID: mirror.ID, RepositoryID: repo.ID, PreserveActiveTask: true, JobClient: jobs, JobCancelClient: cancel}
+			_, err = store.RequeueMirrorRepoTask(ctx, input)
+			require.ErrorIs(t, err, database.ErrMirrorTaskActive)
+			require.Empty(t, jobs.inputs)
+			require.Empty(t, cancel.jobIDs)
+			current, err := store.FindByID(ctx, task.ID)
+			require.NoError(t, err)
+			require.Equal(t, status, current.Status)
+			after, err := mirrors.FindByID(ctx, mirror.ID)
+			require.NoError(t, err)
+			require.Equal(t, before.CurrentTaskID, after.CurrentTaskID)
+			require.True(t, before.UpdatedAt.Equal(after.UpdatedAt))
+			// Every terminal outcome releases automatic scheduling.
+			_, err = db.Core.NewUpdate().Model((*database.MirrorTask)(nil)).Set("status = ?", tc.terminal).Where("id = ?", task.ID).Exec(ctx)
+			require.NoError(t, err)
+			next, err := store.RequeueMirrorRepoTask(ctx, input)
+			require.NoError(t, err)
+			require.NotEqual(t, task.ID, next.ID)
+			require.Len(t, jobs.inputs, 1)
+			require.Empty(t, cancel.jobIDs)
+		})
+	}
 }

@@ -25,5 +25,8 @@
     },
     "error.SYS-ERR-8": {
         "other": "Forbid changing repository visibility setting"
+    },
+    "error.SYS-ERR-9": {
+        "other": "Cannot perform this operation: at least one user must retain permission to manage administrators."
     }
 }

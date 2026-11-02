@@ -12,6 +12,24 @@ fi
 if [[ ! $ENGINE_ARGS == *"-c "* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS -c 8192"
 fi
+# Non-causal decision models (laya, clef, vllm-d3, lfm2-d1-omni) are evaluated
+# in a single batch: llama.cpp rejects a prompt larger than the physical batch
+# size (-ub) and stalls when it does not fit the logical batch size (-b).
+# Decision prompts are bounded by the context size, so both follow -c (default
+# 8192 above); DECISION_BATCH_SIZE overrides explicitly.
+if [[ "$HF_TASK" == "typed-decisions" ]]; then
+    # llama.cpp keeps the last occurrence of a repeated option, so the last
+    # -c/--ctx-size value is the effective context size.
+    decision_ctx="$(printf '%s' "$ENGINE_ARGS" \
+        | grep -oE '(-c|--ctx-size)([[:space:]]+|=)[1-9][0-9]*' \
+        | tail -n 1 \
+        | grep -oE '[0-9]+$')"
+    decision_batch="${DECISION_BATCH_SIZE:-${decision_ctx:-8192}}"
+    ENGINE_ARGS="$(printf '%s' "$ENGINE_ARGS" | sed -E \
+        -e 's/(^|[[:space:]])(-b|--batch-size|-ub|--ubatch-size)[[:space:]]+[^[:space:]]+/\1/g' \
+        -e 's/(^|[[:space:]])(--batch-size|--ubatch-size)=[^[:space:]]+/\1/g')"
+    ENGINE_ARGS="$ENGINE_ARGS -b $decision_batch -ub $decision_batch"
+fi
 # enable embedding mode for embedding-style tasks
 if [[ "$HF_TASK" == "feature-extraction" || "$HF_TASK" == "sentence-similarity" ]]; then
     if [[ ! $ENGINE_ARGS == *"--embedding"* ]]; then

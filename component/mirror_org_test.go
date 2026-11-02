@@ -5,10 +5,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
-	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
@@ -34,15 +32,13 @@ func TestEnsureMirrorOrgNamespaceCoexistsWithHierarchyRoot(t *testing.T) {
 			require.NoError(t, err)
 
 			authorizer := mockrebac.NewMockAuthorizer(t)
-			authorizer.EXPECT().Check(mock.Anything, mock.Anything).Return(rebac.Decision{Allowed: false}, nil)
-			authorizer.EXPECT().Write(mock.Anything, mock.Anything).Return(nil)
 			mirror := &mirrorComponentImpl{
-				orgStore:       database.NewOrgStore(false, nil),
+				orgStore:       database.NewOrgStoreWithJobClients(false, nil, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB())),
 				namespaceStore: database.NewNamespaceStoreWithDB(db),
 				userStore:      database.NewUserStoreWithDB(db),
 				rebac:          authorizer,
 			}
-			unitStore := database.NewOrganizationUnitStoreWithDB(db)
+			unitStore := database.NewOrganizationUnitStoreWithDBAndJobClients(db, nil, nil, tests.NewFixtureRebacTupleJobClient(db))
 			createRoot := func() {
 				rootUUID := uuid.New()
 				_, err := unitStore.CreateRoot(ctx, database.CreateRootOrganizationInput{

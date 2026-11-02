@@ -63,7 +63,7 @@
         "other": "{{.instance_type}} 部署請求欄位 {{.field}} 不能為空"
     },
     "error.AGENT-ERR-21": {
-        "other": "llm 模型 {{.model}} 不適用於 {{.instance_type}}"
+        "other": "未找到可用的文字生成模型 {{.model}}"
     },
     "error.AGENT-ERR-22": {
         "other": "倉庫路徑 {{.repo_path}} 未找到對應的 csgclaw 模板"
@@ -94,5 +94,23 @@
     },
     "error.AGENT-ERR-31": {
         "other": "智能體運行時生命週期衝突"
+    },
+    "error.AGENT-ERR-35": {
+        "other": "欄位 {{.field}} 由程式碼倉庫托管，不能修改"
+    },
+    "error.AGENT-ERR-36": {
+        "other": "模型 {{.model}} 必須支援文字生成才能用於 {{.instance_type}}"
+    },
+    "error.AGENT-ERR-37": {
+        "other": "模型 {{.model}} 必須支援函數呼叫才能用於 {{.instance_type}}"
+    },
+    "error.AGENT-ERR-38": {
+        "other": "沒有適用於 {{.instance_type}} 的預設模型"
+    },
+    "error.AGENT-ERR-39": {
+        "other": "AI 網關模型服務設定無效"
+    },
+    "error.AGENT-ERR-40": {
+        "other": "無法取得 {{.instance_type}} 的 AI Gateway 模型"
     }
 }

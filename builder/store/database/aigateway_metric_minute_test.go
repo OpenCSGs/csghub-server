@@ -44,19 +44,22 @@ func TestAIGatewayMetricMinuteStore_UpsertBatch(t *testing.T) {
 	// First insert.
 	rows := []database.AIGatewayMetricMinute{
 		{
-			BucketTime:         bucket,
-			Model:              "qwen-72b",
-			Provider:           "provider-a",
-			RequestTotal:       100,
-			RequestSuccess:     95,
-			RequestFailed:      5,
-			PromptTokens:       500,
-			CompletionTokens:   200,
-			TotalTokens:        700,
-			CachedTokens:       150,
+			BucketTime:          bucket,
+			RequestModel:        "auto",
+			Model:               "qwen-72b",
+			Provider:            "provider-a",
+			RequestTotal:        100,
+			RequestSuccess:      95,
+			RequestFailed:       5,
+			PromptTokens:        500,
+			CompletionTokens:    200,
+			TotalTokens:         700,
+			CachedTokens:        150,
 			CacheCreationTokens: 80,
-			TTFTP50Ms:          180.5,
-			ActiveRequests:     12,
+			TTFTP50Ms:           180.5,
+			QueueWaitP50Ms:      120,
+			QueueDepth:          4,
+			ActiveRequests:      12,
 		},
 	}
 	err = store.UpsertBatch(ctx, rows)
@@ -67,10 +70,13 @@ func TestAIGatewayMetricMinuteStore_UpsertBatch(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 	require.Equal(t, int64(100), result[0].RequestTotal)
+	require.Equal(t, "auto", result[0].RequestModel)
 	require.Equal(t, "qwen-72b", result[0].Model)
 	require.Equal(t, "provider-a", result[0].Provider)
 	require.Equal(t, int64(150), result[0].CachedTokens)
 	require.Equal(t, int64(80), result[0].CacheCreationTokens)
+	require.Equal(t, 120.0, result[0].QueueWaitP50Ms)
+	require.Equal(t, int64(4), result[0].QueueDepth)
 
 	// Second insert with updated values (idempotent upsert).
 	rows[0].RequestTotal = 150
@@ -108,8 +114,11 @@ func TestAIGatewayMetricMinuteStore_QueryByTimeRange_AllModels(t *testing.T) {
 
 	bucket := time.Date(2026, 7, 31, 13, 0, 0, 0, time.UTC)
 	rows := []database.AIGatewayMetricMinute{
-		{BucketTime: bucket, Model: "model-a", Provider: "provider-a", RequestTotal: 10},
-		{BucketTime: bucket, Model: "model-b", Provider: "provider-b", RequestTotal: 20},
+		{BucketTime: bucket, RequestModel: "model-a", Model: "model-a", Provider: "provider-a", RequestTotal: 10},
+		{BucketTime: bucket, RequestModel: "model-b", Model: "model-b", Provider: "provider-b", RequestTotal: 20},
+		// Same resolved model as model-a but requested through "auto": the
+		// request_model dimension must keep the two rows apart.
+		{BucketTime: bucket, RequestModel: "auto", Model: "model-a", Provider: "provider-a", RequestTotal: 30},
 	}
 	err = store.UpsertBatch(ctx, rows)
 	require.NoError(t, err)
@@ -117,7 +126,7 @@ func TestAIGatewayMetricMinuteStore_QueryByTimeRange_AllModels(t *testing.T) {
 	// Query all models (empty model filter).
 	result, err := store.QueryByTimeRange(ctx, bucket, bucket.Add(time.Minute), "")
 	require.NoError(t, err)
-	require.Len(t, result, 2)
+	require.Len(t, result, 3)
 
 	// Cleanup.
 	_, _ = db.Core.NewDelete().Model((*database.AIGatewayMetricMinute)(nil)).Where("bucket_time = ?", bucket).Exec(ctx)

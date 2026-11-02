@@ -240,7 +240,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `AGENT-ERR-23`
 - **Error Name:** `agentTemplateSensitiveCheckCreateAgentBlocked`
-- **Description:**
+- **Description:** 
 
 ---
 
@@ -248,7 +248,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `AGENT-ERR-24`
 - **Error Name:** `agentTemplateSensitiveCheckMakePublicBlocked`
-- **Description:**
+- **Description:** 
 
 ---
 
@@ -256,7 +256,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `AGENT-ERR-25`
 - **Error Name:** `agentTemplateSensitiveCheckCreateAgentPending`
-- **Description:**
+- **Description:** 
 
 ---
 
@@ -264,7 +264,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `AGENT-ERR-26`
 - **Error Name:** `agentTemplateSensitiveCheckMakePublicPending`
-- **Description:**
+- **Description:** 
 
 ---
 
@@ -288,7 +288,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `AGENT-ERR-29`
 - **Error Name:** `csgclawSubdomainInvalid`
-- **Description:**
+- **Description:** 
 
 ---
 
@@ -425,6 +425,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `AUTH-ERR-15`
 - **Error Name:** `noTargetTransferPermission`
 - **Description:** The user does not have write permission on the target namespace and cannot transfer the repository to it.
+
+---
+
+### `AUTH-ERR-16`
+
+- **Error Code:** `AUTH-ERR-16`
+- **Error Name:** `userEmailNotVerified`
+- **Description:** The email address is not set. Please set your email address before making this request.
 
 ## Collection Errors
 
@@ -1672,7 +1680,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `SERVERLESS-ERR-9`
 - **Error Name:** `codeUpdateFailedErr`
-- **Description:**
+- **Description:** 
 
 ## Skill Errors
 
@@ -2113,3 +2121,4 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-21`
 - **Error Name:** `tagIDsNotExist`
 - **Description:** One or more of the provided tag IDs do not exist in the system. Please verify all tag IDs are valid.
+

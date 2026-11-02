@@ -686,6 +686,61 @@ func TestDeployTaskStore_ListDeployBytype(t *testing.T) {
 	require.Equal(t, 0, len(result))
 }
 
+func TestDeployTaskStore_ListFinetunesByOwnerNamespace(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create finetune deploys for org1, org2, and non-finetune types; some deleted
+	deploys := []database.Deploy{
+		{UserID: 1, Type: types.FinetuneType, Status: common.Running, DeployName: "ft-org1-1", OwnerNamespace: "org1", GitPath: "models_a/b", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, Type: types.FinetuneType, Status: common.Running, DeployName: "ft-org1-2", OwnerNamespace: "org1", GitPath: "models_c/d", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, Type: types.FinetuneType, Status: common.Deleted, DeployName: "ft-org1-deleted", OwnerNamespace: "org1", GitPath: "models_x/y", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, Type: types.FinetuneType, Status: common.Running, DeployName: "ft-org2-1", OwnerNamespace: "org2", GitPath: "models_e/f", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, Type: types.InferenceType, Status: common.Running, DeployName: "inf-org1-1", OwnerNamespace: "org1", GitPath: "models_g/h", GitBranch: "main", Template: "t", Hardware: "{}"},
+	}
+	for i := range deploys {
+		err := store.CreateDeploy(ctx, &deploys[i])
+		require.Nil(t, err)
+	}
+
+	// List finetunes for org1: should return 2 (excluding deleted and inference)
+	result, total, err := store.ListFinetunesByOwnerNamespace(ctx, "org1", 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, result, 2)
+	names := make([]string, len(result))
+	for i, d := range result {
+		names[i] = d.DeployName
+	}
+	require.ElementsMatch(t, []string{"ft-org1-1", "ft-org1-2"}, names)
+
+	// List finetunes for org2: should return 1
+	result, total, err = store.ListFinetunesByOwnerNamespace(ctx, "org2", 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, result, 1)
+	require.Equal(t, "ft-org2-1", result[0].DeployName)
+
+	// Pagination: page size 1, page 1 and 2
+	result, total, err = store.ListFinetunesByOwnerNamespace(ctx, "org1", 1, 1)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, result, 1)
+
+	result, total, err = store.ListFinetunesByOwnerNamespace(ctx, "org1", 1, 2)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, result, 1)
+
+	// Non-existent namespace
+	result, total, err = store.ListFinetunesByOwnerNamespace(ctx, "nonexistent", 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Len(t, result, 0)
+}
+
 func TestDeployTaskStore_ListDeployByOwnerNamespace(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -1071,7 +1126,7 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 3, total)    // Total should be 4
+	require.Equal(t, 3, total)    // Total should be 3
 	require.Equal(t, 2, len(dps)) // But only 2 per page
 
 	// Test 9: Filter by status (Running only)
@@ -1750,4 +1805,206 @@ func TestDeployTaskStore_FindActiveDeployByName(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, found)
 	}
+}
+
+func TestDeployTaskStore_UpdateDeployStatusCAS(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	deploy := &database.Deploy{
+		DeployName: "cas-dp", SvcName: "cas-svc",
+		RepoID:  123,
+		UserID:  456,
+		SpaceID: 321,
+		Type:    types.SandboxType,
+		Status:  common.Running,
+		Message: "old",
+	}
+	require.Nil(t, store.CreateDeploy(ctx, deploy))
+	dp, err := store.GetDeployBySvcName(ctx, "cas-svc")
+	require.Nil(t, err)
+
+	after := &database.Deploy{}
+
+	// CAS with the wrong expected status matches zero rows and writes nothing.
+	dp.Status = common.Sleeping
+	applied, err := store.UpdateDeployStatusCAS(ctx, dp, common.Deploying)
+	require.Nil(t, err)
+	require.False(t, applied)
+	require.Nil(t, db.Core.NewSelect().Model(after).Where("id = ?", dp.ID).Scan(ctx))
+	require.Equal(t, common.Running, after.Status)
+	require.Equal(t, "old", after.Message)
+	updatedAtBefore := after.UpdatedAt
+
+	// CAS with the read-time status applies and updates the managed columns.
+	dp.Status = common.Sleeping
+	dp.Message = "suspended by idle sweeper"
+	dp.StatusUpdateAt = time.Now()
+	applied, err = store.UpdateDeployStatusCAS(ctx, dp, common.Running)
+	require.Nil(t, err)
+	require.True(t, applied)
+	require.Nil(t, db.Core.NewSelect().Model(after).Where("id = ?", dp.ID).Scan(ctx))
+	require.Equal(t, common.Sleeping, after.Status)
+	require.Equal(t, "suspended by idle sweeper", after.Message)
+	// The CAS write must keep advancing updated_at. Client vs DB clock skew can
+	// put the client-written timestamp before the DB-generated create time, so
+	// assert the column changed and carries the value we wrote, not ordering.
+	require.NotEqual(t, updatedAtBefore, after.UpdatedAt)
+	require.WithinDuration(t, dp.UpdatedAt, after.UpdatedAt, time.Millisecond)
+	updatedAtAfterCas := after.UpdatedAt
+
+	// A replay with the now-stale expected status no longer applies.
+	applied, err = store.UpdateDeployStatusCAS(ctx, dp, common.Running)
+	require.Nil(t, err)
+	require.False(t, applied)
+	require.Equal(t, common.Sleeping, after.Status)
+
+	// UpdateDeployStatus overwrites the status unconditionally by primary key.
+	require.Nil(t, store.UpdateDeployStatus(ctx, dp.ID, common.Deleted))
+	require.Nil(t, db.Core.NewSelect().Model(after).Where("id = ?", dp.ID).Scan(ctx))
+	require.Equal(t, common.Deleted, after.Status)
+	require.False(t, after.StatusUpdateAt.IsZero())
+	require.NotEqual(t, updatedAtAfterCas, after.UpdatedAt)
+}
+
+func TestDeployTaskStore_UpdateDeploySpec(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	deploy := &database.Deploy{
+		DeployName: "spec-dp", SvcName: "spec-svc",
+		RepoID:  123,
+		UserID:  456,
+		SpaceID: 321,
+		Type:    types.SandboxType,
+		Status:  common.Running,
+		Message: "keep-me",
+		ImageID: "old-image:1",
+		Env:     `{"a":"b"}`,
+		SKU:     "11",
+	}
+	require.Nil(t, store.CreateDeploy(ctx, deploy))
+	dp, err := store.GetDeployBySvcName(ctx, "spec-svc")
+	require.Nil(t, err)
+
+	// Mutate spec columns only: the column scoping must leave the status
+	// columns untouched even though the struct also carries them.
+	updatedBefore := dp.UpdatedAt
+	dp.ImageID = "new-image:2"
+	dp.SKU = "22"
+	dp.Env = `{"c":"d"}`
+	require.Nil(t, store.UpdateDeploySpec(ctx, dp))
+
+	after := &database.Deploy{}
+	require.Nil(t, db.Core.NewSelect().Model(after).Where("id = ?", dp.ID).Scan(ctx))
+	require.Equal(t, "new-image:2", after.ImageID)
+	require.Equal(t, "22", after.SKU)
+	require.Equal(t, `{"c":"d"}`, after.Env)
+	require.Equal(t, common.Running, after.Status)
+	require.Equal(t, "keep-me", after.Message)
+	require.NotEqual(t, updatedBefore, after.UpdatedAt)
+	require.WithinDuration(t, dp.UpdatedAt, after.UpdatedAt, time.Millisecond)
+}
+
+func TestDeployTaskStore_UpdateDeployColumnsIfNotDeleted(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	deploy := &database.Deploy{
+		DeployName: "gdep-dp", SvcName: "gdep-svc",
+		RepoID:  123,
+		UserID:  456,
+		SpaceID: 321,
+		Type:    types.SandboxType,
+		Status:  common.Pending,
+	}
+	require.Nil(t, store.CreateDeploy(ctx, deploy))
+	dp, err := store.GetDeployBySvcName(ctx, "gdep-svc")
+	require.Nil(t, err)
+
+	// While the row is live, the guarded column write applies.
+	dp.SvcName = "renamed-svc"
+	dp.Status = common.Deploying
+	applied, err := store.UpdateDeployColumnsIfNotDeleted(ctx, dp, "svc_name", "status")
+	require.Nil(t, err)
+	require.True(t, applied)
+	after := &database.Deploy{}
+	require.Nil(t, db.Core.NewSelect().Model(after).Where("id = ?", dp.ID).Scan(ctx))
+	require.Equal(t, "renamed-svc", after.SvcName)
+	require.Equal(t, common.Deploying, after.Status)
+	require.False(t, after.StatusUpdateAt.IsZero())
+
+	// Once the row is Deleted, the same write matches zero rows and persists
+	// nothing: no resurrection of the terminal row.
+	require.Nil(t, store.UpdateDeployStatus(ctx, dp.ID, common.Deleted))
+	afterDelete := &database.Deploy{}
+	require.Nil(t, db.Core.NewSelect().Model(afterDelete).Where("id = ?", dp.ID).Scan(ctx))
+
+	dp.SvcName = "resurrect-svc"
+	dp.Status = common.Running
+	applied, err = store.UpdateDeployColumnsIfNotDeleted(ctx, dp, "svc_name", "status")
+	require.Nil(t, err)
+	require.False(t, applied)
+	afterFinal := &database.Deploy{}
+	require.Nil(t, db.Core.NewSelect().Model(afterFinal).Where("id = ?", dp.ID).Scan(ctx))
+	require.Equal(t, common.Deleted, afterFinal.Status)
+	require.Equal(t, "renamed-svc", afterFinal.SvcName)
+	require.Equal(t, afterDelete.UpdatedAt, afterFinal.UpdatedAt)
+}
+
+func TestDeployTaskStore_UpdateInTxSkipsDeletedDeploy(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	deploy := &database.Deploy{
+		DeployName: "txdel-dp", SvcName: "txdel-svc",
+		RepoID:  123,
+		UserID:  456,
+		SpaceID: 321,
+		Type:    types.SandboxType,
+		Status:  common.Running,
+	}
+	require.Nil(t, store.CreateDeploy(ctx, deploy))
+	dp, err := store.GetDeployBySvcName(ctx, "txdel-svc")
+	require.Nil(t, err)
+
+	task := &database.DeployTask{
+		DeployID: dp.ID,
+		TaskType: common.TaskTypeDeploy,
+		Status:   common.TaskStatusDeployPending,
+	}
+	require.Nil(t, store.CreateDeployTask(ctx, task))
+	loaded, err := store.GetDeployTask(ctx, task.ID)
+	require.Nil(t, err)
+
+	require.Nil(t, store.UpdateDeployStatus(ctx, dp.ID, common.Deleted))
+
+	// handleDeployError-shaped update: the deploy write is skipped on the
+	// Deleted row while the task update still applies.
+	dp.Status = common.DeployFailed
+	loaded.Status = common.TaskStatusDeployFailed
+	loaded.Message = "boom"
+	loaded.Deploy = dp
+	require.Nil(t, store.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, dp, loaded))
+
+	afterDeploy := &database.Deploy{}
+	require.Nil(t, db.Core.NewSelect().Model(afterDeploy).Where("id = ?", dp.ID).Scan(ctx))
+	require.Equal(t, common.Deleted, afterDeploy.Status)
+
+	afterTask := &database.DeployTask{}
+	require.Nil(t, db.Core.NewSelect().Model(afterTask).Where("id = ?", loaded.ID).Scan(ctx))
+	require.Equal(t, common.TaskStatusDeployFailed, afterTask.Status)
+	require.Equal(t, "boom", afterTask.Message)
 }

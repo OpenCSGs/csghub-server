@@ -16,6 +16,7 @@ const (
 	ProviderMutableACAutomaton = "mutable_ac_automaton"
 	ProviderAliyunGreen        = "aliyun_green"
 	ProviderLLM                = "guard_llm"
+	ProviderPromptInjection    = "prompt_injection"
 )
 
 type chainImpl struct {

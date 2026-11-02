@@ -61,7 +61,8 @@ func TestWebHookExecutorKService_ProcessEvent(t *testing.T) {
 		SvcName: event.ServiceName,
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	// oldStatus is common.Pending: the mocked deploy record carries no status.
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) &&
 			d.Status == event.Status &&
 			d.SvcName == event.ServiceName &&
@@ -69,7 +70,7 @@ func TestWebHookExecutorKService_ProcessEvent(t *testing.T) {
 			d.Reason == event.Reason &&
 			d.ClusterNode == event.ClusterNode &&
 			!d.StatusUpdateAt.IsZero()
-	})).Return(nil)
+	}), common.Pending).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 
@@ -115,7 +116,7 @@ func TestKServiceExecutor_updateDeployStatus_success(t *testing.T) {
 		ClusterNode: "",
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) &&
 			d.Status == event.Status &&
 			d.Message == event.Message &&
@@ -125,7 +126,7 @@ func TestKServiceExecutor_updateDeployStatus_success(t *testing.T) {
 			len(d.Instances) == 1 &&
 			d.Instances[0].Name == "inst1" &&
 			!d.StatusUpdateAt.IsZero()
-	})).Return(nil)
+	}), common.Deploying).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -297,11 +298,11 @@ func TestKServiceExecutor_updateDeployStatus_clearInstancesOnStopped(t *testing.
 		},
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) &&
 			d.Status == common.Stopped &&
 			len(d.Instances) == 0 // instances should be cleared on Stopped
-	})).Return(nil)
+	}), common.Running).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -339,11 +340,11 @@ func TestKServiceExecutor_updateDeployStatus_updateEndpointAndQueueName(t *testi
 		SvcName: event.ServiceName,
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) &&
 			d.Endpoint == "http://new-endpoint.example.com" &&
 			d.QueueName == "new-queue"
-	})).Return(nil)
+	}), common.Deploying).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -459,7 +460,7 @@ func TestKServiceExecutor_updateDeployStatus_updateDeployError(t *testing.T) {
 		SvcName: event.ServiceName,
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(errors.New("update error"))
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Deploying).Return(false, errors.New("update error"))
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -508,7 +509,7 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunning(t *testi
 		GitPath:    "ns/n",
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Deploying).Return(true, nil)
 
 	// handleDeployRunning runs in a goroutine and calls GetDeployByIDWithRelations
 	// to build the upstream sync payload. The deploy has no Repository, so
@@ -578,7 +579,7 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunningOnSleepin
 		GitPath:    "ns/n",
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Deploying).Return(true, nil)
 
 	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
 	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(nil)
@@ -637,7 +638,7 @@ func TestKServiceExecutor_updateDeployStatus_noHandleDeployRunningWhenAlreadySle
 		SvcName: event.ServiceName,
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Sleeping).Return(true, nil)
 
 	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
 	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(nil)
@@ -677,7 +678,7 @@ func TestKServiceExecutor_updateDeployStatus_noHandleDeployRunningWhenAlreadyRun
 		SvcName: event.ServiceName,
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Running).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -716,12 +717,12 @@ func TestKServiceExecutor_updateDeployStatus_appendClusterNode(t *testing.T) {
 		ClusterNode: "node1",
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) &&
 			d.ClusterNode != "" &&
 			containsClusterNode(d.ClusterNode, "node1") &&
 			containsClusterNode(d.ClusterNode, "node2")
-	})).Return(nil)
+	}), common.Deploying).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -760,9 +761,9 @@ func TestKServiceExecutor_updateDeployStatus_skipDuplicateClusterNode(t *testing
 		ClusterNode: "node1",
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) && d.ClusterNode == "node1"
-	})).Return(nil)
+	}), common.Deploying).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -802,9 +803,9 @@ func TestKServiceExecutor_updateDeployStatus_overwriteClusterNodeForNonInference
 		ClusterNode: "node1",
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) && d.ClusterNode == "node2"
-	})).Return(nil)
+	}), common.Deploying).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -842,9 +843,9 @@ func TestKServiceExecutor_updateDeployStatus_emptyClusterNodeNotAppended(t *test
 		ClusterNode: "node1",
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) && d.ClusterNode == "node1"
-	})).Return(nil)
+	}), common.Deploying).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -971,6 +972,20 @@ func TestKServiceExecutor_buildDeployNotification(t *testing.T) {
 		require.Equal(t, payload["git_path"], deploy.GitPath)
 		require.Equal(t, url, "")
 	})
+	t.Run("notebook", func(t *testing.T) {
+		deploy := &database.Deploy{
+			ID:         1,
+			UserUUID:   "user1",
+			DeployName: "deploy1",
+			Type:       types.NotebookType,
+			GitPath:    "ns/n",
+		}
+		payload, url := buildDeployNotification(deploy)
+		require.Equal(t, payload["deploy_name"], deploy.DeployName)
+		require.Equal(t, payload["deploy_id"], deploy.ID)
+		require.Equal(t, payload["git_path"], deploy.GitPath)
+		require.Equal(t, url, fmt.Sprintf("/notebooks/%d", deploy.ID))
+	})
 	t.Run("unknown", func(t *testing.T) {
 		deploy := &database.Deploy{
 			ID:         1,
@@ -1014,9 +1029,9 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployDeleted(t *testi
 		SvcName: event.ServiceName,
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) && d.Status == common.Deleted
-	})).Return(nil)
+	}), common.Running).Return(true, nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 	err = exec.updateDeployStatus(ctx, event)
@@ -1209,7 +1224,7 @@ func TestKServiceExecutor_updateDeployStatus_recordsSuspensionOnEverySleepingEve
 	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
 		ID: int64(1), SvcName: event.ServiceName, Status: common.Sleeping,
 	}, nil)
-	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Sleeping).Return(true, nil)
 
 	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
 	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(nil)
@@ -1255,8 +1270,8 @@ func TestKServiceExecutor_updateDeployStatus_retriesSleepingAfterDeployUpdateFai
 		ID: int64(1), SvcName: event.ServiceName, Status: common.Sleeping,
 	}, nil).Twice()
 	updateErr := errors.New("update deploy")
-	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(updateErr).Once()
-	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil).Once()
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Sleeping).Return(false, updateErr).Once()
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Sleeping).Return(true, nil).Once()
 
 	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
 	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(nil).Twice()
@@ -1264,5 +1279,46 @@ func TestKServiceExecutor_updateDeployStatus_retriesSleepingAfterDeployUpdateFai
 	exec := &kserviceExecutorImpl{cfg: cfg, deployTaskStore: dts, orchestratorStore: orchestratorStore}
 	err := exec.updateDeployStatus(ctx, event)
 	require.ErrorIs(t, err, updateErr)
+	require.NoError(t, exec.updateDeployStatus(ctx, event))
+}
+
+// =====================================================================
+// stale-event CAS drop
+// =====================================================================
+
+// When another writer advanced the deploy row between the executor's read and
+// its write, the CAS affects zero rows and the stale event must be dropped
+// without side effects — in particular it must not overwrite a terminal status
+// (e.g. resurrect Deleted(27) back to Stopped(26)) nor trigger
+// handleDeployRunning/handleDeployStopped.
+func TestKServiceExecutor_updateDeployStatus_dropsStaleEventWhenCasLosesRace(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+
+	event := &types.ServiceEvent{
+		ServiceName: "svc-test",
+		Status:      common.Running,
+		TaskID:      100,
+	}
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID: int64(100), DeployID: int64(1), TaskType: common.TaskTypeDeploy,
+	}, nil)
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{
+		ID: int64(100),
+	}, nil)
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID: int64(1), SvcName: event.ServiceName, Status: common.Deploying,
+	}, nil)
+	// The row moved on after the read (e.g. the deployer marked it Deleted):
+	// the CAS on the read-time status matches zero rows.
+	dts.EXPECT().UpdateDeployStatusCAS(ctx, mock.Anything, common.Deploying).Return(false, nil)
+
+	// Strict mock: no GetDeployByIDWithRelations and no notification
+	// expectations — a wrongly triggered handleDeployRunning would fail the
+	// test on missing mock calls (and panic on the nil notification client).
+
+	exec := NewTestKServiceExecutor(cfg, dts)
 	require.NoError(t, exec.updateDeployStatus(ctx, event))
 }

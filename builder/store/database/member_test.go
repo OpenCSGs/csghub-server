@@ -15,10 +15,11 @@ import (
 
 func TestMemberStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
+	seedTupleOrganization(t, db, 123)
 	defer db.Close()
 	ctx := context.TODO()
 
-	userStore := database.NewUserStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	user := &database.User{
 		ID:       456,
 		Username: "testuser",
@@ -28,7 +29,7 @@ func TestMemberStore_CRUD(t *testing.T) {
 	err := userStore.Create(ctx, user, &database.Namespace{Path: "testuser"})
 	require.Nil(t, err)
 
-	store := database.NewMemberStoreWithDB(db)
+	store := database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	err = store.Add(ctx, 123, 456, string(types.UserRead))
 	require.Nil(t, err)
@@ -70,7 +71,8 @@ func TestMemberStore_OrgMembersWithNilUser(t *testing.T) {
 	ctx := context.TODO()
 	store := database.NewMemberStoreWithDB(db)
 
-	err := store.Add(ctx, 123, 456, string(types.UserRead))
+	// Simulate an orphaned historical row; normal writes require valid identities.
+	_, err := db.Core.NewInsert().Model(&database.Member{OrganizationID: 123, UserID: 456, Role: string(types.UserRead)}).Exec(ctx)
 	require.Nil(t, err)
 	mem := &database.Member{}
 	err = db.Core.NewSelect().Model(mem).Where("user_id=?", 456).Scan(ctx)
@@ -94,10 +96,11 @@ func TestMemberStore_UserUUIDsByOrganizationID(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	userStore := database.NewUserStoreWithDB(db)
-	memberStore := database.NewMemberStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	memberStore := database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	orgID := int64(9999)
+	seedTupleOrganization(t, db, orgID)
 	role := string(types.UserRead)
 
 	testUsers := []struct {
@@ -142,10 +145,13 @@ func TestMemberStore_UserUUIDsByOrganizationID(t *testing.T) {
 
 func TestMemberStore_Update(t *testing.T) {
 	db := tests.InitTestDB()
+	seedTupleOrganization(t, db, 123)
+	_, createErr := db.Core.NewInsert().Model(&database.User{ID: 456, Username: "member-update", UUID: uuid.NewString()}).Exec(context.Background())
+	require.NoError(t, createErr)
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewMemberStoreWithDB(db)
+	store := database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	err := store.Add(ctx, 123, 456, string(types.UserRead))
 	require.Nil(t, err)

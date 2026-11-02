@@ -153,6 +153,14 @@ type AdmissionDecision struct {
 	// queueing. Callers that re-plan after a reroute accumulate the wait
 	// across rounds themselves.
 	QueueWaitMs int64
+	// QueueDepth is the admission queue depth observed for this request
+	// (the selected upstream's queue at admission time, or the queue the
+	// request was enqueued on). 0 when no queue was involved.
+	QueueDepth int64
+	// Queued reports that the request actually entered an admission
+	// reservation queue. Queue metrics are only recorded for queued
+	// requests — non-queued traffic must not dilute the queue statistics.
+	Queued bool
 	// RetryAfterSeconds is a retry hint for rejected requests. It is NOT a
 	// capacity guarantee: for RPM/TPM it is the seconds until the current
 	// window ends; for concurrency it is a configured hint.
@@ -201,6 +209,10 @@ type CapacityAdmissionRequest struct {
 	// Model is the resolved model; Model.Upstreams is the router-owned
 	// candidate set (already availability-filtered).
 	Model *Model
+	// RequestModel is the model ID the client asked for. It is carried for
+	// queue metric attribution only (the "auto" virtual model and a direct
+	// model name must remain distinguishable); empty falls back to Model.ID.
+	RequestModel string
 	// PreferredUpstreamID is the upstream selected by the router.
 	PreferredUpstreamID int64
 	// AllowSelect enables capacity-aware fallback re-selection within the

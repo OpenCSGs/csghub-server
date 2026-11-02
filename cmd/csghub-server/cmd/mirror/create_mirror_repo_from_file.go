@@ -113,12 +113,20 @@ var createMirrorRepoFromFile = &cobra.Command{
 			}
 
 			req := types.CreateMirrorRepoReq{
-				SourceNamespace:   sourceNamespace,
-				SourceName:        sourceName,
-				MirrorSourceID:    mirrorSource.ID,
-				RepoType:          types.RepositoryType(repoType),
-				DefaultBranch:     "main",
-				SourceGitCloneUrl: sourceGitCloneUrl,
+				SourceNamespace:             sourceNamespace,
+				SourceName:                  sourceName,
+				MirrorSourceID:              mirrorSource.ID,
+				RepoType:                    types.RepositoryType(repoType),
+				DefaultBranch:               "main",
+				SourceGitCloneUrl:           sourceGitCloneUrl,
+				CurrentUser:                 "AIWizards",
+				AllowAutoCreateOrganization: true,
+				ForkNamespace:               sourceNamespace,
+				ForkName:                    sourceName,
+			}
+			// Catalog models request publication; other types retain their existing private default.
+			if req.RepoType == types.ModelRepo {
+				req.Private = new(false)
 			}
 			fmt.Println(req)
 			_, err = c.CreateMirrorRepo(ctx, req)

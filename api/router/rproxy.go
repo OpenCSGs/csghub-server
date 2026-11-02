@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gin-contrib/cors"
+	"opencsg.com/csghub-server/builder/instrumentation"
+
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -15,14 +16,8 @@ import (
 
 func NewRProxyRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(cors.New(cors.Config{
-		AllowCredentials: true,
-		AllowHeaders:     []string{"*"},
-		AllowMethods:     []string{"*"},
-		AllowAllOrigins:  true,
-	}))
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
+	middleware.SetInfraMiddleware(r, config, instrumentation.RProxy)
+	r.Use(middleware.BuildCORS(config))
 	store := cookie.NewStore([]byte(config.Space.SessionSecretKey))
 	store.Options(sessions.Options{
 		// SameSite: http.SameSiteNoneMode, // support 3rd part

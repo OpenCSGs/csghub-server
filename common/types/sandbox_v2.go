@@ -46,6 +46,9 @@ type SandboxV2CreateRequest struct {
 	VolumeMounts    []VolumeMount          `json:"volume_mounts,omitempty"`
 	MinReplica      int                    `json:"min_replica,omitempty"`
 	MaxReplica      int                    `json:"max_replica,omitempty"`
+	// StoragePolicy is empty for legacy callers (no storage-policy annotation);
+	// orchestrated callers set it via SandboxV2EnsurePersistentRequest instead.
+	StoragePolicy AgentStoragePolicy `json:"storage_policy,omitempty"`
 }
 
 // SandboxV2EnsurePersistentRequest identifies an orchestrated sandbox by an

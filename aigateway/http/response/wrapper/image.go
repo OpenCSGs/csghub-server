@@ -111,9 +111,9 @@ func (w *ImageGeneration) Finalize() error {
 		w.internalWritter.Header().Set("Content-Type", "application/json")
 		w.internalWritter.WriteHeader(http.StatusInternalServerError)
 		return json.NewEncoder(w.internalWritter).Encode(gin.H{"error": types.Error{
-			Code:    "transform_error",
+			Code:    types.ErrCodeTransform,
 			Message: err.Error(),
-			Type:    "internal_error",
+			Type:    types.ErrTypeServer,
 		}})
 	}
 

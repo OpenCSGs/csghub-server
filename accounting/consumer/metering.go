@@ -248,14 +248,28 @@ func (m *MeteringImpl) parseMessageData(raw []byte) (*types.MeteringEvent, error
 	return &evt, nil
 }
 
+// parseMessageExtraData reads the flat string fields the billing pipeline
+// needs out of the event extra.  Values that are not JSON strings are kept
+// as their raw JSON rather than failing the whole event: a producer that
+// adds a field of another shape must not silently take every metering
+// event with it to the dead-letter queue, because an event dropped there
+// is usage that is never billed.
 func (c *MeteringImpl) parseMessageExtraData(extra string) (map[string]string, error) {
 	extraMap := make(map[string]string, 0)
 	if len(strings.Trim(extra, " ")) == 0 {
 		return extraMap, nil
 	}
-	err := json.Unmarshal([]byte(extra), &extraMap)
+	rawMap := make(map[string]json.RawMessage)
+	err := json.Unmarshal([]byte(extra), &rawMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal metering event extra json data, %v, %w", extra, err)
+	}
+	for key, raw := range rawMap {
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil {
+			value = string(raw)
+		}
+		extraMap[key] = value
 	}
 	return extraMap, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
+	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 	mocktemporal "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/types"
@@ -36,8 +37,11 @@ func TestStartCommentMediaModerationWorkflow_ReservesFinalizeAndDeleteBudget(t *
 	require.NoError(t, StartCommentMediaModerationWorkflow(context.Background(), temporalClient, req, timing))
 }
 
+// newPollTestEnv registers mocked activities and deterministic test worker metadata.
 func newPollTestEnv(t *testing.T) (*testsuite.TestWorkflowEnvironment, common.PollCommentMediaOptions) {
 	t.Helper()
+	// Avoid hashing the large test binary inside the first workflow task while keeping deadlock detection enabled.
+	worker.SetBinaryChecksum("moderation-workflow-test")
 	testSuite := &testsuite.WorkflowTestSuite{}
 	env := testSuite.NewTestWorkflowEnvironment()
 	env.RegisterActivity(activity.PollCommentMediaModerationResultActivity)

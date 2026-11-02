@@ -2,8 +2,10 @@ package mq
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -14,8 +16,12 @@ import (
 var _ MessageQueue = (*Nats)(nil)
 
 type Nats struct {
-	conn *nats.Conn
-	js   jetstream.JetStream
+	conn                 *nats.Conn
+	js                   jetstream.JetStream
+	xnetStreamMaxMsgs    int64
+	xnetStreamMaxBytes   int64
+	xnetLimitsMu         sync.Mutex
+	xnetLimitsConfigured bool
 }
 
 func NewNats(cfg *config.Config) (MessageQueue, error) {
@@ -33,17 +39,77 @@ func NewNats(cfg *config.Config) (MessageQueue, error) {
 		return nil, fmt.Errorf("[nats] failed to new jetstream instance context: %w", err)
 	}
 	return &Nats{
-		conn: nc,
-		js:   jetstream,
+		conn:               nc,
+		js:                 jetstream,
+		xnetStreamMaxMsgs:  cfg.Xnet.MigrationStreamMaxMsgs,
+		xnetStreamMaxBytes: cfg.Xnet.MigrationStreamMaxBytes,
 	}, nil
 }
 
 func (n *Nats) Publish(topic string, data []byte) error {
+	if topic == LfsMigrationSubject {
+		if err := n.ensureXnetMigrationStreamLimits(); err != nil {
+			return err
+		}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	_, err := n.js.Publish(ctx, topic, data)
 	if err != nil {
 		return fmt.Errorf("[nats] failed to publish message to subject %s error: %w", topic, err)
+	}
+	return nil
+}
+
+func (n *Nats) ensureXnetMigrationStreamLimits() error {
+	if n.xnetStreamMaxMsgs <= 0 || n.xnetStreamMaxBytes <= 0 {
+		return nil
+	}
+	n.xnetLimitsMu.Lock()
+	defer n.xnetLimitsMu.Unlock()
+	if n.xnetLimitsConfigured {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	stream, err := n.js.Stream(ctx, LfsXnetMigrateGroup.StreamName)
+	if err != nil {
+		return fmt.Errorf("[nats] get existing xnet migration stream: %w", err)
+	}
+	info, err := stream.Info(ctx)
+	if err != nil {
+		return fmt.Errorf("[nats] get xnet migration stream info: %w", err)
+	}
+	config, err := applyXnetMigrationStreamLimits(info.Config, n.xnetStreamMaxMsgs, n.xnetStreamMaxBytes)
+	if err != nil {
+		return err
+	}
+	if _, err := n.js.UpdateStream(ctx, config); err != nil {
+		return fmt.Errorf("[nats] update xnet migration stream limits: %w", err)
+	}
+	n.xnetLimitsConfigured = true
+	return nil
+}
+
+func applyXnetMigrationStreamLimits(config jetstream.StreamConfig, maxMsgs, maxBytes int64) (jetstream.StreamConfig, error) {
+	if err := validateXnetMigrationStreamConfig(config); err != nil {
+		return jetstream.StreamConfig{}, err
+	}
+	config.MaxMsgs = maxMsgs
+	config.MaxBytes = maxBytes
+	config.Discard = jetstream.DiscardNew
+	return config, nil
+}
+
+func validateXnetMigrationStreamConfig(config jetstream.StreamConfig) error {
+	if len(config.Subjects) != 1 || config.Subjects[0] != LfsMigrationSubject {
+		return fmt.Errorf(
+			"[nats] stream %s must exclusively own subject %s", config.Name, LfsMigrationSubject,
+		)
+	}
+	if config.Retention != jetstream.WorkQueuePolicy {
+		return fmt.Errorf("[nats] stream %s must use work queue retention", config.Name)
 	}
 	return nil
 }
@@ -142,7 +208,11 @@ func (n *Nats) PurgeStream(streamName string) error {
 		return fmt.Errorf("[nats] failed to get stream %s error: %w", streamName, err)
 	}
 
-	err = stream.Purge(ctx)
+	if streamName == LfsXnetMigrateGroup.StreamName {
+		err = purgeXnetMigrationStream(ctx, stream)
+	} else {
+		err = stream.Purge(ctx)
+	}
 	if err != nil {
 		return fmt.Errorf("[nats] failed to purge stream %s error: %w", streamName, err)
 	}
@@ -158,6 +228,9 @@ func (n *Nats) DeleteMessagesByFilter(streamName string, filter func(data []byte
 	stream, err := n.js.Stream(ctx, streamName)
 	if err != nil {
 		return fmt.Errorf("[nats] failed to get stream %s error: %w", streamName, err)
+	}
+	if streamName == LfsXnetMigrateGroup.StreamName {
+		return deleteXnetMessagesByFilter(ctx, stream, filter)
 	}
 
 	info, err := stream.Info(ctx)
@@ -218,6 +291,71 @@ func (n *Nats) DeleteMessagesByFilter(streamName string, filter func(data []byte
 	slog.Info("[nats] messages deleted by filter",
 		slog.String("stream", streamName),
 		slog.Int("deleted_count", deletedCount))
+	return nil
+}
+
+type xnetStreamMutation interface {
+	Info(context.Context, ...jetstream.StreamInfoOpt) (*jetstream.StreamInfo, error)
+	GetMsg(context.Context, uint64, ...jetstream.GetMsgOpt) (*jetstream.RawStreamMsg, error)
+	DeleteMsg(context.Context, uint64) error
+	Purge(context.Context, ...jetstream.StreamPurgeOpt) error
+}
+
+func validatedXnetStreamInfo(ctx context.Context, stream xnetStreamMutation) (*jetstream.StreamInfo, error) {
+	info, err := stream.Info(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("[nats] failed to get xnet migration stream info: %w", err)
+	}
+	if err := validateXnetMigrationStreamConfig(info.Config); err != nil {
+		return nil, err
+	}
+	return info, nil
+}
+
+func purgeXnetMigrationStream(ctx context.Context, stream xnetStreamMutation) error {
+	if _, err := validatedXnetStreamInfo(ctx, stream); err != nil {
+		return err
+	}
+	return stream.Purge(ctx, jetstream.WithPurgeSubject(LfsMigrationSubject))
+}
+
+func deleteXnetMessagesByFilter(ctx context.Context, stream xnetStreamMutation, filter func(data []byte) bool) error {
+	info, err := validatedXnetStreamInfo(ctx, stream)
+	if err != nil {
+		return err
+	}
+	if info.State.Msgs == 0 {
+		return nil
+	}
+
+	deletedCount := 0
+	for sequence := info.State.FirstSeq; sequence <= info.State.LastSeq; {
+		msg, err := stream.GetMsg(ctx, sequence, jetstream.WithGetMsgSubject(LfsMigrationSubject))
+		if errors.Is(err, jetstream.ErrMsgNotFound) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("[nats] failed to read xnet migration message at or after sequence %d: %w", sequence, err)
+		}
+		if msg.Sequence > info.State.LastSeq {
+			break
+		}
+		if filter(msg.Data) {
+			if err := stream.DeleteMsg(ctx, msg.Sequence); err != nil {
+				if !errors.Is(err, jetstream.ErrMsgNotFound) {
+					return fmt.Errorf("[nats] failed to delete xnet migration message at sequence %d: %w", msg.Sequence, err)
+				}
+			} else {
+				deletedCount++
+			}
+		}
+		if msg.Sequence == ^uint64(0) {
+			break
+		}
+		sequence = msg.Sequence + 1
+	}
+
+	slog.Info("[nats] xnet migration messages deleted by filter", slog.Int("deleted_count", deletedCount))
 	return nil
 }
 

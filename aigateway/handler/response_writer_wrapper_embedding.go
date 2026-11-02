@@ -76,6 +76,8 @@ func (rw *ResponseWriterWrapperEmbedding) CaptureEmbeddingUsage() {
 	// unmarshal json data
 	if err := json.Unmarshal(jsonData, &embeddingResp); err != nil {
 		slog.Error("failed to unmarshal embedding response", slog.Any("err", err))
+	} else if embeddingResp.Usage.TotalTokens == 0 && embeddingResp.Usage.PromptTokens == 0 {
+		// no usage info in response, leave counter to tokenizer fallback
 	} else {
 		rw.tokenCounter.Embedding(embeddingResp.Usage)
 	}

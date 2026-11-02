@@ -1,12 +1,15 @@
 package cryptox
 
 import (
+	"crypto/aes"
 	"encoding/base64"
 	"errors"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -275,6 +278,21 @@ func TestCipherRejectsMalformedCiphertext(t *testing.T) {
 	}
 }
 
+// TestCipherWrapsBase64DecodeError verifies malformed ciphertext keeps the decode error in the chain.
+func TestCipherWrapsBase64DecodeError(t *testing.T) {
+	cipher := newTestCipher(t, "base64/")
+
+	_, err := cipher.DecryptString("v1:not valid base64", "scope")
+	if err == nil {
+		t.Fatal("expected decrypt error")
+	}
+
+	var corruptInputErr base64.CorruptInputError
+	if !errors.As(err, &corruptInputErr) {
+		t.Fatalf("expected base64.CorruptInputError, got %v", err)
+	}
+}
+
 // TestCipherDetectsTamperedCiphertext verifies AEAD integrity: any single-bit change in the
 // nonce or sealed bytes must cause authentication to fail rather than return wrong plaintext.
 func TestCipherDetectsTamperedCiphertext(t *testing.T) {
@@ -417,6 +435,11 @@ func TestNewGCMRejectsInvalidKeyLength(t *testing.T) {
 	if !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("expected ErrInvalidConfig, got %v", err)
 	}
+
+	var keySizeErr aes.KeySizeError
+	if !errors.As(err, &keySizeErr) {
+		t.Fatalf("expected aes.KeySizeError, got %v", err)
+	}
 }
 
 // TestNewGCMRejectsInvalidBlockSize verifies GCM block-size errors are wrapped consistently.
@@ -497,4 +520,28 @@ func newTestCipher(t *testing.T, infoPrefix string) *Cipher {
 		t.Fatal("cipher random reader must be initialized")
 	}
 	return cipher
+}
+
+// TestIdentityLookupHash verifies domain separation and stable keyed indexes.
+func TestIdentityLookupHash(t *testing.T) {
+	c, err := NewCipher(Config{MasterKey: testMasterKey, Salt: testSalt, InfoPrefix: "identity/"})
+	require.NoError(t, err)
+	h, err := c.LookupHash("11010519491231002X", "id-number")
+	require.NoError(t, err)
+	require.Len(t, h, 64)
+	again, err := c.LookupHash("11010519491231002X", "id-number")
+	require.NoError(t, err)
+	require.Equal(t, h, again)
+	other, err := c.LookupHash("11010519491231002X", "other-purpose")
+	require.NoError(t, err)
+	require.NotEqual(t, h, other)
+	ciphertext, err := c.EncryptString("11010519491231002X", "alice")
+	require.NoError(t, err)
+	_, err = c.DecryptString(ciphertext, "bob")
+	require.Error(t, err)
+	rotated, err := NewCipher(Config{MasterKey: []byte("abcdef0123456789abcdef0123456789ab"), Salt: testSalt, InfoPrefix: "identity/"})
+	require.NoError(t, err)
+	rh, err := rotated.LookupHash("11010519491231002X", "id-number")
+	require.NoError(t, err)
+	require.NotEqual(t, h, rh)
 }

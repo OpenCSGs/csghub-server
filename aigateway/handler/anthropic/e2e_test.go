@@ -129,7 +129,7 @@ type fakeUsageRecorder struct {
 	targetModelName     string
 }
 
-func (f *fakeUsageRecorder) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
+func (f *fakeUsageRecorder) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
 	f.recorded = true
 	f.inputTokens = usage.PromptTokens
 	f.outputTokens = usage.CompletionTokens
@@ -325,6 +325,57 @@ func TestE2E_ToChat_NonStream_200(t *testing.T) {
 	assert.Equal(t, 8, resp.Usage.OutputTokens)
 }
 
+// TestE2E_ClaudeCode_ToChat_MetadataUserNotForwarded reproduces the Claude
+// Code failure against a chat-only upstream with strict JSON decoding:
+// Claude Code sends metadata.user_id, and the gateway used to translate it
+// into the OpenAI `user` field, which such upstreams reject with
+// 400 `json: unknown field "user"`.
+func TestE2E_ClaudeCode_ToChat_MetadataUserNotForwarded(t *testing.T) {
+	var userForwarded bool
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/chat/completions", r.URL.Path)
+		var req map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(readBody(r.Body), &req))
+		if _, exists := req["user"]; exists {
+			userForwarded = true
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, `{"error":{"message":"json: unknown field \"user\""}}`)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		fmt.Fprint(w, `{
+			"id": "chatcmpl-1",
+			"object": "chat.completion",
+			"created": 1234567890,
+			"model": "test-model",
+			"choices": [{
+				"index": 0,
+				"message": {"role": "assistant", "content": "Hello via chat adapter!"},
+				"finish_reason": "stop"
+			}],
+			"usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18}
+		}`)
+	}))
+	defer upstream.Close()
+
+	target := makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")
+	planner := &fakePlanner{target: target}
+	handler := makeTestHandlerWithPlanner(planner)
+
+	body := `{
+		"model": "test-model",
+		"max_tokens": 1024,
+		"messages": [{"role": "user", "content": "hi"}],
+		"metadata": {"user_id": "claude-code-user"}
+	}`
+	w := dispatchWithTarget(t, handler, body, planner)
+
+	require.False(t, userForwarded, "metadata.user_id must not be forwarded upstream as the user field")
+	require.Equal(t, 200, w.Code, "body: %s", w.Body.String())
+}
+
 func TestE2E_ToChat_Stream_200(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -407,6 +458,64 @@ func TestE2E_ToChat_ToolUse_200(t *testing.T) {
 	assert.Equal(t, "call_1", resp.Content[0].ID)
 	assert.Equal(t, "get_weather", resp.Content[0].Name)
 	assert.Equal(t, "tool_use", *resp.StopReason)
+}
+
+// TestE2E_ToChat_ToolResultKeepsAdjacency verifies that a Claude Code-style
+// user turn mixing tool_result blocks with new text is converted so the tool
+// response directly follows the assistant tool_calls message.  DeepSeek-class
+// upstreams validate this adjacency and reject interleaved sequences with
+// 400 "An assistant message with 'tool_calls' must be followed by tool
+// messages responding to each 'tool_call_id'".
+func TestE2E_ToChat_ToolResultKeepsAdjacency(t *testing.T) {
+	var receivedRoles []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Messages []map[string]any `json:"messages"`
+		}
+		require.NoError(t, json.Unmarshal(readBody(r.Body), &req))
+		for _, msg := range req.Messages {
+			role, _ := msg["role"].(string)
+			receivedRoles = append(receivedRoles, role)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		fmt.Fprint(w, `{
+			"id": "chatcmpl-3",
+			"object": "chat.completion",
+			"created": 1234567890,
+			"model": "test-model",
+			"choices": [{
+				"index": 0,
+				"message": {"role": "assistant", "content": "The directory has one file."},
+				"finish_reason": "stop"
+			}],
+			"usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18}
+		}`)
+	}))
+	defer upstream.Close()
+
+	target := makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")
+	planner := &fakePlanner{target: target}
+	handler := makeTestHandlerWithPlanner(planner)
+
+	body := `{
+		"model": "test-model",
+		"max_tokens": 1024,
+		"messages": [
+			{"role": "user", "content": "List files"},
+			{"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_1", "name": "ls", "input": {"path": "."}}]},
+			{"role": "user", "content": [
+				{"type": "tool_result", "tool_use_id": "toolu_1", "content": "main.go"},
+				{"type": "text", "text": "Now summarize."}
+			]}
+		]
+	}`
+	w := dispatchWithTarget(t, handler, body, planner)
+
+	require.Equal(t, 200, w.Code, "body: %s", w.Body.String())
+	assert.Equal(t, []string{"user", "assistant", "tool", "user"}, receivedRoles,
+		"tool response must sit between assistant tool_calls and the user text")
 }
 
 // --- Messages → Responses adapter tests ---

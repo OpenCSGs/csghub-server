@@ -20,6 +20,15 @@ type recordingRepositoryDeletionJobClient struct {
 	err    error
 }
 
+// recordingTupleJobClient keeps SQLite deletion tests independent of PostgreSQL River.
+type recordingTupleJobClient struct{ events []types.RebacTuple }
+
+// InsertRebacTupleJobsTx records the single permission batch without external effects.
+func (c *recordingTupleJobClient) InsertRebacTupleJobsTx(_ context.Context, _ *sql.Tx, events []types.RebacTuple) error {
+	c.events = append(c.events, events...)
+	return nil
+}
+
 const testOrganizationUUID = "44444444-4444-4444-4444-444444444444"
 
 func insertTestOrganizationNamespace(t *testing.T, db *DB, path string) Namespace {
@@ -60,7 +69,7 @@ func newRepositoryBatchDeleteTestDB(t *testing.T) *DB {
 	for _, model := range []any{
 		(*Repository)(nil), (*Model)(nil), (*Dataset)(nil), (*Code)(nil), (*Space)(nil),
 		(*Prompt)(nil), (*MCPServer)(nil), (*Skill)(nil), (*RepositoriesRuntimeFramework)(nil),
-		(*PendingDeletion)(nil), (*Namespace)(nil), (*User)(nil), (*Organization)(nil),
+		(*RepositoryAuthorization)(nil), (*PendingDeletion)(nil), (*Namespace)(nil), (*User)(nil), (*Organization)(nil),
 	} {
 		_, err = db.Core.NewCreateTable().Model(model).IfNotExists().Exec(context.Background())
 		require.NoError(t, err)
@@ -144,7 +153,7 @@ func TestDeleteRepositoriesByIDsUsesOwnerEntityUUID(t *testing.T) {
 	jobClient := &recordingRepositoryDeletionJobClient{}
 
 	err = db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repositories[0].ID, repositories[1].ID, repositories[2].ID}, jobClient)
+		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repositories[0].ID, repositories[1].ID, repositories[2].ID}, jobClient, new([]types.RebacTuple))
 		return err
 	})
 	require.NoError(t, err)
@@ -272,7 +281,7 @@ func TestDeleteRepositoriesByIDs(t *testing.T) {
 	var deleted []DeletedRepository
 	err = db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var err error
-		deleted, err = deleteRepositoriesByIDs(ctx, tx, selectedIDs, jobClient)
+		deleted, err = deleteRepositoriesByIDs(ctx, tx, selectedIDs, jobClient, new([]types.RebacTuple))
 		return err
 	})
 	require.NoError(t, err)
@@ -323,7 +332,7 @@ func TestDeleteRepositoriesByIDs(t *testing.T) {
 	require.Len(t, withDeleted, len(repos))
 
 	err = db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		deleted, err = deleteRepositoriesByIDs(ctx, tx, nil, jobClient)
+		deleted, err = deleteRepositoriesByIDs(ctx, tx, nil, jobClient, new([]types.RebacTuple))
 		return err
 	})
 	require.NoError(t, err)
@@ -334,16 +343,19 @@ func TestRepoStoreDeleteRepoSoftDeletesAndEnqueues(t *testing.T) {
 	db := newRepositoryBatchDeleteTestDB(t)
 	ctx := context.Background()
 	jobClient := &recordingRepositoryDeletionJobClient{}
-	store := NewRepoStoreWithDBAndDeletionJobClient(db, jobClient)
+	tupleJobs := &recordingTupleJobClient{}
+	store := NewRepoStoreWithDBAndJobClients(db, jobClient, tupleJobs)
 	insertTestUserNamespace(t, db, "owner", "owner-uuid")
-	var err error
-	repo, err := store.CreateRepo(ctx, Repository{
+	// Seed the repository directly: this test exercises deletion, not creation's tuple producer.
+	repo := &Repository{
 		UserID: 1, Name: "model", Path: "owner/model", GitPath: "models_owner/model", RepositoryType: types.ModelRepo,
-	})
+	}
+	_, err := db.Core.NewInsert().Model(repo).Exec(ctx)
 	require.NoError(t, err)
 
 	require.NoError(t, store.DeleteRepo(ctx, *repo))
 	require.Len(t, jobClient.inputs, 1)
+	require.Len(t, tupleJobs.events, 1)
 	require.Equal(t, repo.ID, jobClient.inputs[0].RepositoryID)
 	var deleted Repository
 	require.NoError(t, db.Core.NewSelect().Model(&deleted).WhereAllWithDeleted().Where("id = ?", repo.ID).Scan(ctx))
@@ -360,7 +372,7 @@ func TestDeleteRepositoriesByIDsRollback(t *testing.T) {
 	require.NoError(t, err)
 
 	err = db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repo.ID}, &recordingRepositoryDeletionJobClient{})
+		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repo.ID}, &recordingRepositoryDeletionJobClient{}, new([]types.RebacTuple))
 		require.NoError(t, err)
 		return errors.New("forced failure")
 	})
@@ -381,7 +393,7 @@ func TestDeleteRepositoriesByIDsEnqueueFailureRollsBack(t *testing.T) {
 	require.NoError(t, err)
 
 	err = db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repo.ID, repo.ID}, &recordingRepositoryDeletionJobClient{err: errors.New("river unavailable")})
+		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repo.ID, repo.ID}, &recordingRepositoryDeletionJobClient{err: errors.New("river unavailable")}, new([]types.RebacTuple))
 		return err
 	})
 	require.EqualError(t, err, "enqueue repository 1 deletion: river unavailable")
@@ -406,7 +418,7 @@ func TestDeleteRepositoriesByIDsOwnerLookupFailureRollsBack(t *testing.T) {
 	jobClient := &recordingRepositoryDeletionJobClient{}
 
 	err = db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repository.ID}, jobClient)
+		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repository.ID}, jobClient, new([]types.RebacTuple))
 		return err
 	})
 	require.ErrorIs(t, err, sql.ErrNoRows)
@@ -427,7 +439,7 @@ func TestDeleteRepositoriesByIDsDeduplicatesIDs(t *testing.T) {
 	jobClient := &recordingRepositoryDeletionJobClient{}
 
 	err = db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		deleted, err := deleteRepositoriesByIDs(ctx, tx, []int64{repo.ID, repo.ID}, jobClient)
+		deleted, err := deleteRepositoriesByIDs(ctx, tx, []int64{repo.ID, repo.ID}, jobClient, new([]types.RebacTuple))
 		require.Len(t, deleted, 1)
 		return err
 	})
@@ -449,7 +461,7 @@ func TestDeleteRepositoriesByIDsAffectedRowsMismatchRollsBack(t *testing.T) {
 	require.NoError(t, err)
 
 	err = db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repo.ID}, &recordingRepositoryDeletionJobClient{})
+		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{repo.ID}, &recordingRepositoryDeletionJobClient{}, new([]types.RebacTuple))
 		return err
 	})
 	require.EqualError(t, err, "soft-delete repositories: expected 1 affected rows, got 0")
@@ -471,7 +483,7 @@ func TestDeleteRepositoriesByIDsLocksSelectedRepositories(t *testing.T) {
 		WillReturnError(errors.New("stop after locked select"))
 	tx, err := db.BeginTx(context.Background(), nil)
 	require.NoError(t, err)
-	_, err = deleteRepositoriesByIDs(context.Background(), tx, []int64{1, 2}, &recordingRepositoryDeletionJobClient{})
+	_, err = deleteRepositoriesByIDs(context.Background(), tx, []int64{1, 2}, &recordingRepositoryDeletionJobClient{}, new([]types.RebacTuple))
 	require.ErrorContains(t, err, "load repositories before deletion: stop after locked select")
 	mock.ExpectRollback()
 	require.NoError(t, tx.Rollback())

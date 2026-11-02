@@ -1,6 +1,10 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+
+	"opencsg.com/csghub-server/common/types"
+)
 
 // TokenPlanQuotaExceededError reports that the tenant's active token plan
 // subscription has no allowance left for the requested model in the current
@@ -12,6 +16,7 @@ import "fmt"
 // reported to the client as quota exhaustion.
 type TokenPlanQuotaExceededError struct {
 	ModelID           string
+	TaskType          string
 	UsedTokens        int64
 	QuotaTokens       int64
 	UsedRequestCount  int64
@@ -21,13 +26,13 @@ type TokenPlanQuotaExceededError struct {
 // TokensExhausted reports whether the period's token allowance is spent.
 // A non-positive allowance means the model is not token-limited.
 func (e *TokenPlanQuotaExceededError) TokensExhausted() bool {
-	return e.QuotaTokens > 0 && e.UsedTokens >= e.QuotaTokens
+	return types.IsTokenMetred(e.TaskType) && e.QuotaTokens > 0 && e.UsedTokens >= e.QuotaTokens
 }
 
 // RequestsExhausted reports whether the period's request allowance is spent.
 // A non-positive allowance means the model is not request-limited.
 func (e *TokenPlanQuotaExceededError) RequestsExhausted() bool {
-	return e.QuotaRequestCount > 0 && e.UsedRequestCount >= e.QuotaRequestCount
+	return !types.IsTokenMetred(e.TaskType) && e.QuotaRequestCount > 0 && e.UsedRequestCount >= e.QuotaRequestCount
 }
 
 func (e *TokenPlanQuotaExceededError) Error() string {

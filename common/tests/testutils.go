@@ -25,6 +25,8 @@ import (
 	"github.com/uptrace/bun/migrate"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database/migrations"
+	"opencsg.com/csghub-server/builder/workhub"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // This is a modified version of db.go NewDB method, used in test only.
@@ -488,4 +490,32 @@ func initTestRedisContainer() error {
 	}
 	redisTestContainerAddr = fmt.Sprintf("%s:%s", hostIP, mappedPort.Port())
 	return nil
+}
+
+// fixtureTupleJobs persists fixture events transactionally without validating
+// identities omitted by legacy non-authorization tests. Tuple integration tests
+// explicitly inject the real validating producer into their Stores.
+type fixtureTupleJobs struct{ client workhub.JobClient }
+
+// InsertRebacTupleJobsTx keeps fixture events on the supplied SQL transaction.
+func (f fixtureTupleJobs) InsertRebacTupleJobsTx(ctx context.Context, tx *sql.Tx, inputs []types.RebacTuple) error {
+	var params []workhub.InsertManyParams
+	for _, input := range inputs {
+		key := "fixture:" + input.Source
+		if len(input.Operations) > 0 && len(input.Operations[0].Relationships) > 0 {
+			key = workhub.RebacSequenceKey(input.Operations[0].Relationships[0])
+		}
+		params = append(params, workhub.InsertManyParams{Args: workhub.RebacTupleArgs{SubjectKey: key, RebacTuple: input}, Opts: &workhub.InsertOpts{Queue: workhub.RebacTupleQueue}})
+	}
+	_, err := f.client.InsertManyTx(ctx, tx, params)
+	return err
+}
+
+// NewFixtureRebacTupleJobClient builds a producer for explicit Store fixture injection.
+func NewFixtureRebacTupleJobClient(db *database.DB) database.RebacTupleJobClient {
+	client, err := workhub.NewJobClient(context.Background(), db.BunDB)
+	if err != nil {
+		panic(err)
+	}
+	return fixtureTupleJobs{client: client}
 }

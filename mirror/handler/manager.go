@@ -36,13 +36,14 @@ func (h *ManagerHandler) SyncNow(c *gin.Context) {
 	c.JSON(http.StatusGone, gin.H{"error": "manual LFS worker rerun has been replaced by workhub jobs"})
 }
 
+// Cancel validates the task ID and preserves cancellation errors and request authorization.
 func (h *ManagerHandler) Cancel(c *gin.Context) {
 	var req CancelReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	found, err := h.managerComponent.Cancel(c, req.TaskID)
+	found, err := h.managerComponent.Cancel(c.Request.Context(), req.TaskID)
 	if err != nil {
 		if found {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

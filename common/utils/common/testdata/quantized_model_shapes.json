@@ -1,0 +1,317 @@
+[
+{
+  "model": "DeepseekAI/DeepSeek-R1",
+  "config": {
+    "architectures": [
+      "DeepseekV3ForCausalLM"
+    ],
+    "quantization_config": {
+      "quant_method": "fp8",
+      "weight_block_size": [
+        128,
+        128
+      ]
+    }
+  },
+  "want": 684489845504,
+  "legacy": 684531386000,
+  "source_shards_sha256": "a295d9ce817589733a04bc06c307133fd7ba0ac884519818aa6dc927299ecb83",
+  "groups": [
+    {"copies":4,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[129280,7168]}]},
+    {"copies":62,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[1536,7168]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[12,56]}]},
+    {"copies":62,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1536]}]},
+    {"copies":62,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[24576,1536]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[192,12]}]},
+    {"copies":62,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[576,7168]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[5,56]}]},
+    {"copies":62,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[512]}]},
+    {"copies":62,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[32768,512]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[256,4]}]},
+    {"copies":62,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[7168,16384]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[56,128]}]},
+    {"copies":6,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[18432,7168]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[144,56]}]},
+    {"copies":3,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[7168,18432]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[56,144]}]},
+    {"copies":128,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[7168]}]},
+    {"copies":59,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[256,7168]}]},
+    {"copies":30326,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[2048,7168]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[16,56]}]},
+    {"copies":15163,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[7168,2048]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[56,16]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[7168,14336]}]},
+    {"copies":59,"prefix":"","tensors":[{"suffix":".e_score_correction_bias","dtype":"F32","shape":[256]}]}
+  ]
+},
+{
+  "model": "Qwen/Qwen2-VL-72B-Instruct-AWQ",
+  "config": {
+    "architectures": [
+      "Qwen2VLForConditionalGeneration"
+    ],
+    "quantization_config": {
+      "bits": 4,
+      "group_size": 128,
+      "quant_method": "awq",
+      "version": "gemm",
+      "zero_point": true
+    }
+  },
+  "want": 73657218560,
+  "legacy": 12620264960,
+  "source_shards_sha256": "1698ecccbaeaa33b00efbd4ccb2ab83c3fce5c835d75183cca878e69494e8a87",
+  "groups": [
+    {"copies":160,"prefix":"","tensors":[{"suffix":".qweight","dtype":"I32","shape":[8192,128]},{"suffix":".scales","dtype":"F16","shape":[64,1024]},{"suffix":".qzeros","dtype":"I32","shape":[64,128]}]},
+    {"copies":160,"prefix":"","tensors":[{"suffix":".qweight","dtype":"I32","shape":[8192,1024]},{"suffix":".scales","dtype":"F16","shape":[64,8192]},{"suffix":".qzeros","dtype":"I32","shape":[64,1024]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[152064,8192]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[1280,1280]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[3840,1280]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[5120,1280]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[1280,5120]}]},
+    {"copies":65,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[1280]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[5120,5120]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[8192,5120]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[1280,3,2,14,14]}]},
+    {"copies":80,"prefix":"","tensors":[{"suffix":".qweight","dtype":"I32","shape":[29696,1024]},{"suffix":".scales","dtype":"F16","shape":[232,8192]},{"suffix":".qzeros","dtype":"I32","shape":[232,1024]}]},
+    {"copies":160,"prefix":"","tensors":[{"suffix":".qweight","dtype":"I32","shape":[8192,3712]},{"suffix":".scales","dtype":"F16","shape":[64,29696]},{"suffix":".qzeros","dtype":"I32","shape":[64,3712]}]},
+    {"copies":161,"prefix":"","tensors":[{"suffix":".weight","dtype":"F16","shape":[8192]}]},
+    {"copies":160,"prefix":"","tensors":[{"suffix":".bias","dtype":"F16","shape":[1024]}]},
+    {"copies":81,"prefix":"","tensors":[{"suffix":".bias","dtype":"F16","shape":[8192]}]},
+    {"copies":129,"prefix":"","tensors":[{"suffix":".bias","dtype":"F16","shape":[1280]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".bias","dtype":"F16","shape":[3840]}]},
+    {"copies":33,"prefix":"","tensors":[{"suffix":".bias","dtype":"F16","shape":[5120]}]}
+  ]
+},
+{
+  "model": "Qwen/Qwen3.8-2.4T-A95B",
+  "config": {
+    "architectures": [
+      "Qwen3_5MoeForCausalLM"
+    ]
+  },
+  "want": 2446182725504,
+  "legacy": 2446182725504,
+  "source_shards_sha256": "586b59d84694ea9fbee723a2d28a9435b90188fb265e53f3e5d8393dedfd7fd3",
+  "groups": [
+    {"copies":190,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[8192]}]},
+    {"copies":69,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[20480,1,4]}]},
+    {"copies":138,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[128,8192]}]},
+    {"copies":69,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[20480,8192]}]},
+    {"copies":69,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[16384,8192]}]},
+    {"copies":69,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[128]}]},
+    {"copies":94,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[8192,16384]}]},
+    {"copies":93,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[512,8192]}]},
+    {"copies":93,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[8192,2048]}]},
+    {"copies":186,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[2048,8192]}]},
+    {"copies":93,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1,8192]}]},
+    {"copies":48,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[256]}]},
+    {"copies":48,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1024,8192]}]},
+    {"copies":24,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[32768,8192]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[248320,8192]}]},
+    {"copies":93,"prefix":"","tensors":[{"suffix":".gate_up_proj","dtype":"BF16","shape":[512,4096,8192]}]},
+    {"copies":93,"prefix":"","tensors":[{"suffix":".down_proj","dtype":"BF16","shape":[512,8192,2048]}]},
+    {"copies":69,"prefix":"","tensors":[{"suffix":".A_log","dtype":"BF16","shape":[128]}]},
+    {"copies":69,"prefix":"","tensors":[{"suffix":".dt_bias","dtype":"BF16","shape":[128]}]}
+  ]
+},
+{
+  "model": "deepseek-ai/DeepSeek-V4-Pro-0813",
+  "config": {
+    "architectures": [
+      "DeepseekV4ForCausalLM"
+    ],
+    "quantization_config": {
+      "quant_method": "fp8",
+      "scale_fmt": "ue8m0",
+      "weight_block_size": [
+        128,
+        128
+      ]
+    }
+  },
+  "want": 1650497936906,
+  "legacy": 889484881098,
+  "source_shards_sha256": "63eda6ca7f2a47a80a7fbda79a349b542642ff6b8dd60cdd1d26f0314a0d2101",
+  "groups": [
+    {"copies":2,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[129280,7168]}]},
+    {"copies":125,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[512]}]},
+    {"copies":62,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[512,7168]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1536]}]},
+    {"copies":131,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[7168]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[384,7168]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[512,7168]},{"suffix":".scale","dtype":"F8_E8M0","shape":[4,56]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[16384,4096]},{"suffix":".scale","dtype":"F8_E8M0","shape":[128,32]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[7168,16384]},{"suffix":".scale","dtype":"F8_E8M0","shape":[56,128]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[1536,7168]},{"suffix":".scale","dtype":"F8_E8M0","shape":[12,56]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[65536,1536]},{"suffix":".scale","dtype":"F8_E8M0","shape":[512,12]}]},
+    {"copies":128,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[3072,7168]},{"suffix":".scale","dtype":"F8_E8M0","shape":[24,56]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[7168,3072]},{"suffix":".scale","dtype":"F8_E8M0","shape":[56,24]}]},
+    {"copies":49152,"prefix":"","tensors":[{"suffix":".weight","dtype":"I8","shape":[3072,3584]},{"suffix":".scale","dtype":"F8_E8M0","shape":[3072,224]}]},
+    {"copies":24576,"prefix":"","tensors":[{"suffix":".weight","dtype":"I8","shape":[7168,1536]},{"suffix":".scale","dtype":"F8_E8M0","shape":[7168,96]}]},
+    {"copies":60,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1024,7168]}]},
+    {"copies":30,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[128]}]},
+    {"copies":60,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[256,7168]}]},
+    {"copies":30,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[64,7168]}]},
+    {"copies":30,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[8192,1536]},{"suffix":".scale","dtype":"F8_E8M0","shape":[64,12]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[7168,21504]},{"suffix":".scale","dtype":"F8_E8M0","shape":[56,168]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1,7680]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[129280,512]}]},
+    {"copies":3,"prefix":"","tensors":[{"suffix":".tid2eid","dtype":"I64","shape":[129280,6]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".attn_sink","dtype":"F32","shape":[128]}]},
+    {"copies":31,"prefix":"","tensors":[{"suffix":".ape","dtype":"F32","shape":[128,512]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".hc_attn_base","dtype":"F32","shape":[24]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".hc_attn_fn","dtype":"F32","shape":[24,28672]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".hc_attn_scale","dtype":"F32","shape":[3]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".hc_ffn_base","dtype":"F32","shape":[24]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".hc_ffn_fn","dtype":"F32","shape":[24,28672]}]},
+    {"copies":64,"prefix":"","tensors":[{"suffix":".hc_ffn_scale","dtype":"F32","shape":[3]}]},
+    {"copies":30,"prefix":"","tensors":[{"suffix":".ape","dtype":"F32","shape":[4,1024]}]},
+    {"copies":30,"prefix":"","tensors":[{"suffix":".ape","dtype":"F32","shape":[4,256]}]},
+    {"copies":61,"prefix":"","tensors":[{"suffix":".bias","dtype":"F32","shape":[384]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".hc_head_base","dtype":"F32","shape":[4]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".hc_head_fn","dtype":"F32","shape":[4,28672]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".hc_head_scale","dtype":"F32","shape":[1]}]}
+  ]
+},
+{
+  "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+  "config": {
+    "architectures": [
+      "DeepseekV41ForCausalLM"
+    ],
+    "quantization_config": {
+      "quant_method": "fp8",
+      "weight_block_size": [
+        32,
+        32
+      ],
+      "scale_fmt": "ue8m0"
+    }
+  },
+  "want": 763205315794,
+  "legacy": 508182659298,
+  "source_shards_sha256": "b16b9c108b6e89a4b578553d1c295cee66f413b175a7c8787b60cf56aab3fed6",
+  "groups": [
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[5120,9216]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[5120,5120]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1024,1024]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[3072,1024]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[5632,1024]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1024,2816]}]},
+    {"copies":65,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1024]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1024,588]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[129280,5120]}]},
+    {"copies":47,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[512]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1280]}]},
+    {"copies":89,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[5120]}]},
+    {"copies":40,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[384,5120]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[512,5120]},{"suffix":".scale","dtype":"F8_E8M0","shape":[16,160]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[8192,4096]},{"suffix":".scale","dtype":"F8_E8M0","shape":[256,128]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[5120,8192]},{"suffix":".scale","dtype":"F8_E8M0","shape":[160,256]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[1280,5120]},{"suffix":".scale","dtype":"F8_E8M0","shape":[40,160]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[32768,1280]},{"suffix":".scale","dtype":"F8_E8M0","shape":[1024,40]}]},
+    {"copies":86,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[2304,5120]},{"suffix":".scale","dtype":"F8_E8M0","shape":[72,160]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[5120,2304]},{"suffix":".scale","dtype":"F8_E8M0","shape":[160,72]}]},
+    {"copies":31488,"prefix":"","tensors":[{"suffix":".weight","dtype":"I8","shape":[2304,2560]},{"suffix":".scale","dtype":"F8_E8M0","shape":[2304,160]}]},
+    {"copies":15744,"prefix":"","tensors":[{"suffix":".weight","dtype":"I8","shape":[5120,1152]},{"suffix":".scale","dtype":"F8_E8M0","shape":[5120,72]}]},
+    {"copies":7,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[512,5120]}]},
+    {"copies":4,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[128]}]},
+    {"copies":8,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[32,5120]}]},
+    {"copies":4,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[128,512]}]},
+    {"copies":8,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[4096,1280]},{"suffix":".scale","dtype":"F8_E8M0","shape":[128,40]}]},
+    {"copies":3,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[128,5120]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[5120,15360]},{"suffix":".scale","dtype":"F8_E8M0","shape":[160,480]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[1,5376]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[129280,256]}]},
+    {"copies":1,"prefix":".engram.embed","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[384006168,256]},{"suffix":".scale","dtype":"F8_E8M0","shape":[384006168,8]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[25600,6144]},{"suffix":".scale","dtype":"F8_E8M0","shape":[800,192]}]},
+    {"copies":1,"prefix":".engram.embed","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[384016682,256]},{"suffix":".scale","dtype":"F8_E8M0","shape":[384016682,8]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".bias","dtype":"BF16","shape":[5120]}]},
+    {"copies":33,"prefix":"","tensors":[{"suffix":".bias","dtype":"BF16","shape":[1024]}]},
+    {"copies":32,"prefix":"","tensors":[{"suffix":".bias","dtype":"BF16","shape":[3072]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".image_end","dtype":"BF16","shape":[5120]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".image_newline","dtype":"BF16","shape":[5120]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".image_start","dtype":"BF16","shape":[5120]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".attn_sink","dtype":"F32","shape":[64]}]},
+    {"copies":40,"prefix":"","tensors":[{"suffix":".bias","dtype":"F32","shape":[384]}]},
+    {"copies":40,"prefix":"","tensors":[{"suffix":".bias_vl","dtype":"F32","shape":[384]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".hc_attn_base","dtype":"F32","shape":[24]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".hc_attn_fn","dtype":"F32","shape":[24,20480]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".hc_attn_scale","dtype":"F32","shape":[3]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".hc_ffn_base","dtype":"F32","shape":[24]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".hc_ffn_fn","dtype":"F32","shape":[24,20480]}]},
+    {"copies":43,"prefix":"","tensors":[{"suffix":".hc_ffn_scale","dtype":"F32","shape":[3]}]},
+    {"copies":3,"prefix":"","tensors":[{"suffix":".bias","dtype":"F32","shape":[128]}]},
+    {"copies":3,"prefix":"","tensors":[{"suffix":".bias_vl","dtype":"F32","shape":[128]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".q_weight","dtype":"BF16","shape":[4,5120]}]},
+    {"copies":2,"prefix":"","tensors":[{"suffix":".k_weight","dtype":"BF16","shape":[4,5120]}]}
+  ]
+},
+{
+  "model": "zai-org/GLM-5.3",
+  "config": {
+    "architectures": [
+      "GlmMoeDsaForCausalLM"
+    ],
+    "quantization_config": {
+      "quant_method": "fp8",
+      "weight_block_size": [
+        128,
+        128
+      ]
+    }
+  },
+  "want": 753329940480,
+  "legacy": 753375793584,
+  "source_shards_sha256": "ba18bbb5d6ffdd8086c2ff7ec78b1b521d288c20808cda0f91805d0ea93ce0d4",
+  "groups": [
+    {"copies":2,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[154880,6144]}]},
+    {"copies":162,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[6144]}]},
+    {"copies":22,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[128]}]},
+    {"copies":22,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[32,6144]}]},
+    {"copies":79,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[512]}]},
+    {"copies":79,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[2048]}]},
+    {"copies":3,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[6144,12288]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[48,96]}]},
+    {"copies":6,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[12288,6144]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[96,48]}]},
+    {"copies":22,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[128,6144]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[1,48]}]},
+    {"copies":22,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[4096,2048]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[32,16]}]},
+    {"copies":79,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[576,6144]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[5,48]}]},
+    {"copies":79,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[28672,512]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[224,4]}]},
+    {"copies":79,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[6144,16384]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[48,128]}]},
+    {"copies":39143,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[2048,6144]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[16,48]}]},
+    {"copies":79,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[16384,2048]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[128,16]}]},
+    {"copies":19532,"prefix":"","tensors":[{"suffix":".weight","dtype":"F8_E4M3","shape":[6144,2048]},{"suffix":".weight_scale_inv","dtype":"F32","shape":[48,16]}]},
+    {"copies":76,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[256,6144]}]},
+    {"copies":1,"prefix":"","tensors":[{"suffix":".weight","dtype":"BF16","shape":[6144,12288]}]},
+    {"copies":22,"prefix":"","tensors":[{"suffix":".bias","dtype":"BF16","shape":[128]}]},
+    {"copies":76,"prefix":"","tensors":[{"suffix":".e_score_correction_bias","dtype":"F32","shape":[256]}]}
+  ]
+},
+  {"model":"mlx-community/gpt-oss-20b-MXFP4-Q8","source":"https://huggingface.co/mlx-community/gpt-oss-20b-MXFP4-Q8","source_revision":"773a7da77e569019bb0fd17a554b263738d669a3","config":{"quantization":{"bits":4,"group_size":32,"mode":"mxfp4","module0_0":{"bits":8,"group_size":64,"mode":"affine"},"module0_1":{"bits":8,"group_size":64,"mode":"affine"},"module3_0":{"bits":8,"group_size":64},"module3_1":{"bits":8,"group_size":64},"module3_2":{"bits":8,"group_size":64},"module3_3":{"bits":8,"group_size":64},"module3_4":{"bits":8,"group_size":64},"module3_5":{"bits":8,"group_size":64},"module3_6":{"bits":8,"group_size":64},"module3_7":{"bits":8,"group_size":64},"module3_8":{"bits":8,"group_size":64},"module3_9":{"bits":8,"group_size":64},"module3_10":{"bits":8,"group_size":64},"module3_11":{"bits":8,"group_size":64},"module3_12":{"bits":8,"group_size":64},"module3_13":{"bits":8,"group_size":64},"module3_14":{"bits":8,"group_size":64},"module3_15":{"bits":8,"group_size":64},"module3_16":{"bits":8,"group_size":64},"module3_17":{"bits":8,"group_size":64},"module3_18":{"bits":8,"group_size":64},"module3_19":{"bits":8,"group_size":64},"module3_20":{"bits":8,"group_size":64},"module3_21":{"bits":8,"group_size":64},"module3_22":{"bits":8,"group_size":64},"module3_23":{"bits":8,"group_size":64},"module4_0":{"bits":8,"group_size":64,"mode":"affine"},"module4_1":{"bits":8,"group_size":64,"mode":"affine"},"module4_2":{"bits":8,"group_size":64,"mode":"affine"},"module4_3":{"bits":8,"group_size":64,"mode":"affine"},"module4_4":{"bits":8,"group_size":64,"mode":"affine"},"module4_5":{"bits":8,"group_size":64,"mode":"affine"},"module4_6":{"bits":8,"group_size":64,"mode":"affine"},"module4_7":{"bits":8,"group_size":64,"mode":"affine"},"module4_8":{"bits":8,"group_size":64,"mode":"affine"},"module4_9":{"bits":8,"group_size":64,"mode":"affine"},"module4_10":{"bits":8,"group_size":64,"mode":"affine"},"module4_11":{"bits":8,"group_size":64,"mode":"affine"},"module4_12":{"bits":8,"group_size":64,"mode":"affine"},"module4_13":{"bits":8,"group_size":64,"mode":"affine"},"module4_14":{"bits":8,"group_size":64,"mode":"affine"},"module4_15":{"bits":8,"group_size":64,"mode":"affine"},"module4_16":{"bits":8,"group_size":64,"mode":"affine"},"module4_17":{"bits":8,"group_size":64,"mode":"affine"},"module4_18":{"bits":8,"group_size":64,"mode":"affine"},"module4_19":{"bits":8,"group_size":64,"mode":"affine"},"module4_20":{"bits":8,"group_size":64,"mode":"affine"},"module4_21":{"bits":8,"group_size":64,"mode":"affine"},"module4_22":{"bits":8,"group_size":64,"mode":"affine"},"module4_23":{"bits":8,"group_size":64,"mode":"affine"},"module4_24":{"bits":8,"group_size":64,"mode":"affine"},"module4_25":{"bits":8,"group_size":64,"mode":"affine"},"module4_26":{"bits":8,"group_size":64,"mode":"affine"},"module4_27":{"bits":8,"group_size":64,"mode":"affine"},"module4_28":{"bits":8,"group_size":64,"mode":"affine"},"module4_29":{"bits":8,"group_size":64,"mode":"affine"},"module4_30":{"bits":8,"group_size":64,"mode":"affine"},"module4_31":{"bits":8,"group_size":64,"mode":"affine"},"module4_32":{"bits":8,"group_size":64,"mode":"affine"},"module4_33":{"bits":8,"group_size":64,"mode":"affine"},"module4_34":{"bits":8,"group_size":64,"mode":"affine"},"module4_35":{"bits":8,"group_size":64,"mode":"affine"},"module4_36":{"bits":8,"group_size":64,"mode":"affine"},"module4_37":{"bits":8,"group_size":64,"mode":"affine"},"module4_38":{"bits":8,"group_size":64,"mode":"affine"},"module4_39":{"bits":8,"group_size":64,"mode":"affine"},"module4_40":{"bits":8,"group_size":64,"mode":"affine"},"module4_41":{"bits":8,"group_size":64,"mode":"affine"},"module4_42":{"bits":8,"group_size":64,"mode":"affine"},"module4_43":{"bits":8,"group_size":64,"mode":"affine"},"module4_44":{"bits":8,"group_size":64,"mode":"affine"},"module4_45":{"bits":8,"group_size":64,"mode":"affine"},"module4_46":{"bits":8,"group_size":64,"mode":"affine"},"module4_47":{"bits":8,"group_size":64,"mode":"affine"},"module5_0":{"bits":8,"group_size":64,"mode":"affine"},"module5_1":{"bits":8,"group_size":64,"mode":"affine"},"module5_2":{"bits":8,"group_size":64,"mode":"affine"},"module5_3":{"bits":8,"group_size":64,"mode":"affine"},"module5_4":{"bits":8,"group_size":64,"mode":"affine"},"module5_5":{"bits":8,"group_size":64,"mode":"affine"},"module5_6":{"bits":8,"group_size":64,"mode":"affine"},"module5_7":{"bits":8,"group_size":64,"mode":"affine"},"module5_8":{"bits":8,"group_size":64,"mode":"affine"},"module5_9":{"bits":8,"group_size":64,"mode":"affine"},"module5_10":{"bits":8,"group_size":64,"mode":"affine"},"module5_11":{"bits":8,"group_size":64,"mode":"affine"},"module5_12":{"bits":8,"group_size":64,"mode":"affine"},"module5_13":{"bits":8,"group_size":64,"mode":"affine"},"module5_14":{"bits":8,"group_size":64,"mode":"affine"},"module5_15":{"bits":8,"group_size":64,"mode":"affine"},"module5_16":{"bits":8,"group_size":64,"mode":"affine"},"module5_17":{"bits":8,"group_size":64,"mode":"affine"},"module5_18":{"bits":8,"group_size":64,"mode":"affine"},"module5_19":{"bits":8,"group_size":64,"mode":"affine"},"module5_20":{"bits":8,"group_size":64,"mode":"affine"},"module5_21":{"bits":8,"group_size":64,"mode":"affine"},"module5_22":{"bits":8,"group_size":64,"mode":"affine"},"module5_23":{"bits":8,"group_size":64,"mode":"affine"},"module6_0":{"bits":8,"group_size":64,"mode":"affine"},"module6_1":{"bits":8,"group_size":64,"mode":"affine"},"module6_2":{"bits":8,"group_size":64,"mode":"affine"},"module6_3":{"bits":8,"group_size":64,"mode":"affine"},"module6_4":{"bits":8,"group_size":64,"mode":"affine"},"module6_5":{"bits":8,"group_size":64,"mode":"affine"},"module6_6":{"bits":8,"group_size":64,"mode":"affine"},"module6_7":{"bits":8,"group_size":64,"mode":"affine"},"module6_8":{"bits":8,"group_size":64,"mode":"affine"},"module6_9":{"bits":8,"group_size":64,"mode":"affine"},"module6_10":{"bits":8,"group_size":64,"mode":"affine"},"module6_11":{"bits":8,"group_size":64,"mode":"affine"},"module6_12":{"bits":8,"group_size":64,"mode":"affine"},"module6_13":{"bits":8,"group_size":64,"mode":"affine"},"module6_14":{"bits":8,"group_size":64,"mode":"affine"},"module6_15":{"bits":8,"group_size":64,"mode":"affine"},"module6_16":{"bits":8,"group_size":64,"mode":"affine"},"module6_17":{"bits":8,"group_size":64,"mode":"affine"},"module6_18":{"bits":8,"group_size":64,"mode":"affine"},"module6_19":{"bits":8,"group_size":64,"mode":"affine"},"module6_20":{"bits":8,"group_size":64,"mode":"affine"},"module6_21":{"bits":8,"group_size":64,"mode":"affine"},"module6_22":{"bits":8,"group_size":64,"mode":"affine"},"module6_23":{"bits":8,"group_size":64,"mode":"affine"}}},"want":20914757184,"legacy":3498498624,"groups":[
+    {"copies":2,"prefix":"","tensors":[{"dtype":"BF16","shape":[201088,45],"suffix":".biases"},{"dtype":"BF16","shape":[201088,45],"suffix":".scales"},{"dtype":"U32","shape":[201088,720],"suffix":".weight"}]},
+    {"copies":49,"prefix":"","tensors":[{"dtype":"BF16","shape":[2880],"suffix":".weight"}]},
+    {"copies":72,"prefix":"","tensors":[{"dtype":"BF16","shape":[32,2880],"suffix":".bias"},{"dtype":"U8","shape":[32,2880,90],"suffix":".scales"},{"dtype":"U32","shape":[32,2880,360],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[32],"suffix":".bias"},{"dtype":"BF16","shape":[32,45],"suffix":".biases"},{"dtype":"BF16","shape":[32,45],"suffix":".scales"},{"dtype":"U32","shape":[32,720],"suffix":".weight"}]},
+    {"copies":48,"prefix":"","tensors":[{"dtype":"BF16","shape":[512],"suffix":".bias"},{"dtype":"BF16","shape":[512,45],"suffix":".biases"},{"dtype":"BF16","shape":[512,45],"suffix":".scales"},{"dtype":"U32","shape":[512,720],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[2880],"suffix":".bias"},{"dtype":"BF16","shape":[2880,64],"suffix":".biases"},{"dtype":"BF16","shape":[2880,64],"suffix":".scales"},{"dtype":"U32","shape":[2880,1024],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[4096],"suffix":".bias"},{"dtype":"BF16","shape":[4096,45],"suffix":".biases"},{"dtype":"BF16","shape":[4096,45],"suffix":".scales"},{"dtype":"U32","shape":[4096,720],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[64],"suffix":".plain"}]}
+  ]},
+  {"model":"openai/gpt-oss-20b","source":"https://huggingface.co/openai/gpt-oss-20b","source_revision":"6cee5e81ee83917806bbde320786a8fb61efebee","config":{"quantization_config":{"modules_to_not_convert":["model.layers.*.self_attn","model.layers.*.mlp.router","model.embed_tokens","lm_head"],"quant_method":"mxfp4"}},"want":20914757184,"legacy":11956805184,"groups":[
+    {"copies":49,"prefix":"","tensors":[{"dtype":"BF16","shape":[2880],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[32,2880],"suffix":".plain"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[32,5760],"suffix":".plain"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[32],"suffix":".bias"},{"dtype":"BF16","shape":[32,2880],"suffix":".weight"}]},
+    {"copies":48,"prefix":"","tensors":[{"dtype":"BF16","shape":[512],"suffix":".bias"},{"dtype":"BF16","shape":[512,2880],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[2880],"suffix":".bias"},{"dtype":"BF16","shape":[2880,4096],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[4096],"suffix":".bias"},{"dtype":"BF16","shape":[4096,2880],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[64],"suffix":".plain"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"U8","shape":[32,2880,90,16],"suffix":"_blocks"},{"dtype":"U8","shape":[32,2880,90],"suffix":"_scales"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"U8","shape":[32,5760,90,16],"suffix":"_blocks"},{"dtype":"U8","shape":[32,5760,90],"suffix":"_scales"}]},
+    {"copies":2,"prefix":"","tensors":[{"dtype":"BF16","shape":[201088,2880],"suffix":".weight"}]}
+  ]},
+  {"model":"openai/gpt-oss-20b original","source":"https://huggingface.co/openai/gpt-oss-20b","source_revision":"6cee5e81ee83917806bbde320786a8fb61efebee","config":{"quantization_config":{"modules_to_not_convert":["model.layers.*.self_attn","model.layers.*.mlp.router","model.embed_tokens","lm_head"],"quant_method":"mxfp4"}},"want":20914757184,"legacy":11956805184,"groups":[
+    {"copies":49,"prefix":"","tensors":[{"dtype":"BF16","shape":[2880],"suffix":".plain"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[2880],"suffix":".bias"},{"dtype":"BF16","shape":[2880,4096],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[5120],"suffix":".bias"},{"dtype":"BF16","shape":[5120,2880],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[64],"suffix":".plain"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[32],"suffix":".bias"},{"dtype":"BF16","shape":[32,2880],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[32,5760],"suffix":".plain"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"BF16","shape":[32,2880],"suffix":".plain"}]},
+    {"copies":2,"prefix":"","tensors":[{"dtype":"BF16","shape":[201088,2880],"suffix":".weight"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"U8","shape":[32,5760,90,16],"suffix":".blocks"},{"dtype":"U8","shape":[32,5760,90],"suffix":".scales"}]},
+    {"copies":24,"prefix":"","tensors":[{"dtype":"U8","shape":[32,2880,90,16],"suffix":".blocks"},{"dtype":"U8","shape":[32,2880,90],"suffix":".scales"}]}
+  ]}
+]

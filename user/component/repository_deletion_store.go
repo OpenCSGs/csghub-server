@@ -39,3 +39,8 @@ func newOrganizationDeletionJobClientWithDB(db *database.DB) (database.Organizat
 	}
 	return workhub.NewOrganizationDeletionJobClient(client), nil
 }
+
+// newRebacTupleJobClient creates the permission producer injected into business Stores.
+func newRebacTupleJobClient() (database.RebacTupleJobClient, error) {
+	return workhub.NewRebacTupleJobClientWithDB(database.GetDB())
+}

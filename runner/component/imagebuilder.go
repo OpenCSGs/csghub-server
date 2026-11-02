@@ -406,6 +406,7 @@ func wfTemplateForImageBuilder(cfg *config.Config, params ctypes.ImageBuilderReq
 					Container: &corev1.Container{
 						Name:         buildContainerType,
 						Image:        cfg.Runner.ImageBuilderKanikoImage,
+						Command:      []string{"/kaniko/executor"},
 						Args:         builderArgs,
 						VolumeMounts: containerVolumeMounts,
 						Env: []corev1.EnvVar{
@@ -609,5 +610,5 @@ func buildImageName(orgName, spaceName string, repoID int64, commitId string) st
 	if len(commitId) > 10 {
 		commitId = commitId[:10]
 	}
-	return fmt.Sprintf("%s/%s-%d:%s", strings.ToLower(orgName), strings.ToLower(spaceName), repoID, commitId)
+	return fmt.Sprintf("%s-%s-%d:%s", strings.ToLower(orgName), strings.ToLower(spaceName), repoID, commitId)
 }

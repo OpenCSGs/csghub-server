@@ -2,6 +2,7 @@ package router
 
 import (
 	"log/slog"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -12,8 +13,7 @@ import (
 
 func NewNotifierRouter(conf *config.Config) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
+	middleware.SetInfraMiddleware(r, conf, instrumentation.Notification)
 	needAPIKey := middleware.NeedAPIKey(conf)
 	debugGroup := r.Group("/debug", needAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")
@@ -38,5 +38,8 @@ func NewNotifierRouter(conf *config.Config) (*gin.Engine, error) {
 		notificationsGroup.GET("/message-types", messageHandler.GetAllMessageTypes)
 	}
 
+	platformAdmin := middleware.NewPlatformAdmin()
+	createAdminRoutes(r.Group("/api/v1"), platformAdmin, messageHandler)
+	createAdminCommonNotificationRoutes(r.Group("/api/v1"), platformAdmin, messageHandler)
 	return r, nil
 }

@@ -138,13 +138,13 @@ func admissionLeaseFromPlan(p *types.RequestPlan) *types.AdmissionLease {
 func admissionStatusForReason(reason string) (int, string) {
 	switch reason {
 	case types.AdmissionReasonQueueTimeout:
-		return http.StatusRequestTimeout, "queue_timeout"
+		return http.StatusRequestTimeout, types.AdmissionReasonQueueTimeout
 	case types.AdmissionReasonQueueCancelled:
-		return http.StatusRequestTimeout, "queue_cancelled"
+		return http.StatusRequestTimeout, types.AdmissionReasonQueueCancelled
 	case types.AdmissionReasonQueueFull:
-		return http.StatusTooManyRequests, "queue_full"
+		return http.StatusTooManyRequests, types.AdmissionReasonQueueFull
 	default:
-		return http.StatusTooManyRequests, "capacity_exceeded"
+		return http.StatusTooManyRequests, types.AdmissionReasonCapacityExceeded
 	}
 }
 
@@ -158,7 +158,7 @@ func (h *OpenAIHandlerImpl) handleAdmissionDenied(c *gin.Context, isStream bool,
 	if !errors.As(err, &denied) {
 		return false
 	}
-	message := "model capacity exceeded, please retry later"
+	message := types.MsgCapacityExceeded
 	retryAfter := int64(1)
 	reason := ""
 	if denied.Decision != nil {
@@ -172,9 +172,9 @@ func (h *OpenAIHandlerImpl) handleAdmissionDenied(c *gin.Context, isStream bool,
 	}
 	status, code := admissionStatusForReason(reason)
 	if reason == types.AdmissionReasonQueueTimeout {
-		message = "queued request exceeded its queue wait time for model capacity"
+		message = types.MsgQueueTimeout
 	} else if reason == types.AdmissionReasonQueueCancelled {
-		message = "request left the admission queue before being served"
+		message = types.MsgQueueCancelled
 	}
 	SetMetricsError(c, reason, message)
 	slog.WarnContext(c.Request.Context(), "capacity admission denied",
@@ -183,26 +183,41 @@ func (h *OpenAIHandlerImpl) handleAdmissionDenied(c *gin.Context, isStream bool,
 		slog.Int64("retry_after", retryAfter),
 		admissionTokenAttr(denied.Decision))
 
-	payload := gin.H{
-		"error": gin.H{
-			"code":    code,
-			"message": message,
-			"type":    "rate_limit_error",
-		},
+	errorType := types.ErrTypeRateLimit
+	if code == types.AdmissionReasonQueueTimeout || code == types.AdmissionReasonQueueCancelled {
+		errorType = types.ErrTypeTimeout
 	}
-	if code == "queue_timeout" || code == "queue_cancelled" {
-		payload["error"].(gin.H)["type"] = "timeout_error"
+	payload := gin.H{
+		"error": types.Error{
+			Code:    code,
+			Message: message,
+			Type:    errorType,
+		},
 	}
 	if status == http.StatusTooManyRequests {
 		c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
 	}
-	if isStream {
+	// isStream only means the client asked for a stream, not that the stream
+	// has started. A denial can land here before any byte is written (the
+	// plan phase rejected the request, or a lease rotation failed before the
+	// proxy started), and the first Write on an uncommitted head would
+	// commit HTTP 200 — official SDKs classify by status code and would
+	// never see the 429/408. Only fall back to an in-stream error event
+	// once the head is already gone.
+	if isStream && c.Writer.Written() {
 		errorChunkJSON, _ := json.Marshal(payload)
 		if _, writeErr := c.Writer.Write([]byte("data: " + string(errorChunkJSON) + "\n\ndata: [DONE]\n\n")); writeErr != nil {
 			slog.Error("failed to write admission denied error to stream", "error", writeErr)
 		}
 		c.Writer.Flush()
 		return true
+	}
+	if isStream {
+		// A streaming handler may have pre-set the SSE content type on the
+		// uncommitted head (chat does before planning); c.JSON keeps an
+		// existing Content-Type, so clear it or the JSON error body goes
+		// out labelled as text/event-stream.
+		c.Writer.Header().Del("Content-Type")
 	}
 	c.JSON(status, payload)
 	return true

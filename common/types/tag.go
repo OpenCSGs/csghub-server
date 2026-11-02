@@ -73,7 +73,11 @@ const (
 	MCPTagScope          TagScope = "mcp"
 	SkillTagScope        TagScope = "skill"
 	OrganizationTagScope TagScope = "organization"
-	UnknownScope         TagScope = "unknown"
+	// UserTagScope tags a user identity (the user_tags relation) rather than
+	// a resource. The gateway reads routing tiers from it (low_priority /
+	// priority:<n>); other user-level labels may reuse the same scope.
+	UserTagScope TagScope = "user"
+	UnknownScope TagScope = "unknown"
 )
 
 const (
@@ -82,7 +86,7 @@ const (
 )
 
 type TagFilter struct {
-	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt|eq=mcp|eq=skill|eq=organization"`
+	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt|eq=mcp|eq=skill|eq=organization|eq=user"`
 	Categories []string   `form:"category" binding:"omitempty,dive"`
 	BuiltIn    *bool      `form:"built_in" binding:"omitnil"`
 	Search     string     `form:"search" binding:"omitempty"`

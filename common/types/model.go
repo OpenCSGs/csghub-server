@@ -107,6 +107,8 @@ type CreateRepoReq struct {
 	Description string `json:"description" binding:"lt=1000"`
 	// Whether the repository is private
 	Private bool `json:"private"`
+	// PendingPublish is set only by internal synchronization callers, never by repository creation JSON.
+	PendingPublish bool `json:"-"`
 	// The license for the repository
 	License string `json:"license" example:"MIT" binding:"lt=100"`
 	Readme  string `json:"-"`
@@ -508,6 +510,9 @@ type ModelConfig struct {
 	HiddenSize        int      `json:"hidden_size"`
 	NumAttentionHeads int      `json:"num_attention_heads"`
 	TorchDtype        string   `json:"torch_dtype"`
+
+	Quantization       json.RawMessage `json:"quantization,omitempty"`
+	QuantizationConfig json.RawMessage `json:"quantization_config,omitempty"`
 	// MoE expert fields parsed from config.json.
 	// Different model families use different field names for the same concept,
 	// so we capture all industry-standard variants.

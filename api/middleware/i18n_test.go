@@ -15,6 +15,41 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// TestModifyAcceptLanguageMiddleware returns actual resource keys for valid locale variants and fallbacks.
+func TestModifyAcceptLanguageMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	i18n.InitLocalizersFromEmbedFile()
+	r := gin.New()
+	r.Use(ModifyAcceptLanguageMiddleware())
+	r.GET("/language", func(ctx *gin.Context) { ctx.String(http.StatusOK, ctx.GetHeader("Accept-Language")) })
+	for _, tc := range []struct{ header, want string }{
+		{"en-US", "en-US"}, {"zh-CN", "zh-CN"}, {"zh-HK", "zh-HK"},
+		{"en-GB", "en-US"}, {"zh-TW", "zh-CN"}, {"en-US-u-nu-latn", "en-US"},
+		{"zh-TW,en-GB;q=0.9", "en-US"}, {"fr-FR", "en-US"}, {"", "en-US"}, {"invalid!", "en-US"},
+	} {
+		t.Run(tc.header, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/language", nil)
+			request.Header.Set("Accept-Language", tc.header)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, request)
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, tc.want, w.Body.String())
+			assert.Contains(t, i18n.LocalizerMap, w.Body.String())
+		})
+	}
+	t.Run("uninitialized", func(t *testing.T) {
+		previousMatcher, previousLanguages := i18n.Matcher, i18n.SupportedLanguages
+		i18n.Matcher, i18n.SupportedLanguages = nil, nil
+		defer func() { i18n.Matcher, i18n.SupportedLanguages = previousMatcher, previousLanguages }()
+		request := httptest.NewRequest(http.MethodGet, "/language", nil)
+		request.Header.Set("Accept-Language", "en-GB")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, request)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "en-US", w.Body.String())
+	})
+}
+
 func TestLocalizedErrorMiddleware(t *testing.T) {
 	// Set up test LocalizerMap
 	i18n.InitLocalizersFromEmbedFile()
@@ -127,6 +162,9 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 	})
 	router.GET("/organization-access-forbidden", func(c *gin.Context) {
 		httpbase.ForbiddenError(c, errorx.OrganizationAccessForbidden("organization-uuid"))
+	})
+	router.GET("/token-plan-name-duplicate", func(c *gin.Context) {
+		httpbase.BadRequestWithExt(c, errorx.TokenPlanNameDuplicate("users 月度计划7"))
 	})
 
 	// Run tests
@@ -360,6 +398,31 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		var resp httpbase.R
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Equal(t, "ORG-ERR-3: 無權訪問該組織", resp.Msg)
+	})
+
+	t.Run("LocalizedTokenPlanNameDuplicateEnUS", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/token-plan-name-duplicate", nil)
+		req.Header.Set("Accept-Language", "en-US")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "TOKENPLAN-ERR-4: Token plan name already exists: users 月度计划7", resp.Msg)
+		assert.Equal(t, "users 月度计划7", resp.Context["plan_name"])
+	})
+
+	t.Run("LocalizedTokenPlanNameDuplicateZhCN", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/token-plan-name-duplicate", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "TOKENPLAN-ERR-4: TokenPlan名称已存在：users 月度计划7", resp.Msg)
 	})
 }
 

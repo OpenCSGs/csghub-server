@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -35,7 +37,8 @@ type AgentKnowledgeBaseStore interface {
 	Create(ctx context.Context, kb *AgentKnowledgeBase) (*AgentKnowledgeBase, error)
 	FindByID(ctx context.Context, id int64) (*AgentKnowledgeBase, error)
 	FindByContentID(ctx context.Context, contentID string) (*AgentKnowledgeBase, error)
-	Update(ctx context.Context, kb *AgentKnowledgeBase) error
+	// Update preserves visibility unless public explicitly requests a new value.
+	Update(ctx context.Context, kb *AgentKnowledgeBase, public *bool) error
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, filter types.AgentKnowledgeBaseFilter, per int, page int) ([]AgentKnowledgeBase, int, error)
 	Exists(ctx context.Context, nsUUID string, name string) (bool, error)
@@ -46,31 +49,36 @@ var _ AgentKnowledgeBaseStore = (*agentKnowledgeBaseStoreImpl)(nil)
 
 // agentKnowledgeBaseStoreImpl is the implementation of AgentKnowledgeBaseStore
 type agentKnowledgeBaseStoreImpl struct {
-	db *DB
+	// rebacTupleJobClient records permission changes on this Store's business transaction.
+	rebacTupleJobClient RebacTupleJobClient
+	db                  *DB
 }
 
 // NewAgentKnowledgeBaseStore creates a new AgentKnowledgeBaseStore
 func NewAgentKnowledgeBaseStore() AgentKnowledgeBaseStore {
-	return &agentKnowledgeBaseStoreImpl{
-		db: defaultDB,
-	}
+	return NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(defaultDB, nil)
 }
 
 // NewAgentKnowledgeBaseStoreWithDB creates a new AgentKnowledgeBaseStore with a specific DB
 func NewAgentKnowledgeBaseStoreWithDB(db *DB) AgentKnowledgeBaseStore {
-	return &agentKnowledgeBaseStoreImpl{
-		db: db,
-	}
+	return NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, nil)
+}
+
+// NewAgentKnowledgeBaseStoreWithRebacTupleJobClient injects the transactional permission job producer.
+func NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db *DB, tupleJobs RebacTupleJobClient) AgentKnowledgeBaseStore {
+	return &agentKnowledgeBaseStoreImpl{db: db, rebacTupleJobClient: tupleJobs}
 }
 
 // Create inserts a new AgentKnowledgeBase into the database
 func (s *agentKnowledgeBaseStoreImpl) Create(ctx context.Context, kb *AgentKnowledgeBase) (*AgentKnowledgeBase, error) {
-	res, err := s.db.Core.NewInsert().Model(kb).Exec(ctx, kb)
-	if err = assertAffectedOneRow(res, err); err != nil {
-		return nil, errorx.HandleDBError(err, map[string]any{
-			"ns_uuid": kb.NsUUID,
-			"name":    kb.Name,
-		})
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := assertAffectedOneRow(tx.NewInsert().Model(kb).Exec(ctx, kb)); err != nil {
+			return err
+		}
+		return s.enqueueKnowledgeBaseTx(ctx, tx, *kb, false)
+	})
+	if err != nil {
+		return nil, errorx.HandleDBError(err, map[string]any{"ns_uuid": kb.NsUUID, "name": kb.Name})
 	}
 	return kb, nil
 }
@@ -114,26 +122,47 @@ func (s *agentKnowledgeBaseStoreImpl) FindByContentID(ctx context.Context, conte
 	return kb, nil
 }
 
-// Update updates an existing AgentKnowledgeBase
-func (s *agentKnowledgeBaseStoreImpl) Update(ctx context.Context, kb *AgentKnowledgeBase) error {
-	res, err := s.db.Core.NewUpdate().Model(kb).Where("id = ?", kb.ID).Exec(ctx)
-	if err = assertAffectedOneRow(res, err); err != nil {
-		return errorx.HandleDBError(err, map[string]any{
-			"knowledge_base_id": kb.ID,
-		})
-	}
-	return nil
+// Update changes knowledge base data and atomically queues explicit visibility changes.
+func (s *agentKnowledgeBaseStoreImpl) Update(ctx context.Context, kb *AgentKnowledgeBase, public *bool) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		query := tx.NewUpdate().Model(kb).Where("id = ?", kb.ID)
+		if public == nil {
+			// A stale metadata snapshot must not overwrite the current visibility.
+			query.ExcludeColumn("public")
+		} else {
+			kb.Public = *public
+		}
+		if err := assertAffectedOneRow(query.Exec(ctx)); err != nil {
+			return errorx.HandleDBError(err, map[string]any{"knowledge_base_id": kb.ID})
+		}
+		if public == nil {
+			return nil
+		}
+		return enqueueRebacTuple(ctx, tx, s.rebacTupleJobClient, types.NewRebacTuple("knowledge_base", types.TupleOperation{
+			Delete: !kb.Public,
+			Relationships: []rebac.Relationship{{
+				Subject: rebac.PublicUserWildcard(), Relation: rebac.RelationPublic, Object: rebac.KnowledgeBaseObject(kb.ID),
+			}},
+		}))
+	})
 }
 
 // Delete deletes an AgentKnowledgeBase
 func (s *agentKnowledgeBaseStoreImpl) Delete(ctx context.Context, id int64) error {
-	res, err := s.db.Core.NewDelete().Model((*AgentKnowledgeBase)(nil)).Where("id = ?", id).Exec(ctx)
-	if err = assertAffectedOneRow(res, err); err != nil {
-		return errorx.HandleDBError(err, map[string]any{
-			"knowledge_base_id": id,
-		})
-	}
-	return nil
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var kb AgentKnowledgeBase
+		q := tx.NewSelect().Model(&kb).Where("id = ?", id)
+		if tx.Dialect().Name() == dialect.PG {
+			q.For("UPDATE")
+		}
+		if err := q.Scan(ctx); err != nil {
+			return errorx.HandleDBError(err, map[string]any{"knowledge_base_id": id})
+		}
+		if err := assertAffectedOneRow(tx.NewDelete().Model(&kb).WherePK().Exec(ctx)); err != nil {
+			return err
+		}
+		return s.enqueueKnowledgeBaseTx(ctx, tx, kb, true)
+	})
 }
 
 // applyAgentKnowledgeBaseFilters applies filters to the query
@@ -249,4 +278,11 @@ func (s *agentKnowledgeBaseStoreImpl) ExistsByContentID(ctx context.Context, con
 		})
 	}
 	return exists, nil
+}
+
+// enqueueKnowledgeBaseTx keeps namespace/public projection with the local row.
+func (s *agentKnowledgeBaseStoreImpl) enqueueKnowledgeBaseTx(ctx context.Context, tx bun.Tx, kb AgentKnowledgeBase, remove bool) error {
+	public := rebac.Relationship{Subject: rebac.PublicUserWildcard(), Relation: rebac.RelationPublic, Object: rebac.KnowledgeBaseObject(kb.ID)}
+	ops := []types.TupleOperation{{Delete: remove, Relationships: []rebac.Relationship{{Subject: rebac.NewSubject(rebac.ObjectTypeNamespace, kb.NsUUID), Relation: rebac.RelationNamespace, Object: rebac.KnowledgeBaseObject(kb.ID)}}}, {Delete: remove || !kb.Public, Relationships: []rebac.Relationship{public}}}
+	return enqueueRebacTuple(ctx, tx, s.rebacTupleJobClient, types.NewRebacTuple("knowledge_base", ops...))
 }

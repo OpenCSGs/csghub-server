@@ -22,6 +22,179 @@ func (_m *MockUserComponent) EXPECT() *MockUserComponent_Expecter {
 	return &MockUserComponent_Expecter{mock: &_m.Mock}
 }
 
+// AdminGetUserTags provides a mock function with given fields: ctx, username
+func (_m *MockUserComponent) AdminGetUserTags(ctx context.Context, username string) ([]types.RepoTag, error) {
+	ret := _m.Called(ctx, username)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AdminGetUserTags")
+	}
+
+	var r0 []types.RepoTag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]types.RepoTag, error)); ok {
+		return rf(ctx, username)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []types.RepoTag); ok {
+		r0 = rf(ctx, username)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.RepoTag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, username)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_AdminGetUserTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AdminGetUserTags'
+type MockUserComponent_AdminGetUserTags_Call struct {
+	*mock.Call
+}
+
+// AdminGetUserTags is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+func (_e *MockUserComponent_Expecter) AdminGetUserTags(ctx interface{}, username interface{}) *MockUserComponent_AdminGetUserTags_Call {
+	return &MockUserComponent_AdminGetUserTags_Call{Call: _e.mock.On("AdminGetUserTags", ctx, username)}
+}
+
+func (_c *MockUserComponent_AdminGetUserTags_Call) Run(run func(ctx context.Context, username string)) *MockUserComponent_AdminGetUserTags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_AdminGetUserTags_Call) Return(_a0 []types.RepoTag, _a1 error) *MockUserComponent_AdminGetUserTags_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_AdminGetUserTags_Call) RunAndReturn(run func(context.Context, string) ([]types.RepoTag, error)) *MockUserComponent_AdminGetUserTags_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// AdminResetUserTags provides a mock function with given fields: ctx, username, tagIDs, operatorUUID, operatorName
+func (_m *MockUserComponent) AdminResetUserTags(ctx context.Context, username string, tagIDs []int64, operatorUUID string, operatorName string) error {
+	ret := _m.Called(ctx, username, tagIDs, operatorUUID, operatorName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AdminResetUserTags")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []int64, string, string) error); ok {
+		r0 = rf(ctx, username, tagIDs, operatorUUID, operatorName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserComponent_AdminResetUserTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AdminResetUserTags'
+type MockUserComponent_AdminResetUserTags_Call struct {
+	*mock.Call
+}
+
+// AdminResetUserTags is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - tagIDs []int64
+//   - operatorUUID string
+//   - operatorName string
+func (_e *MockUserComponent_Expecter) AdminResetUserTags(ctx interface{}, username interface{}, tagIDs interface{}, operatorUUID interface{}, operatorName interface{}) *MockUserComponent_AdminResetUserTags_Call {
+	return &MockUserComponent_AdminResetUserTags_Call{Call: _e.mock.On("AdminResetUserTags", ctx, username, tagIDs, operatorUUID, operatorName)}
+}
+
+func (_c *MockUserComponent_AdminResetUserTags_Call) Run(run func(ctx context.Context, username string, tagIDs []int64, operatorUUID string, operatorName string)) *MockUserComponent_AdminResetUserTags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]int64), args[3].(string), args[4].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_AdminResetUserTags_Call) Return(_a0 error) *MockUserComponent_AdminResetUserTags_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserComponent_AdminResetUserTags_Call) RunAndReturn(run func(context.Context, string, []int64, string, string) error) *MockUserComponent_AdminResetUserTags_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BuildSigninRedirect provides a mock function with given fields: ctx, state
+func (_m *MockUserComponent) BuildSigninRedirect(ctx context.Context, state string) (string, string, error) {
+	ret := _m.Called(ctx, state)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildSigninRedirect")
+	}
+
+	var r0 string
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, string, error)); ok {
+		return rf(ctx, state)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, state)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) string); ok {
+		r1 = rf(ctx, state)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string) error); ok {
+		r2 = rf(ctx, state)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_BuildSigninRedirect_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildSigninRedirect'
+type MockUserComponent_BuildSigninRedirect_Call struct {
+	*mock.Call
+}
+
+// BuildSigninRedirect is a helper method to define mock.On call
+//   - ctx context.Context
+//   - state string
+func (_e *MockUserComponent_Expecter) BuildSigninRedirect(ctx interface{}, state interface{}) *MockUserComponent_BuildSigninRedirect_Call {
+	return &MockUserComponent_BuildSigninRedirect_Call{Call: _e.mock.On("BuildSigninRedirect", ctx, state)}
+}
+
+func (_c *MockUserComponent_BuildSigninRedirect_Call) Run(run func(ctx context.Context, state string)) *MockUserComponent_BuildSigninRedirect_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_BuildSigninRedirect_Call) Return(redirectURL string, oauthState string, err error) *MockUserComponent_BuildSigninRedirect_Call {
+	_c.Call.Return(redirectURL, oauthState, err)
+	return _c
+}
+
+func (_c *MockUserComponent_BuildSigninRedirect_Call) RunAndReturn(run func(context.Context, string) (string, string, error)) *MockUserComponent_BuildSigninRedirect_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CanAdmin provides a mock function with given fields: ctx, username
 func (_m *MockUserComponent) CanAdmin(ctx context.Context, username string) (bool, error) {
 	ret := _m.Called(ctx, username)
@@ -1340,6 +1513,131 @@ func (_c *MockUserComponent_UpdateUserLabels_Call) Return(_a0 error) *MockUserCo
 }
 
 func (_c *MockUserComponent_UpdateUserLabels_Call) RunAndReturn(run func(context.Context, *types.UserLabelsRequest) error) *MockUserComponent_UpdateUserLabels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UserChoice provides a mock function with given fields: ctx, username
+func (_m *MockUserComponent) UserChoice(ctx context.Context, username string) (*types.UserChoiceDetail, error) {
+	ret := _m.Called(ctx, username)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UserChoice")
+	}
+
+	var r0 *types.UserChoiceDetail
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.UserChoiceDetail, error)); ok {
+		return rf(ctx, username)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.UserChoiceDetail); ok {
+		r0 = rf(ctx, username)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.UserChoiceDetail)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, username)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_UserChoice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UserChoice'
+type MockUserComponent_UserChoice_Call struct {
+	*mock.Call
+}
+
+// UserChoice is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+func (_e *MockUserComponent_Expecter) UserChoice(ctx interface{}, username interface{}) *MockUserComponent_UserChoice_Call {
+	return &MockUserComponent_UserChoice_Call{Call: _e.mock.On("UserChoice", ctx, username)}
+}
+
+func (_c *MockUserComponent_UserChoice_Call) Run(run func(ctx context.Context, username string)) *MockUserComponent_UserChoice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_UserChoice_Call) Return(_a0 *types.UserChoiceDetail, _a1 error) *MockUserComponent_UserChoice_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_UserChoice_Call) RunAndReturn(run func(context.Context, string) (*types.UserChoiceDetail, error)) *MockUserComponent_UserChoice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UserChoices provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) UserChoices(ctx context.Context, req types.UserListReq) ([]types.UserChoice, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UserChoices")
+	}
+
+	var r0 []types.UserChoice
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.UserListReq) ([]types.UserChoice, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.UserListReq) []types.UserChoice); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.UserChoice)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.UserListReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.UserListReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_UserChoices_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UserChoices'
+type MockUserComponent_UserChoices_Call struct {
+	*mock.Call
+}
+
+// UserChoices is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.UserListReq
+func (_e *MockUserComponent_Expecter) UserChoices(ctx interface{}, req interface{}) *MockUserComponent_UserChoices_Call {
+	return &MockUserComponent_UserChoices_Call{Call: _e.mock.On("UserChoices", ctx, req)}
+}
+
+func (_c *MockUserComponent_UserChoices_Call) Run(run func(ctx context.Context, req types.UserListReq)) *MockUserComponent_UserChoices_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.UserListReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_UserChoices_Call) Return(_a0 []types.UserChoice, _a1 int, _a2 error) *MockUserComponent_UserChoices_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_UserChoices_Call) RunAndReturn(run func(context.Context, types.UserListReq) ([]types.UserChoice, int, error)) *MockUserComponent_UserChoices_Call {
 	_c.Call.Return(run)
 	return _c
 }

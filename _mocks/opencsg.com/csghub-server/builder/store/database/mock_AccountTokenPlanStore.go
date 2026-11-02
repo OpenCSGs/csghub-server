@@ -484,6 +484,65 @@ func (_c *MockAccountTokenPlanStore_GetByPlanCode_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// GetByPlanName provides a mock function with given fields: ctx, planName
+func (_m *MockAccountTokenPlanStore) GetByPlanName(ctx context.Context, planName string) (*database.AccountTokenPlan, error) {
+	ret := _m.Called(ctx, planName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByPlanName")
+	}
+
+	var r0 *database.AccountTokenPlan
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.AccountTokenPlan, error)); ok {
+		return rf(ctx, planName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.AccountTokenPlan); ok {
+		r0 = rf(ctx, planName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AccountTokenPlan)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, planName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountTokenPlanStore_GetByPlanName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByPlanName'
+type MockAccountTokenPlanStore_GetByPlanName_Call struct {
+	*mock.Call
+}
+
+// GetByPlanName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - planName string
+func (_e *MockAccountTokenPlanStore_Expecter) GetByPlanName(ctx interface{}, planName interface{}) *MockAccountTokenPlanStore_GetByPlanName_Call {
+	return &MockAccountTokenPlanStore_GetByPlanName_Call{Call: _e.mock.On("GetByPlanName", ctx, planName)}
+}
+
+func (_c *MockAccountTokenPlanStore_GetByPlanName_Call) Run(run func(ctx context.Context, planName string)) *MockAccountTokenPlanStore_GetByPlanName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_GetByPlanName_Call) Return(_a0 *database.AccountTokenPlan, _a1 error) *MockAccountTokenPlanStore_GetByPlanName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_GetByPlanName_Call) RunAndReturn(run func(context.Context, string) (*database.AccountTokenPlan, error)) *MockAccountTokenPlanStore_GetByPlanName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLatestPeriodModelQuota provides a mock function with given fields: ctx, instanceID, modelID
 func (_m *MockAccountTokenPlanStore) GetLatestPeriodModelQuota(ctx context.Context, instanceID int64, modelID string) (*database.TokenPlanPeriodQuota, error) {
 	ret := _m.Called(ctx, instanceID, modelID)
@@ -540,6 +599,65 @@ func (_c *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call) Return(_a0 *
 }
 
 func (_c *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call) RunAndReturn(run func(context.Context, int64, string) (*database.TokenPlanPeriodQuota, error)) *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPeriodByEvent provides a mock function with given fields: ctx, req
+func (_m *MockAccountTokenPlanStore) GetPeriodByEvent(ctx context.Context, req types.AcctTokenPlanNSEventReq) (*database.AccountTokenPlanInstancePeriod, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPeriodByEvent")
+	}
+
+	var r0 *database.AccountTokenPlanInstancePeriod
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctTokenPlanNSEventReq) (*database.AccountTokenPlanInstancePeriod, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctTokenPlanNSEventReq) *database.AccountTokenPlanInstancePeriod); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AccountTokenPlanInstancePeriod)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctTokenPlanNSEventReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountTokenPlanStore_GetPeriodByEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPeriodByEvent'
+type MockAccountTokenPlanStore_GetPeriodByEvent_Call struct {
+	*mock.Call
+}
+
+// GetPeriodByEvent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctTokenPlanNSEventReq
+func (_e *MockAccountTokenPlanStore_Expecter) GetPeriodByEvent(ctx interface{}, req interface{}) *MockAccountTokenPlanStore_GetPeriodByEvent_Call {
+	return &MockAccountTokenPlanStore_GetPeriodByEvent_Call{Call: _e.mock.On("GetPeriodByEvent", ctx, req)}
+}
+
+func (_c *MockAccountTokenPlanStore_GetPeriodByEvent_Call) Run(run func(ctx context.Context, req types.AcctTokenPlanNSEventReq)) *MockAccountTokenPlanStore_GetPeriodByEvent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctTokenPlanNSEventReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_GetPeriodByEvent_Call) Return(_a0 *database.AccountTokenPlanInstancePeriod, _a1 error) *MockAccountTokenPlanStore_GetPeriodByEvent_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_GetPeriodByEvent_Call) RunAndReturn(run func(context.Context, types.AcctTokenPlanNSEventReq) (*database.AccountTokenPlanInstancePeriod, error)) *MockAccountTokenPlanStore_GetPeriodByEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -668,6 +786,72 @@ func (_c *MockAccountTokenPlanStore_ListActiveTokenPlanNamespaces_Call) RunAndRe
 	return _c
 }
 
+// ListInstances provides a mock function with given fields: ctx, req
+func (_m *MockAccountTokenPlanStore) ListInstances(ctx context.Context, req types.AcctTokenPlanInstanceListReq) ([]database.AccountTokenPlanInstance, types.AcctTokenPlanInstanceTotalValue, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListInstances")
+	}
+
+	var r0 []database.AccountTokenPlanInstance
+	var r1 types.AcctTokenPlanInstanceTotalValue
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctTokenPlanInstanceListReq) ([]database.AccountTokenPlanInstance, types.AcctTokenPlanInstanceTotalValue, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctTokenPlanInstanceListReq) []database.AccountTokenPlanInstance); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountTokenPlanInstance)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctTokenPlanInstanceListReq) types.AcctTokenPlanInstanceTotalValue); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(types.AcctTokenPlanInstanceTotalValue)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.AcctTokenPlanInstanceListReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockAccountTokenPlanStore_ListInstances_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListInstances'
+type MockAccountTokenPlanStore_ListInstances_Call struct {
+	*mock.Call
+}
+
+// ListInstances is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctTokenPlanInstanceListReq
+func (_e *MockAccountTokenPlanStore_Expecter) ListInstances(ctx interface{}, req interface{}) *MockAccountTokenPlanStore_ListInstances_Call {
+	return &MockAccountTokenPlanStore_ListInstances_Call{Call: _e.mock.On("ListInstances", ctx, req)}
+}
+
+func (_c *MockAccountTokenPlanStore_ListInstances_Call) Run(run func(ctx context.Context, req types.AcctTokenPlanInstanceListReq)) *MockAccountTokenPlanStore_ListInstances_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctTokenPlanInstanceListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_ListInstances_Call) Return(_a0 []database.AccountTokenPlanInstance, _a1 types.AcctTokenPlanInstanceTotalValue, _a2 error) *MockAccountTokenPlanStore_ListInstances_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_ListInstances_Call) RunAndReturn(run func(context.Context, types.AcctTokenPlanInstanceListReq) ([]database.AccountTokenPlanInstance, types.AcctTokenPlanInstanceTotalValue, error)) *MockAccountTokenPlanStore_ListInstances_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListInstancesByNsUUID provides a mock function with given fields: ctx, req
 func (_m *MockAccountTokenPlanStore) ListInstancesByNsUUID(ctx context.Context, req types.AcctTokenPlanHistoryReq) ([]database.AccountTokenPlanInstance, int, error) {
 	ret := _m.Called(ctx, req)
@@ -730,6 +914,124 @@ func (_c *MockAccountTokenPlanStore_ListInstancesByNsUUID_Call) Return(_a0 []dat
 }
 
 func (_c *MockAccountTokenPlanStore_ListInstancesByNsUUID_Call) RunAndReturn(run func(context.Context, types.AcctTokenPlanHistoryReq) ([]database.AccountTokenPlanInstance, int, error)) *MockAccountTokenPlanStore_ListInstancesByNsUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPeriodsForInstance provides a mock function with given fields: ctx, filter
+func (_m *MockAccountTokenPlanStore) ListPeriodsForInstance(ctx context.Context, filter types.AcctTokenPlanInstancePeriodsFilter) (*database.TokenPlanPeriodListResult, error) {
+	ret := _m.Called(ctx, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPeriodsForInstance")
+	}
+
+	var r0 *database.TokenPlanPeriodListResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctTokenPlanInstancePeriodsFilter) (*database.TokenPlanPeriodListResult, error)); ok {
+		return rf(ctx, filter)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctTokenPlanInstancePeriodsFilter) *database.TokenPlanPeriodListResult); ok {
+		r0 = rf(ctx, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.TokenPlanPeriodListResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctTokenPlanInstancePeriodsFilter) error); ok {
+		r1 = rf(ctx, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountTokenPlanStore_ListPeriodsForInstance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPeriodsForInstance'
+type MockAccountTokenPlanStore_ListPeriodsForInstance_Call struct {
+	*mock.Call
+}
+
+// ListPeriodsForInstance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filter types.AcctTokenPlanInstancePeriodsFilter
+func (_e *MockAccountTokenPlanStore_Expecter) ListPeriodsForInstance(ctx interface{}, filter interface{}) *MockAccountTokenPlanStore_ListPeriodsForInstance_Call {
+	return &MockAccountTokenPlanStore_ListPeriodsForInstance_Call{Call: _e.mock.On("ListPeriodsForInstance", ctx, filter)}
+}
+
+func (_c *MockAccountTokenPlanStore_ListPeriodsForInstance_Call) Run(run func(ctx context.Context, filter types.AcctTokenPlanInstancePeriodsFilter)) *MockAccountTokenPlanStore_ListPeriodsForInstance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctTokenPlanInstancePeriodsFilter))
+	})
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_ListPeriodsForInstance_Call) Return(_a0 *database.TokenPlanPeriodListResult, _a1 error) *MockAccountTokenPlanStore_ListPeriodsForInstance_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_ListPeriodsForInstance_Call) RunAndReturn(run func(context.Context, types.AcctTokenPlanInstancePeriodsFilter) (*database.TokenPlanPeriodListResult, error)) *MockAccountTokenPlanStore_ListPeriodsForInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPeriodsForNS provides a mock function with given fields: ctx, filter
+func (_m *MockAccountTokenPlanStore) ListPeriodsForNS(ctx context.Context, filter types.AcctTokenPlanPeriodsFilter) (*database.TokenPlanPeriodListResult, error) {
+	ret := _m.Called(ctx, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPeriodsForNS")
+	}
+
+	var r0 *database.TokenPlanPeriodListResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctTokenPlanPeriodsFilter) (*database.TokenPlanPeriodListResult, error)); ok {
+		return rf(ctx, filter)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctTokenPlanPeriodsFilter) *database.TokenPlanPeriodListResult); ok {
+		r0 = rf(ctx, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.TokenPlanPeriodListResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctTokenPlanPeriodsFilter) error); ok {
+		r1 = rf(ctx, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountTokenPlanStore_ListPeriodsForNS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPeriodsForNS'
+type MockAccountTokenPlanStore_ListPeriodsForNS_Call struct {
+	*mock.Call
+}
+
+// ListPeriodsForNS is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filter types.AcctTokenPlanPeriodsFilter
+func (_e *MockAccountTokenPlanStore_Expecter) ListPeriodsForNS(ctx interface{}, filter interface{}) *MockAccountTokenPlanStore_ListPeriodsForNS_Call {
+	return &MockAccountTokenPlanStore_ListPeriodsForNS_Call{Call: _e.mock.On("ListPeriodsForNS", ctx, filter)}
+}
+
+func (_c *MockAccountTokenPlanStore_ListPeriodsForNS_Call) Run(run func(ctx context.Context, filter types.AcctTokenPlanPeriodsFilter)) *MockAccountTokenPlanStore_ListPeriodsForNS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctTokenPlanPeriodsFilter))
+	})
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_ListPeriodsForNS_Call) Return(_a0 *database.TokenPlanPeriodListResult, _a1 error) *MockAccountTokenPlanStore_ListPeriodsForNS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_ListPeriodsForNS_Call) RunAndReturn(run func(context.Context, types.AcctTokenPlanPeriodsFilter) (*database.TokenPlanPeriodListResult, error)) *MockAccountTokenPlanStore_ListPeriodsForNS_Call {
 	_c.Call.Return(run)
 	return _c
 }

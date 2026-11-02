@@ -725,9 +725,11 @@ func TestPlatformDataflowComponent_GetJob(t *testing.T) {
 		}
 
 		user := &types.User{
-			UUID:     "admin-uuid",
-			Username: "admin",
-			Roles:    []string{"admin"},
+			UUID:       "admin-uuid",
+			Username:   "admin",
+			Roles:      []string{"super_admin"},
+			Admin:      true,
+			SuperAdmin: true,
 		}
 		ns := &rpc.Namespace{
 			Path:   "admin",
@@ -796,9 +798,11 @@ func TestCheckUserOrOrgPermission(t *testing.T) {
 		c := newTestPlatformDataflowComponent(t)
 
 		user := &types.User{
-			UUID:     "admin-uuid",
-			Username: "admin",
-			Roles:    []string{"admin"},
+			UUID:       "admin-uuid",
+			Username:   "admin",
+			Roles:      []string{"super_admin"},
+			Admin:      true,
+			SuperAdmin: true,
 		}
 		ns := &rpc.Namespace{
 			Path:   "targetuser",
@@ -862,12 +866,14 @@ func TestCheckUserOrOrgPermission(t *testing.T) {
 		require.NotNil(t, result)
 	})
 
-	t.Run("user accessing other user namespace denied", func(t *testing.T) {
+	t.Run("module administrator accessing other user namespace denied", func(t *testing.T) {
 		c := newTestPlatformDataflowComponent(t)
 
 		user := &types.User{
 			UUID:     "user-uuid-1",
 			Username: "testuser",
+			Roles:    []string{"asset_admin"},
+			Admin:    true,
 		}
 		ns := &rpc.Namespace{
 			Path:   "otheruser",
