@@ -1272,6 +1272,36 @@ func TestResponsesAdapterStreamWriterCompletedResponseIncludesUsage(t *testing.T
 	require.Contains(t, body, `"usage":{"input_tokens":48,"output_tokens":116,"total_tokens":164}`)
 }
 
+func TestResponsesAdapterStreamWriterKeepsDetailOnlyUsage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	counter := token.NewResponsesTokenCounter(&token.DumyTokenizer{})
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter, nil, "")
+	writer.WriteHeader(200)
+
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"hello"},"finish_reason":"stop","index":0}]}` + "\n\n"))
+	require.NoError(t, err)
+	// the usage chunk carries only detail fields, no prompt/completion/total counts
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[],"usage":{"prompt_tokens_details":{"cached_tokens":64},"completion_tokens_details":{"reasoning_tokens":25}}}` + "\n\n"))
+	require.NoError(t, err)
+	writer.finishResponseStream()
+
+	require.NotNil(t, writer.usage)
+	require.NotNil(t, writer.usage.InputTokensDetails)
+	require.Equal(t, int64(64), writer.usage.InputTokensDetails.CachedTokens)
+	require.NotNil(t, writer.usage.OutputTokensDetails)
+	require.Equal(t, int64(25), writer.usage.OutputTokensDetails.ReasoningTokens)
+	body := w.Body.String()
+	require.Contains(t, body, `"cached_tokens":64`)
+	require.Contains(t, body, `"reasoning_tokens":25`)
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, int64(64), usage.CachedPromptTokens)
+	require.Equal(t, int64(25), usage.ReasoningTokens)
+}
+
 func parseResponsesAdapterSSEEvents(t *testing.T, body string) []map[string]any {
 	t.Helper()
 	events := []map[string]any{}
