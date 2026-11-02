@@ -448,6 +448,30 @@ func TestE2E_ToResponses_NonStream_200(t *testing.T) {
 	assert.Equal(t, 7, resp.Usage.OutputTokens)
 }
 
+// TestE2E_ToResponses_NonStream_TruncatedToolCall verifies that a response cut
+// off mid tool call still reaches the client as a valid max_tokens message.
+func TestE2E_ToResponses_NonStream_TruncatedToolCall(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		fmt.Fprint(w, `{"id":"resp_1","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},
+			"output":[{"type":"function_call","call_id":"call_1","name":"get_weather","arguments":"{\"city\":"}],
+			"usage":{"input_tokens":10,"output_tokens":7}}`)
+	}))
+	defer upstream.Close()
+
+	target := makeMessagesTarget(upstream.URL+"/v1/responses", "")
+	planner := &fakePlanner{target: target}
+	handler := makeTestHandlerWithPlanner(planner)
+	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
+
+	require.Equal(t, 200, w.Code)
+	var resp types.AnthropicMessagesResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp), w.Body.String())
+	require.NotNil(t, resp.StopReason)
+	assert.Equal(t, "max_tokens", *resp.StopReason)
+}
+
 func TestE2E_ToResponses_Stream_200(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

@@ -355,6 +355,34 @@ func TestResponsesResponseToMessagesResponse(t *testing.T) {
 		assert.Equal(t, "tool_use", *result.StopReason)
 	})
 
+	t.Run("non-completed statuses never report tool_use", func(t *testing.T) {
+		for _, status := range []string{"failed", "in_progress", "queued", "cancelled", ""} {
+			resp := &types.ResponsesResponse{
+				Status: status,
+				Output: []types.ResponsesOutputItem{
+					{Type: "function_call", CallID: "call_1", Name: "get_weather", Arguments: `{"city":"SF"}`},
+				},
+			}
+			result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+			require.NoError(t, err)
+			assert.Equal(t, "end_turn", *result.StopReason, "status %q", status)
+		}
+	})
+
+	t.Run("truncated function call arguments still serialize", func(t *testing.T) {
+		resp := &types.ResponsesResponse{
+			Status: "incomplete",
+			Output: []types.ResponsesOutputItem{
+				{Type: "function_call", CallID: "call_1", Name: "get_weather", Arguments: `{"city":`},
+			},
+		}
+		result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+		require.NoError(t, err)
+		_, err = json.Marshal(result)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{}`, string(result.Content[0].Input))
+	})
+
 	t.Run("incomplete function call keeps max_tokens", func(t *testing.T) {
 		resp := &types.ResponsesResponse{
 			Status: "incomplete",
@@ -627,4 +655,23 @@ func TestExtractCarriesPriorityScope(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, meta)
 	require.Equal(t, "high", meta.PriorityScope, "the Extract phase must carry the server-side priority scope")
+}
+
+func TestBuildChatCompletionFromResponsesResponseFinishReason(t *testing.T) {
+	call := types.ResponsesOutputItem{Type: "function_call", CallID: "call_1", Name: "get_weather", Arguments: `{"city":"SF"}`}
+	cases := []struct {
+		status string
+		output []types.ResponsesOutputItem
+		want   string
+	}{
+		{"completed", []types.ResponsesOutputItem{call}, "tool_calls"},
+		{"completed", nil, "stop"},
+		{"incomplete", []types.ResponsesOutputItem{call}, "length"},
+		{"failed", []types.ResponsesOutputItem{call}, "stop"},
+	}
+	for _, tc := range cases {
+		got := buildChatCompletionFromResponsesResponse(&types.ResponsesResponse{Status: tc.status, Output: tc.output}, "m")
+		require.Len(t, got.Choices, 1)
+		assert.Equal(t, tc.want, got.Choices[0].FinishReason, "status %q", tc.status)
+	}
 }

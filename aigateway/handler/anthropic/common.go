@@ -456,7 +456,11 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 			}
 		case "function_call":
 			inputArgs := json.RawMessage(item.Arguments)
-			if len(inputArgs) == 0 {
+			// Arguments cut off by max_output_tokens are not valid JSON and
+			// would make the whole response fail to serialize; send an empty
+			// object instead. The stop reason is not tool_use in that case,
+			// so clients do not run the tool.
+			if len(inputArgs) == 0 || !json.Valid(inputArgs) {
 				inputArgs = json.RawMessage(`{}`)
 			}
 			contentBlocks = append(contentBlocks, types.AnthropicContentBlock{
@@ -507,11 +511,11 @@ func responsesIncompleteReason(details json.RawMessage) string {
 }
 
 // responsesStopReason is responsesStatusToStopReason, except that a completed
-// response that emitted function calls reports "tool_use": Anthropic clients
+// response (status "completed" only) that emitted function calls reports "tool_use": Anthropic clients
 // such as Claude Code only run the requested tools on that stop reason.
 func responsesStopReason(status, incompleteReason string, hasToolUse bool) string {
 	reason := responsesStatusToStopReason(status, incompleteReason)
-	if reason == "end_turn" && hasToolUse {
+	if status == "completed" && reason == "end_turn" && hasToolUse {
 		return "tool_use"
 	}
 	return reason
