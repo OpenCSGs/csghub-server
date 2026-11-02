@@ -343,7 +343,7 @@ func (w *toChatResponseWriter) Finalize() error {
 			hasToolUse := len(sortedToolCalls) > 0
 			// message_delta with stop_reason and usage.
 			usageMap := map[string]any{
-				"input_tokens":  w.inputTokens,
+				"input_tokens":  uncachedInputTokens(w.inputTokens, w.cacheReadTokens),
 				"output_tokens": w.outputTokens,
 			}
 			if w.cacheReadTokens > 0 {
@@ -393,7 +393,9 @@ func (w *toChatResponseWriter) Finalize() error {
 			"failed to convert upstream response")
 		return nil
 	}
-	w.inputTokens = int64(resp.Usage.InputTokens)
+	// Messages input_tokens excludes cache reads; the internal usage keeps
+	// the OpenAI semantics (prompt tokens include cached ones).
+	w.inputTokens = int64(resp.Usage.InputTokens + resp.Usage.CacheReadInputTokens)
 	w.outputTokens = int64(resp.Usage.OutputTokens)
 	w.cacheReadTokens = int64(resp.Usage.CacheReadInputTokens)
 	// The converted Messages usage has no reasoning field — read it from

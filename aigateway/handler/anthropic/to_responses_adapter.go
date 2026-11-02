@@ -251,7 +251,7 @@ func (w *toResponsesResponseWriter) Finalize() error {
 				})
 			}
 			usageMap := map[string]any{
-				"input_tokens":  w.inputTokens,
+				"input_tokens":  uncachedInputTokens(w.inputTokens, w.cacheReadTokens),
 				"output_tokens": w.outputTokens,
 			}
 			if w.cacheReadTokens > 0 {
@@ -311,7 +311,9 @@ func (w *toResponsesResponseWriter) Finalize() error {
 			"failed to convert upstream response")
 		return nil
 	}
-	w.inputTokens = int64(result.Usage.InputTokens)
+	// Messages input_tokens excludes cache reads; the internal usage keeps
+	// the OpenAI semantics (input tokens include cached ones).
+	w.inputTokens = int64(result.Usage.InputTokens + result.Usage.CacheReadInputTokens)
 	w.outputTokens = int64(result.Usage.OutputTokens)
 	w.cacheReadTokens = int64(result.Usage.CacheReadInputTokens)
 	w.cacheCreationTokens = int64(result.Usage.CacheCreationInputTokens)

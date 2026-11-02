@@ -270,7 +270,7 @@ func chatResponseToMessagesResponse(data []byte, model string) (*types.Anthropic
 		Role:  "assistant",
 		Model: model,
 		Usage: types.AnthropicMessagesUsage{
-			InputTokens:          int(chat.Usage.PromptTokens),
+			InputTokens:          uncachedInputTokens(chat.Usage.PromptTokens, chat.Usage.PromptTokensDetails.CachedTokens),
 			OutputTokens:         int(chat.Usage.CompletionTokens),
 			CacheReadInputTokens: int(chat.Usage.PromptTokensDetails.CachedTokens),
 		},
@@ -429,6 +429,7 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 			OutputTokens: int(resp.Usage.OutputTokens),
 		}
 		if resp.Usage.InputTokensDetails != nil {
+			usage.InputTokens = uncachedInputTokens(resp.Usage.InputTokens, resp.Usage.InputTokensDetails.CachedTokens)
 			usage.CacheReadInputTokens = int(resp.Usage.InputTokensDetails.CachedTokens)
 			usage.CacheCreationInputTokens = int(resp.Usage.InputTokensDetails.CachedCreationTokens)
 		}
@@ -768,4 +769,14 @@ func convertToolChoiceForChat(raw json.RawMessage) (json.RawMessage, error) {
 	default:
 		return json.RawMessage(`"auto"`), nil
 	}
+}
+
+// uncachedInputTokens converts an OpenAI-style prompt token count, which
+// includes cached tokens, into Anthropic's input_tokens, which excludes
+// cache_read_input_tokens.
+func uncachedInputTokens(prompt, cached int64) int {
+	if cached > prompt {
+		return 0
+	}
+	return int(prompt - cached)
 }
