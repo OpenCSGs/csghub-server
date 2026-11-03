@@ -382,6 +382,8 @@ func chatFinishReasonToStopReason(finishReason string) string {
 		return "tool_use"
 	case "stop_sequence":
 		return "stop_sequence"
+	case "content_filter":
+		return "refusal"
 	default:
 		return "end_turn"
 	}
