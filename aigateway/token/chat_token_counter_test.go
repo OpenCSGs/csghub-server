@@ -271,6 +271,57 @@ func TestChatTokenCounter_Usage_WithoutTokenizer(t *testing.T) {
 	assert.Greater(t, usage.TotalTokens, int64(0))
 }
 
+func TestChatTokenCounter_Usage_WithoutTokenizerCountsDeltaReasoning(t *testing.T) {
+	// Providers such as vLLM and OpenRouter stream the reasoning in delta.reasoning
+	// rather than delta.reasoning_content.
+	counter := token.NewLLMTokenCounter(nil)
+	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage("Hello, how are you?"),
+	})
+	counter.AppendCompletionChunk(types.ChatCompletionChunk{
+		ID: "test-id",
+		Choices: []types.ChatCompletionChunkChoice{{
+			Delta: types.ChatCompletionChunkChoiceDelta{
+				Reasoning: "The user greets me, so I should greet them back politely.",
+			},
+		}},
+		Model:  "test-model",
+		Object: new(constant.ChatCompletion).Default(),
+	})
+
+	usage, err := counter.Usage(context.Background())
+
+	assert.NoError(t, err)
+	assert.NotNil(t, usage)
+	assert.Greater(t, usage.CompletionTokens, int64(0))
+}
+
+func TestChatTokenCounter_Usage_WithoutTokenizerCountsDeltaReasoningOnce(t *testing.T) {
+	// Providers in transition send the same text in reasoning_content and reasoning.
+	text := "The user greets me, so I should greet them back politely."
+	count := func(delta types.ChatCompletionChunkChoiceDelta) int64 {
+		counter := token.NewLLMTokenCounter(nil)
+		counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("Hello, how are you?"),
+		})
+		counter.AppendCompletionChunk(types.ChatCompletionChunk{
+			ID:      "test-id",
+			Choices: []types.ChatCompletionChunkChoice{{Delta: delta}},
+			Model:   "test-model",
+			Object:  new(constant.ChatCompletion).Default(),
+		})
+		usage, err := counter.Usage(context.Background())
+		assert.NoError(t, err)
+		return usage.CompletionTokens
+	}
+
+	single := count(types.ChatCompletionChunkChoiceDelta{ReasoningContent: text})
+	both := count(types.ChatCompletionChunkChoiceDelta{ReasoningContent: text, Reasoning: text})
+
+	assert.Greater(t, single, int64(0))
+	assert.Equal(t, single, both)
+}
+
 func TestChatTokenCounter_Usage_WithCompletionWithoutUsage_FallbackTokenizer(t *testing.T) {
 	tokenizer := mocktoken.NewMockTokenizer(t)
 	counter := token.NewLLMTokenCounter(tokenizer)
