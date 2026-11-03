@@ -615,3 +615,63 @@ func TestExtractCarriesPriorityScope(t *testing.T) {
 	require.NotNil(t, meta)
 	require.Equal(t, "high", meta.PriorityScope, "the Extract phase must carry the server-side priority scope")
 }
+
+func TestUncachedInputTokens(t *testing.T) {
+	assert.Equal(t, 70, uncachedInputTokens(100, 30))
+	assert.Equal(t, 100, uncachedInputTokens(100, 0))
+	assert.Equal(t, 0, uncachedInputTokens(100, 150), "cached larger than prompt must not go negative")
+	assert.Equal(t, 50, uncachedInputTokens(100, 30, 20), "cache reads and writes are both excluded")
+	assert.Equal(t, 0, uncachedInputTokens(100, 80, 40), "combined cache larger than prompt must not go negative")
+}
+
+func TestResponsesUsageExcludesCacheReadsAndWrites(t *testing.T) {
+	resp := &types.ResponsesResponse{
+		ID: "resp_1", Status: "completed", Model: "gpt-4",
+		Output: []types.ResponsesOutputItem{{
+			Type: "message", Role: "assistant",
+			Content: []types.ResponsesContentPart{{Type: "output_text", Text: "Hi"}},
+		}},
+		Usage: &types.ResponsesUsage{
+			InputTokens: 100, OutputTokens: 5,
+			InputTokensDetails: &types.ResponsesInputTokenDetails{CachedTokens: 30, CachedCreationTokens: 20},
+		},
+	}
+	result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+	require.NoError(t, err)
+	assert.Equal(t, 50, result.Usage.InputTokens)
+	assert.Equal(t, 30, result.Usage.CacheReadInputTokens)
+	assert.Equal(t, 20, result.Usage.CacheCreationInputTokens)
+}
+
+func TestUsageExcludesCacheReads(t *testing.T) {
+	t.Run("chat response", func(t *testing.T) {
+		chatJSON := `{
+			"id": "chatcmpl-1", "object": "chat.completion", "model": "qwen3",
+			"choices": [{"index": 0, "message": {"role": "assistant", "content": "Hi"}, "finish_reason": "stop"}],
+			"usage": {"prompt_tokens": 100, "completion_tokens": 5, "total_tokens": 105,
+				"prompt_tokens_details": {"cached_tokens": 30}}
+		}`
+		resp, err := chatResponseToMessagesResponse([]byte(chatJSON), "claude-3")
+		require.NoError(t, err)
+		assert.Equal(t, 70, resp.Usage.InputTokens)
+		assert.Equal(t, 30, resp.Usage.CacheReadInputTokens)
+	})
+
+	t.Run("responses response", func(t *testing.T) {
+		resp := &types.ResponsesResponse{
+			ID: "resp_1", Status: "completed", Model: "gpt-4",
+			Output: []types.ResponsesOutputItem{{
+				Type: "message", Role: "assistant",
+				Content: []types.ResponsesContentPart{{Type: "output_text", Text: "Hi"}},
+			}},
+			Usage: &types.ResponsesUsage{
+				InputTokens: 100, OutputTokens: 5,
+				InputTokensDetails: &types.ResponsesInputTokenDetails{CachedTokens: 30},
+			},
+		}
+		result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+		require.NoError(t, err)
+		assert.Equal(t, 70, result.Usage.InputTokens)
+		assert.Equal(t, 30, result.Usage.CacheReadInputTokens)
+	})
+}

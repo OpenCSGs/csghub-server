@@ -256,6 +256,20 @@ func messagesToolsToChatTools(tools []types.AnthropicTool) []map[string]any {
 
 // --- OpenAI Chat → Anthropic Messages response conversion ---
 
+// rawChatPromptTokens returns the prompt_tokens a Chat Completions response
+// reports, or 0 if it has none.
+func rawChatPromptTokens(data []byte) int64 {
+	var u struct {
+		Usage struct {
+			PromptTokens int64 `json:"prompt_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(data, &u); err != nil {
+		return 0
+	}
+	return u.Usage.PromptTokens
+}
+
 // chatResponseToMessagesResponse converts an OpenAI Chat Completions response
 // to an Anthropic Messages response.
 func chatResponseToMessagesResponse(data []byte, model string) (*types.AnthropicMessagesResponse, error) {
@@ -270,7 +284,7 @@ func chatResponseToMessagesResponse(data []byte, model string) (*types.Anthropic
 		Role:  "assistant",
 		Model: model,
 		Usage: types.AnthropicMessagesUsage{
-			InputTokens:          int(chat.Usage.PromptTokens),
+			InputTokens:          uncachedInputTokens(int(chat.Usage.PromptTokens), int(chat.Usage.PromptTokensDetails.CachedTokens)),
 			OutputTokens:         int(chat.Usage.CompletionTokens),
 			CacheReadInputTokens: int(chat.Usage.PromptTokensDetails.CachedTokens),
 		},
@@ -413,6 +427,21 @@ func newMessagesResponseID() string {
 
 // --- OpenAI Responses → Anthropic Messages response conversion ---
 
+// uncachedInputTokens converts an OpenAI-style prompt/input token count, which
+// includes cache reads and cache writes, into Anthropic's input_tokens, which
+// excludes both. It never returns less than zero.
+func uncachedInputTokens(prompt int, cached ...int) int {
+	for _, n := range cached {
+		if n > 0 {
+			prompt -= n
+		}
+	}
+	if prompt < 0 {
+		return 0
+	}
+	return prompt
+}
+
 // responsesResponseToMessagesResponse converts an OpenAI Responses response
 // to an Anthropic Messages response.
 func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model string) (*types.AnthropicMessagesResponse, error) {
@@ -429,6 +458,9 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 			OutputTokens: int(resp.Usage.OutputTokens),
 		}
 		if resp.Usage.InputTokensDetails != nil {
+			usage.InputTokens = uncachedInputTokens(usage.InputTokens,
+				int(resp.Usage.InputTokensDetails.CachedTokens),
+				int(resp.Usage.InputTokensDetails.CachedCreationTokens))
 			usage.CacheReadInputTokens = int(resp.Usage.InputTokensDetails.CachedTokens)
 			usage.CacheCreationInputTokens = int(resp.Usage.InputTokensDetails.CachedCreationTokens)
 		}

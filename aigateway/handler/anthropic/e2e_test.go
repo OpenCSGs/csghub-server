@@ -1664,3 +1664,125 @@ func TestE2E_ClaudeCode_MetadataProtocol_OverridesFallback(t *testing.T) {
 	_, hasType := tools[0]["type"]
 	assert.True(t, hasType, "tools should have 'type' field — metadata protocol=chat should force chat adapter")
 }
+
+func TestE2E_ToChat_Stream_InputTokensExcludeCacheReads(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		flusher := w.(http.Flusher)
+		for _, chunk := range []string{
+			`data: {"id":"1","object":"chat.completion.chunk","model":"test","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"},"finish_reason":null}]}`,
+			`data: {"id":"1","object":"chat.completion.chunk","model":"test","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":2,"total_tokens":102,"prompt_tokens_details":{"cached_tokens":30}}}`,
+			`data: [DONE]`,
+		} {
+			fmt.Fprintf(w, "%s\n\n", chunk)
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
+	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")}
+	handler := makeTestHandlerWithPlanner(planner)
+	w := dispatchWithTarget(t, handler, body, planner)
+
+	require.Equal(t, 200, w.Code)
+	bodyStr := w.Body.String()
+	assert.Contains(t, bodyStr, `"input_tokens":70`)
+	assert.Contains(t, bodyStr, `"cache_read_input_tokens":30`)
+}
+
+func TestE2E_ToResponses_Stream_InputTokensExcludeCacheReads(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		flusher := w.(http.Flusher)
+		for _, e := range []string{
+			`event: response.created\ndata: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","model":"test"}}`,
+			`event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hi"}`,
+			`event: response.completed\ndata: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"test","usage":{"input_tokens":100,"output_tokens":2,"input_tokens_details":{"cached_tokens":30}}}}`,
+		} {
+			fmt.Fprint(w, strings.ReplaceAll(e, `\n`, "\n")+"\n\n")
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
+	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/responses", "")}
+	handler := makeTestHandlerWithPlanner(planner)
+	w := dispatchWithTarget(t, handler, body, planner)
+
+	require.Equal(t, 200, w.Code)
+	bodyStr := w.Body.String()
+	assert.Contains(t, bodyStr, `"input_tokens":70`)
+	assert.Contains(t, bodyStr, `"cache_read_input_tokens":30`)
+}
+
+func TestE2E_ToResponses_Stream_InputTokensExcludeCacheReadsAndWrites(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		flusher := w.(http.Flusher)
+		for _, e := range []string{
+			`event: response.created\ndata: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","model":"test"}}`,
+			`event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hi"}`,
+			`event: response.completed\ndata: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"test","usage":{"input_tokens":100,"output_tokens":2,"input_tokens_details":{"cached_tokens":30,"cached_creation_tokens":20}}}}`,
+		} {
+			fmt.Fprint(w, strings.ReplaceAll(e, `\n`, "\n")+"\n\n")
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
+	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/responses", "")}
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	w := dispatchWithTarget(t, handler, body, planner)
+
+	require.Equal(t, 200, w.Code)
+	bodyStr := w.Body.String()
+	assert.Contains(t, bodyStr, `"input_tokens":50`)
+	assert.Contains(t, bodyStr, `"cache_read_input_tokens":30`)
+	assert.Contains(t, bodyStr, `"cache_creation_input_tokens":20`)
+
+	require.Eventually(t, func() bool { return recorder.recorded }, 2*time.Second, 10*time.Millisecond)
+	assert.Equal(t, int64(100), recorder.inputTokens, "recording keeps the upstream total")
+}
+
+func TestE2E_ToResponses_NonStream_Billing_KeepsUpstreamTotalWhenCacheExceedsPrompt(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":"resp_1","status":"completed","model":"test-model",
+			"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hi"}]}],
+			"usage":{"input_tokens":100,"output_tokens":7,"input_tokens_details":{"cached_tokens":150}}}`)
+	}))
+	defer upstream.Close()
+
+	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/responses", "")}
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
+
+	require.Equal(t, 200, w.Code)
+	require.Eventually(t, func() bool { return recorder.recorded }, 2*time.Second, 10*time.Millisecond)
+	assert.Equal(t, int64(100), recorder.inputTokens, "must not be rebuilt from the clamped client usage (would be 150)")
+	assert.Equal(t, int64(150), recorder.cachedPromptTokens)
+}
+
+func TestE2E_ToChat_NonStream_Billing_KeepsUpstreamTotalWhenCacheExceedsPrompt(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":"c1","object":"chat.completion","model":"test-model",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":100,"completion_tokens":7,"total_tokens":107,"prompt_tokens_details":{"cached_tokens":150}}}`)
+	}))
+	defer upstream.Close()
+
+	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")}
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
+
+	require.Equal(t, 200, w.Code)
+	require.Eventually(t, func() bool { return recorder.recorded }, 2*time.Second, 10*time.Millisecond)
+	assert.Equal(t, int64(100), recorder.inputTokens)
+}
