@@ -1272,6 +1272,36 @@ func TestResponsesAdapterStreamWriterCompletedResponseIncludesUsage(t *testing.T
 	require.Contains(t, body, `"usage":{"input_tokens":48,"output_tokens":116,"total_tokens":164}`)
 }
 
+func TestResponsesAdapterStreamWriterKeepsDetailOnlyUsage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	counter := token.NewResponsesTokenCounter(&token.DumyTokenizer{})
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter, nil, "")
+	writer.WriteHeader(200)
+
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"hello"},"finish_reason":"stop","index":0}]}` + "\n\n"))
+	require.NoError(t, err)
+	// the usage chunk carries only detail fields, no prompt/completion/total counts
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[],"usage":{"prompt_tokens_details":{"cached_tokens":64},"completion_tokens_details":{"reasoning_tokens":25}}}` + "\n\n"))
+	require.NoError(t, err)
+	writer.finishResponseStream()
+
+	require.NotNil(t, writer.usage)
+	require.NotNil(t, writer.usage.InputTokensDetails)
+	require.Equal(t, int64(64), writer.usage.InputTokensDetails.CachedTokens)
+	require.NotNil(t, writer.usage.OutputTokensDetails)
+	require.Equal(t, int64(25), writer.usage.OutputTokensDetails.ReasoningTokens)
+	body := w.Body.String()
+	require.Contains(t, body, `"cached_tokens":64`)
+	require.Contains(t, body, `"reasoning_tokens":25`)
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, int64(64), usage.CachedPromptTokens)
+	require.Equal(t, int64(25), usage.ReasoningTokens)
+}
+
 func parseResponsesAdapterSSEEvents(t *testing.T, body string) []map[string]any {
 	t.Helper()
 	events := []map[string]any{}
@@ -2571,4 +2601,64 @@ func TestResponsesAdapterStreamWriterContinuesRepeatedNameFragments(t *testing.T
 			require.Equal(t, `{"q":"x"}`, arguments)
 		})
 	}
+}
+
+func TestChatResponseToResponsesKeepsUsageDetails(t *testing.T) {
+	resp, err := chatResponseToResponsesWithToolAliases([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],
+		"usage":{
+			"prompt_tokens":100,
+			"completion_tokens":40,
+			"total_tokens":140,
+			"prompt_tokens_details":{"cached_tokens":64},
+			"completion_tokens_details":{"reasoning_tokens":25}
+		}
+	}`), "public-model", nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp.Usage)
+	require.Equal(t, int64(100), resp.Usage.InputTokens)
+	require.NotNil(t, resp.Usage.InputTokensDetails)
+	require.Equal(t, int64(64), resp.Usage.InputTokensDetails.CachedTokens)
+	require.NotNil(t, resp.Usage.OutputTokensDetails)
+	require.Equal(t, int64(25), resp.Usage.OutputTokensDetails.ReasoningTokens)
+}
+
+func TestChatResponseToResponsesOmitsEmptyUsageDetails(t *testing.T) {
+	resp, err := chatResponseToResponsesWithToolAliases([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],
+		"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}
+	}`), "public-model", nil)
+	require.NoError(t, err)
+	require.Nil(t, resp.Usage.InputTokensDetails)
+	require.Nil(t, resp.Usage.OutputTokensDetails)
+}
+
+func TestCaptureChatStreamUsageKeepsUsageDetails(t *testing.T) {
+	var chunk types.ChatCompletionChunk
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"id":"chatcmpl_1",
+		"choices":[],
+		"usage":{
+			"prompt_tokens":100,
+			"completion_tokens":40,
+			"total_tokens":140,
+			"prompt_tokens_details":{"cached_tokens":64},
+			"completion_tokens_details":{"reasoning_tokens":25}
+		}
+	}`), &chunk))
+
+	w := &responsesAdapterStreamWriter{}
+	w.captureChatStreamUsage(chunk)
+
+	require.NotNil(t, w.usage)
+	require.NotNil(t, w.usage.InputTokensDetails)
+	require.Equal(t, int64(64), w.usage.InputTokensDetails.CachedTokens)
+	require.NotNil(t, w.usage.OutputTokensDetails)
+	require.Equal(t, int64(25), w.usage.OutputTokensDetails.ReasoningTokens)
 }
