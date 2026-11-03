@@ -550,7 +550,7 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 					w.reasoningTokens = event.Response.Usage.OutputTokensDetails.ReasoningTokens
 				}
 			}
-			w.stopReason = responsesStatusToStopReason(event.Response.Status, responsesIncompleteReason(event.Response.IncompleteDetails))
+			w.stopReason = responsesStopReason(event.Response.Status, responsesIncompleteReason(event.Response.IncompleteDetails), len(w.toolCallStates) > 0)
 		}
 		if w.recorder != nil {
 			finishReason := messagesStopReasonToFinishReason(w.stopReason)
@@ -610,6 +610,11 @@ func buildChatCompletionFromResponsesResponse(resp *types.ResponsesResponse, mod
 	}
 
 	finishReason := responsesStatusToFinishReason(resp.Status)
+	// Match the stop reason sent to the client (and the streaming path): a
+	// completed response that made tool calls ends with tool_calls.
+	if resp.Status == "completed" && len(toolCalls) > 0 {
+		finishReason = "tool_calls"
+	}
 	msg := openai.ChatCompletionMessage{
 		Role:    "assistant",
 		Content: content,
