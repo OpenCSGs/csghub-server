@@ -674,6 +674,8 @@ func TestBuildChatCompletionFromResponsesResponseFinishReason(t *testing.T) {
 		require.Len(t, got.Choices, 1)
 		assert.Equal(t, tc.want, got.Choices[0].FinishReason, "status %q", tc.status)
 	}
+}
+
 func TestUncachedInputTokens(t *testing.T) {
 	assert.Equal(t, 70, uncachedInputTokens(100, 30))
 	assert.Equal(t, 100, uncachedInputTokens(100, 0))
