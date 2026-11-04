@@ -352,6 +352,47 @@ func TestResponsesResponseToMessagesResponse(t *testing.T) {
 		require.Len(t, result.Content, 1)
 		assert.Equal(t, "tool_use", result.Content[0].Type)
 		assert.Equal(t, "call_1", result.Content[0].ID)
+		assert.Equal(t, "tool_use", *result.StopReason)
+	})
+
+	t.Run("non-completed statuses never report tool_use", func(t *testing.T) {
+		for _, status := range []string{"failed", "in_progress", "queued", "cancelled", ""} {
+			resp := &types.ResponsesResponse{
+				Status: status,
+				Output: []types.ResponsesOutputItem{
+					{Type: "function_call", CallID: "call_1", Name: "get_weather", Arguments: `{"city":"SF"}`},
+				},
+			}
+			result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+			require.NoError(t, err)
+			assert.Equal(t, "end_turn", *result.StopReason, "status %q", status)
+		}
+	})
+
+	t.Run("truncated function call arguments still serialize", func(t *testing.T) {
+		resp := &types.ResponsesResponse{
+			Status: "incomplete",
+			Output: []types.ResponsesOutputItem{
+				{Type: "function_call", CallID: "call_1", Name: "get_weather", Arguments: `{"city":`},
+			},
+		}
+		result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+		require.NoError(t, err)
+		_, err = json.Marshal(result)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{}`, string(result.Content[0].Input))
+	})
+
+	t.Run("incomplete function call keeps max_tokens", func(t *testing.T) {
+		resp := &types.ResponsesResponse{
+			Status: "incomplete",
+			Output: []types.ResponsesOutputItem{
+				{Type: "function_call", CallID: "call_1", Name: "get_weather", Arguments: `{"city":`},
+			},
+		}
+		result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+		require.NoError(t, err)
+		assert.Equal(t, "max_tokens", *result.StopReason)
 	})
 
 	t.Run("reasoning output", func(t *testing.T) {
@@ -511,6 +552,7 @@ func TestChatFinishReasonToStopReason(t *testing.T) {
 		{"tool_calls", "tool_use"},
 		{"function_call", "tool_use"},
 		{"stop_sequence", "stop_sequence"},
+		{"content_filter", "refusal"},
 		{"unknown", "end_turn"},
 	}
 	for _, tt := range tests {
@@ -614,4 +656,83 @@ func TestExtractCarriesPriorityScope(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, meta)
 	require.Equal(t, "high", meta.PriorityScope, "the Extract phase must carry the server-side priority scope")
+}
+
+func TestBuildChatCompletionFromResponsesResponseFinishReason(t *testing.T) {
+	call := types.ResponsesOutputItem{Type: "function_call", CallID: "call_1", Name: "get_weather", Arguments: `{"city":"SF"}`}
+	cases := []struct {
+		status string
+		output []types.ResponsesOutputItem
+		want   string
+	}{
+		{"completed", []types.ResponsesOutputItem{call}, "tool_calls"},
+		{"completed", nil, "stop"},
+		{"incomplete", []types.ResponsesOutputItem{call}, "length"},
+		{"failed", []types.ResponsesOutputItem{call}, "stop"},
+	}
+	for _, tc := range cases {
+		got := buildChatCompletionFromResponsesResponse(&types.ResponsesResponse{Status: tc.status, Output: tc.output}, "m")
+		require.Len(t, got.Choices, 1)
+		assert.Equal(t, tc.want, got.Choices[0].FinishReason, "status %q", tc.status)
+	}
+}
+
+func TestUncachedInputTokens(t *testing.T) {
+	assert.Equal(t, 70, uncachedInputTokens(100, 30))
+	assert.Equal(t, 100, uncachedInputTokens(100, 0))
+	assert.Equal(t, 0, uncachedInputTokens(100, 150), "cached larger than prompt must not go negative")
+	assert.Equal(t, 50, uncachedInputTokens(100, 30, 20), "cache reads and writes are both excluded")
+	assert.Equal(t, 0, uncachedInputTokens(100, 80, 40), "combined cache larger than prompt must not go negative")
+}
+
+func TestResponsesUsageExcludesCacheReadsAndWrites(t *testing.T) {
+	resp := &types.ResponsesResponse{
+		ID: "resp_1", Status: "completed", Model: "gpt-4",
+		Output: []types.ResponsesOutputItem{{
+			Type: "message", Role: "assistant",
+			Content: []types.ResponsesContentPart{{Type: "output_text", Text: "Hi"}},
+		}},
+		Usage: &types.ResponsesUsage{
+			InputTokens: 100, OutputTokens: 5,
+			InputTokensDetails: &types.ResponsesInputTokenDetails{CachedTokens: 30, CachedCreationTokens: 20},
+		},
+	}
+	result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+	require.NoError(t, err)
+	assert.Equal(t, 50, result.Usage.InputTokens)
+	assert.Equal(t, 30, result.Usage.CacheReadInputTokens)
+	assert.Equal(t, 20, result.Usage.CacheCreationInputTokens)
+}
+
+func TestUsageExcludesCacheReads(t *testing.T) {
+	t.Run("chat response", func(t *testing.T) {
+		chatJSON := `{
+			"id": "chatcmpl-1", "object": "chat.completion", "model": "qwen3",
+			"choices": [{"index": 0, "message": {"role": "assistant", "content": "Hi"}, "finish_reason": "stop"}],
+			"usage": {"prompt_tokens": 100, "completion_tokens": 5, "total_tokens": 105,
+				"prompt_tokens_details": {"cached_tokens": 30}}
+		}`
+		resp, err := chatResponseToMessagesResponse([]byte(chatJSON), "claude-3")
+		require.NoError(t, err)
+		assert.Equal(t, 70, resp.Usage.InputTokens)
+		assert.Equal(t, 30, resp.Usage.CacheReadInputTokens)
+	})
+
+	t.Run("responses response", func(t *testing.T) {
+		resp := &types.ResponsesResponse{
+			ID: "resp_1", Status: "completed", Model: "gpt-4",
+			Output: []types.ResponsesOutputItem{{
+				Type: "message", Role: "assistant",
+				Content: []types.ResponsesContentPart{{Type: "output_text", Text: "Hi"}},
+			}},
+			Usage: &types.ResponsesUsage{
+				InputTokens: 100, OutputTokens: 5,
+				InputTokensDetails: &types.ResponsesInputTokenDetails{CachedTokens: 30},
+			},
+		}
+		result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+		require.NoError(t, err)
+		assert.Equal(t, 70, result.Usage.InputTokens)
+		assert.Equal(t, 30, result.Usage.CacheReadInputTokens)
+	})
 }

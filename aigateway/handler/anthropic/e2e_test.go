@@ -448,6 +448,30 @@ func TestE2E_ToResponses_NonStream_200(t *testing.T) {
 	assert.Equal(t, 7, resp.Usage.OutputTokens)
 }
 
+// TestE2E_ToResponses_NonStream_TruncatedToolCall verifies that a response cut
+// off mid tool call still reaches the client as a valid max_tokens message.
+func TestE2E_ToResponses_NonStream_TruncatedToolCall(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		fmt.Fprint(w, `{"id":"resp_1","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},
+			"output":[{"type":"function_call","call_id":"call_1","name":"get_weather","arguments":"{\"city\":"}],
+			"usage":{"input_tokens":10,"output_tokens":7}}`)
+	}))
+	defer upstream.Close()
+
+	target := makeMessagesTarget(upstream.URL+"/v1/responses", "")
+	planner := &fakePlanner{target: target}
+	handler := makeTestHandlerWithPlanner(planner)
+	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
+
+	require.Equal(t, 200, w.Code)
+	var resp types.AnthropicMessagesResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp), w.Body.String())
+	require.NotNil(t, resp.StopReason)
+	assert.Equal(t, "max_tokens", *resp.StopReason)
+}
+
 func TestE2E_ToResponses_Stream_200(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -996,6 +1020,7 @@ func TestE2E_ToResponses_ToolUse_Stream(t *testing.T) {
 	assert.Contains(t, bodyStr, "tool_use")
 	assert.Contains(t, bodyStr, "call_xyz")
 	assert.Contains(t, bodyStr, "get_weather")
+	assert.Contains(t, bodyStr, `"stop_reason":"tool_use"`)
 	assert.Contains(t, bodyStr, "input_json_delta")
 	assert.Contains(t, bodyStr, "city")
 }
@@ -1665,34 +1690,14 @@ func TestE2E_ClaudeCode_MetadataProtocol_OverridesFallback(t *testing.T) {
 	assert.True(t, hasType, "tools should have 'type' field — metadata protocol=chat should force chat adapter")
 }
 
-func messageDeltaUsage(t *testing.T, body string) map[string]any {
-	t.Helper()
-	for _, block := range strings.Split(body, "\n\n") {
-		if !strings.Contains(block, "event: message_delta") {
-			continue
-		}
-		for _, line := range strings.Split(block, "\n") {
-			if data, ok := strings.CutPrefix(line, "data: "); ok {
-				var ev struct {
-					Usage map[string]any `json:"usage"`
-				}
-				require.NoError(t, json.Unmarshal([]byte(data), &ev))
-				return ev.Usage
-			}
-		}
-	}
-	t.Fatalf("no message_delta in stream: %s", body)
-	return nil
-}
-
-func TestE2E_Usage_InputTokensExcludeCache_ToChat_Stream(t *testing.T) {
+func TestE2E_ToChat_Stream_InputTokensExcludeCacheReads(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(200)
 		flusher := w.(http.Flusher)
 		for _, chunk := range []string{
 			`data: {"id":"1","object":"chat.completion.chunk","model":"test","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"},"finish_reason":null}]}`,
-			`data: {"id":"1","object":"chat.completion.chunk","model":"test","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":3,"total_tokens":103,"prompt_tokens_details":{"cached_tokens":80}}}`,
+			`data: {"id":"1","object":"chat.completion.chunk","model":"test","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":2,"total_tokens":102,"prompt_tokens_details":{"cached_tokens":30}}}`,
 			`data: [DONE]`,
 		} {
 			fmt.Fprintf(w, "%s\n\n", chunk)
@@ -1703,29 +1708,51 @@ func TestE2E_Usage_InputTokensExcludeCache_ToChat_Stream(t *testing.T) {
 
 	body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
 	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")}
-	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	handler := makeTestHandlerWithPlanner(planner)
 	w := dispatchWithTarget(t, handler, body, planner)
+
 	require.Equal(t, 200, w.Code)
-
-	usage := messageDeltaUsage(t, w.Body.String())
-	assert.EqualValues(t, 20, usage["input_tokens"])
-	assert.EqualValues(t, 80, usage["cache_read_input_tokens"])
-
-	require.Eventually(t, func() bool { return recorder.recorded }, 2*time.Second, 10*time.Millisecond)
-	// Internal accounting keeps OpenAI semantics (prompt tokens include cached).
-	assert.Equal(t, int64(100), recorder.inputTokens)
-	assert.Equal(t, int64(80), recorder.cachedPromptTokens)
+	bodyStr := w.Body.String()
+	assert.Contains(t, bodyStr, `"input_tokens":70`)
+	assert.Contains(t, bodyStr, `"cache_read_input_tokens":30`)
 }
 
-func TestE2E_Usage_InputTokensExcludeCache_ToResponses_Stream(t *testing.T) {
+func TestE2E_ToResponses_Stream_InputTokensExcludeCacheReads(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(200)
 		flusher := w.(http.Flusher)
 		for _, e := range []string{
 			`event: response.created\ndata: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","model":"test"}}`,
-			`event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hello"}`,
-			`event: response.completed\ndata: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"test","usage":{"input_tokens":100,"output_tokens":2,"input_tokens_details":{"cached_tokens":80}}}}`,
+			`event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hi"}`,
+			`event: response.completed\ndata: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"test","usage":{"input_tokens":100,"output_tokens":2,"input_tokens_details":{"cached_tokens":30}}}}`,
+		} {
+			fmt.Fprint(w, strings.ReplaceAll(e, `\n`, "\n")+"\n\n")
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
+	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/responses", "")}
+	handler := makeTestHandlerWithPlanner(planner)
+	w := dispatchWithTarget(t, handler, body, planner)
+
+	require.Equal(t, 200, w.Code)
+	bodyStr := w.Body.String()
+	assert.Contains(t, bodyStr, `"input_tokens":70`)
+	assert.Contains(t, bodyStr, `"cache_read_input_tokens":30`)
+}
+
+func TestE2E_ToResponses_Stream_InputTokensExcludeCacheReadsAndWrites(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		flusher := w.(http.Flusher)
+		for _, e := range []string{
+			`event: response.created\ndata: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","model":"test"}}`,
+			`event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hi"}`,
+			`event: response.completed\ndata: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"test","usage":{"input_tokens":100,"output_tokens":2,"input_tokens_details":{"cached_tokens":30,"cached_creation_tokens":20}}}}`,
 		} {
 			fmt.Fprint(w, strings.ReplaceAll(e, `\n`, "\n")+"\n\n")
 			flusher.Flush()
@@ -1737,45 +1764,50 @@ func TestE2E_Usage_InputTokensExcludeCache_ToResponses_Stream(t *testing.T) {
 	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/responses", "")}
 	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
 	w := dispatchWithTarget(t, handler, body, planner)
-	require.Equal(t, 200, w.Code)
 
-	usage := messageDeltaUsage(t, w.Body.String())
-	assert.EqualValues(t, 20, usage["input_tokens"])
-	assert.EqualValues(t, 80, usage["cache_read_input_tokens"])
+	require.Equal(t, 200, w.Code)
+	bodyStr := w.Body.String()
+	assert.Contains(t, bodyStr, `"input_tokens":50`)
+	assert.Contains(t, bodyStr, `"cache_read_input_tokens":30`)
+	assert.Contains(t, bodyStr, `"cache_creation_input_tokens":20`)
 
 	require.Eventually(t, func() bool { return recorder.recorded }, 2*time.Second, 10*time.Millisecond)
-	assert.Equal(t, int64(100), recorder.inputTokens)
+	assert.Equal(t, int64(100), recorder.inputTokens, "recording keeps the upstream total")
 }
 
-func TestE2E_Usage_InputTokensExcludeCache_NonStream(t *testing.T) {
-	for name, tc := range map[string]struct{ path, resp string }{
-		"chat": {"/v1/chat/completions", `{"id":"c","object":"chat.completion","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"x"},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":3,"total_tokens":103,"prompt_tokens_details":{"cached_tokens":80}}}`},
-		"responses": {"/v1/responses", `{"id":"r","object":"response","status":"completed","model":"m","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"x"}]}],"usage":{"input_tokens":100,"output_tokens":3,"total_tokens":103,"input_tokens_details":{"cached_tokens":80}}}`},
-	} {
-		t.Run(name, func(t *testing.T) {
-			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				fmt.Fprint(w, tc.resp)
-			}))
-			defer upstream.Close()
-			planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+tc.path, "")}
-			handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
-			w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
-			require.Equal(t, 200, w.Code)
+func TestE2E_ToResponses_NonStream_Billing_KeepsUpstreamTotalWhenCacheExceedsPrompt(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":"resp_1","status":"completed","model":"test-model",
+			"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hi"}]}],
+			"usage":{"input_tokens":100,"output_tokens":7,"input_tokens_details":{"cached_tokens":150}}}`)
+	}))
+	defer upstream.Close()
 
-			var got struct {
-				Usage struct {
-					InputTokens          int `json:"input_tokens"`
-					CacheReadInputTokens int `json:"cache_read_input_tokens"`
-				} `json:"usage"`
-			}
-			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
-			assert.Equal(t, 20, got.Usage.InputTokens)
-			assert.Equal(t, 80, got.Usage.CacheReadInputTokens)
+	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/responses", "")}
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
 
-			require.Eventually(t, func() bool { return recorder.recorded }, 2*time.Second, 10*time.Millisecond)
-			assert.Equal(t, int64(100), recorder.inputTokens)
-			assert.Equal(t, int64(80), recorder.cachedPromptTokens)
-		})
-	}
+	require.Equal(t, 200, w.Code)
+	require.Eventually(t, func() bool { return recorder.recorded }, 2*time.Second, 10*time.Millisecond)
+	assert.Equal(t, int64(100), recorder.inputTokens, "must not be rebuilt from the clamped client usage (would be 150)")
+	assert.Equal(t, int64(150), recorder.cachedPromptTokens)
+}
+
+func TestE2E_ToChat_NonStream_Billing_KeepsUpstreamTotalWhenCacheExceedsPrompt(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":"c1","object":"chat.completion","model":"test-model",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":100,"completion_tokens":7,"total_tokens":107,"prompt_tokens_details":{"cached_tokens":150}}}`)
+	}))
+	defer upstream.Close()
+
+	planner := &fakePlanner{target: makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")}
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
+
+	require.Equal(t, 200, w.Code)
+	require.Eventually(t, func() bool { return recorder.recorded }, 2*time.Second, 10*time.Millisecond)
+	assert.Equal(t, int64(100), recorder.inputTokens)
 }

@@ -256,6 +256,20 @@ func messagesToolsToChatTools(tools []types.AnthropicTool) []map[string]any {
 
 // --- OpenAI Chat → Anthropic Messages response conversion ---
 
+// rawChatPromptTokens returns the prompt_tokens a Chat Completions response
+// reports, or 0 if it has none.
+func rawChatPromptTokens(data []byte) int64 {
+	var u struct {
+		Usage struct {
+			PromptTokens int64 `json:"prompt_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(data, &u); err != nil {
+		return 0
+	}
+	return u.Usage.PromptTokens
+}
+
 // chatResponseToMessagesResponse converts an OpenAI Chat Completions response
 // to an Anthropic Messages response.
 func chatResponseToMessagesResponse(data []byte, model string) (*types.AnthropicMessagesResponse, error) {
@@ -270,7 +284,7 @@ func chatResponseToMessagesResponse(data []byte, model string) (*types.Anthropic
 		Role:  "assistant",
 		Model: model,
 		Usage: types.AnthropicMessagesUsage{
-			InputTokens:          uncachedInputTokens(chat.Usage.PromptTokens, chat.Usage.PromptTokensDetails.CachedTokens),
+			InputTokens:          uncachedInputTokens(int(chat.Usage.PromptTokens), int(chat.Usage.PromptTokensDetails.CachedTokens)),
 			OutputTokens:         int(chat.Usage.CompletionTokens),
 			CacheReadInputTokens: int(chat.Usage.PromptTokensDetails.CachedTokens),
 		},
@@ -368,6 +382,8 @@ func chatFinishReasonToStopReason(finishReason string) string {
 		return "tool_use"
 	case "stop_sequence":
 		return "stop_sequence"
+	case "content_filter":
+		return "refusal"
 	default:
 		return "end_turn"
 	}
@@ -376,11 +392,11 @@ func chatFinishReasonToStopReason(finishReason string) string {
 // chatStopReason derives the Messages stop_reason from the Chat finish_reason
 // and the content that was actually produced. Some OpenAI-compatible upstreams
 // (Gemini) end a tool-calling turn with finish_reason "stop", so a message with
-// tool_use blocks reports tool_use; a truncated message ("length") still wins
-// and reports max_tokens.
+// tool_use blocks reports tool_use; a truncated message ("length") or a
+// filtered one ("content_filter") still wins and reports max_tokens or refusal.
 func chatStopReason(finishReason string, hasToolUse bool) string {
 	stopReason := chatFinishReasonToStopReason(finishReason)
-	if hasToolUse && stopReason != "max_tokens" {
+	if hasToolUse && stopReason != "max_tokens" && stopReason != "refusal" {
 		return "tool_use"
 	}
 	return stopReason
@@ -413,6 +429,21 @@ func newMessagesResponseID() string {
 
 // --- OpenAI Responses → Anthropic Messages response conversion ---
 
+// uncachedInputTokens converts an OpenAI-style prompt/input token count, which
+// includes cache reads and cache writes, into Anthropic's input_tokens, which
+// excludes both. It never returns less than zero.
+func uncachedInputTokens(prompt int, cached ...int) int {
+	for _, n := range cached {
+		if n > 0 {
+			prompt -= n
+		}
+	}
+	if prompt < 0 {
+		return 0
+	}
+	return prompt
+}
+
 // responsesResponseToMessagesResponse converts an OpenAI Responses response
 // to an Anthropic Messages response.
 func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model string) (*types.AnthropicMessagesResponse, error) {
@@ -429,7 +460,9 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 			OutputTokens: int(resp.Usage.OutputTokens),
 		}
 		if resp.Usage.InputTokensDetails != nil {
-			usage.InputTokens = uncachedInputTokens(resp.Usage.InputTokens, resp.Usage.InputTokensDetails.CachedTokens)
+			usage.InputTokens = uncachedInputTokens(usage.InputTokens,
+				int(resp.Usage.InputTokensDetails.CachedTokens),
+				int(resp.Usage.InputTokensDetails.CachedCreationTokens))
 			usage.CacheReadInputTokens = int(resp.Usage.InputTokensDetails.CachedTokens)
 			usage.CacheCreationInputTokens = int(resp.Usage.InputTokensDetails.CachedCreationTokens)
 		}
@@ -457,7 +490,11 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 			}
 		case "function_call":
 			inputArgs := json.RawMessage(item.Arguments)
-			if len(inputArgs) == 0 {
+			// Arguments cut off by max_output_tokens are not valid JSON and
+			// would make the whole response fail to serialize; send an empty
+			// object instead. The stop reason is not tool_use in that case,
+			// so clients do not run the tool.
+			if len(inputArgs) == 0 || !json.Valid(inputArgs) {
 				inputArgs = json.RawMessage(`{}`)
 			}
 			contentBlocks = append(contentBlocks, types.AnthropicContentBlock{
@@ -483,7 +520,14 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 	}
 	result.Content = contentBlocks
 
-	stopReason := responsesStatusToStopReason(resp.Status, responsesIncompleteReason(resp.IncompleteDetails))
+	hasToolUse := false
+	for _, block := range contentBlocks {
+		if block.Type == "tool_use" {
+			hasToolUse = true
+			break
+		}
+	}
+	stopReason := responsesStopReason(resp.Status, responsesIncompleteReason(resp.IncompleteDetails), hasToolUse)
 	result.StopReason = &stopReason
 
 	return result, nil
@@ -498,6 +542,17 @@ func responsesIncompleteReason(details json.RawMessage) string {
 		return ""
 	}
 	return parsed.Reason
+}
+
+// responsesStopReason is responsesStatusToStopReason, except that a completed
+// response (status "completed" only) that emitted function calls reports "tool_use": Anthropic clients
+// such as Claude Code only run the requested tools on that stop reason.
+func responsesStopReason(status, incompleteReason string, hasToolUse bool) string {
+	reason := responsesStatusToStopReason(status, incompleteReason)
+	if status == "completed" && reason == "end_turn" && hasToolUse {
+		return "tool_use"
+	}
+	return reason
 }
 
 func responsesStatusToStopReason(status, incompleteReason string) string {
@@ -769,14 +824,4 @@ func convertToolChoiceForChat(raw json.RawMessage) (json.RawMessage, error) {
 	default:
 		return json.RawMessage(`"auto"`), nil
 	}
-}
-
-// uncachedInputTokens converts an OpenAI-style prompt token count, which
-// includes cached tokens, into Anthropic's input_tokens, which excludes
-// cache_read_input_tokens.
-func uncachedInputTokens(prompt, cached int64) int {
-	if cached > prompt {
-		return 0
-	}
-	return int(prompt - cached)
 }
