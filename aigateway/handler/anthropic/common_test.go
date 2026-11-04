@@ -552,6 +552,7 @@ func TestChatFinishReasonToStopReason(t *testing.T) {
 		{"tool_calls", "tool_use"},
 		{"function_call", "tool_use"},
 		{"stop_sequence", "stop_sequence"},
+		{"content_filter", "refusal"},
 		{"unknown", "end_turn"},
 	}
 	for _, tt := range tests {

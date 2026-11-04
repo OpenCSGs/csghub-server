@@ -382,6 +382,8 @@ func chatFinishReasonToStopReason(finishReason string) string {
 		return "tool_use"
 	case "stop_sequence":
 		return "stop_sequence"
+	case "content_filter":
+		return "refusal"
 	default:
 		return "end_turn"
 	}
@@ -390,11 +392,11 @@ func chatFinishReasonToStopReason(finishReason string) string {
 // chatStopReason derives the Messages stop_reason from the Chat finish_reason
 // and the content that was actually produced. Some OpenAI-compatible upstreams
 // (Gemini) end a tool-calling turn with finish_reason "stop", so a message with
-// tool_use blocks reports tool_use; a truncated message ("length") still wins
-// and reports max_tokens.
+// tool_use blocks reports tool_use; a truncated message ("length") or a
+// filtered one ("content_filter") still wins and reports max_tokens or refusal.
 func chatStopReason(finishReason string, hasToolUse bool) string {
 	stopReason := chatFinishReasonToStopReason(finishReason)
-	if hasToolUse && stopReason != "max_tokens" {
+	if hasToolUse && stopReason != "max_tokens" && stopReason != "refusal" {
 		return "tool_use"
 	}
 	return stopReason
