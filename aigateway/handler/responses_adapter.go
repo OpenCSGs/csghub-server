@@ -1034,6 +1034,24 @@ func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesR
 	return chatResponseToResponsesWithToolAliases(data, publicModel, nil)
 }
 
+// responsesUsageFromChat converts chat completion usage into Responses usage,
+// keeping the cached prompt and reasoning token breakdown so downstream
+// accounting does not lose it.
+func responsesUsageFromChat(usage openai.CompletionUsage) *types.ResponsesUsage {
+	resp := &types.ResponsesUsage{
+		InputTokens:  usage.PromptTokens,
+		OutputTokens: usage.CompletionTokens,
+		TotalTokens:  usage.TotalTokens,
+	}
+	if cached := usage.PromptTokensDetails.CachedTokens; cached > 0 {
+		resp.InputTokensDetails = &types.ResponsesInputTokenDetails{CachedTokens: cached}
+	}
+	if reasoning := usage.CompletionTokensDetails.ReasoningTokens; reasoning > 0 {
+		resp.OutputTokensDetails = &types.ResponsesOutputTokenDetails{ReasoningTokens: reasoning}
+	}
+	return resp
+}
+
 func chatResponseToResponsesWithToolAliases(data []byte, publicModel string, toolAliases *responsesToolAliases) (*types.ResponsesResponse, error) {
 	var chat types.ChatCompletion
 	if err := json.Unmarshal(data, &chat); err != nil {
@@ -1048,7 +1066,7 @@ func chatResponseToResponsesWithToolAliases(data []byte, publicModel string, too
 		CreatedAt: chat.Created,
 		Status:    "completed",
 		Model:     publicModel,
-		Usage:     chatUsageToResponses(chat.Usage),
+		Usage:     responsesUsageFromChat(chat.Usage),
 	}
 	if resp.CreatedAt == 0 {
 		resp.CreatedAt = time.Now().Unix()
@@ -1166,25 +1184,4 @@ func responsesIncompleteReason(finishReason string) string {
 	default:
 		return ""
 	}
-}
-
-// chatUsageToResponses converts chat completion usage into Responses usage,
-// keeping the cached prompt tokens and reasoning tokens the upstream reported.
-func chatUsageToResponses(usage openai.CompletionUsage) *types.ResponsesUsage {
-	out := &types.ResponsesUsage{
-		InputTokens:  usage.PromptTokens,
-		OutputTokens: usage.CompletionTokens,
-		TotalTokens:  usage.TotalTokens,
-	}
-	if usage.PromptTokensDetails.CachedTokens > 0 {
-		out.InputTokensDetails = &types.ResponsesInputTokenDetails{
-			CachedTokens: usage.PromptTokensDetails.CachedTokens,
-		}
-	}
-	if usage.CompletionTokensDetails.ReasoningTokens > 0 {
-		out.OutputTokensDetails = &types.ResponsesOutputTokenDetails{
-			ReasoningTokens: usage.CompletionTokensDetails.ReasoningTokens,
-		}
-	}
-	return out
 }

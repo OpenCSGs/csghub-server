@@ -109,6 +109,8 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 			}
 			if chunk.Choices[0].Delta.ReasoningContent != "" {
 				contentBuf.WriteString(chunk.Choices[0].Delta.ReasoningContent)
+			} else if chunk.Choices[0].Delta.Reasoning != "" {
+				contentBuf.WriteString(chunk.Choices[0].Delta.Reasoning)
 			}
 		}
 		// contains usage data

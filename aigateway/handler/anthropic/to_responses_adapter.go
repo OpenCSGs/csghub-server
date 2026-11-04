@@ -251,7 +251,7 @@ func (w *toResponsesResponseWriter) Finalize() error {
 				})
 			}
 			usageMap := map[string]any{
-				"input_tokens":  w.inputTokens,
+				"input_tokens":  int64(uncachedInputTokens(int(w.inputTokens), int(w.cacheReadTokens), int(w.cacheCreationTokens))),
 				"output_tokens": w.outputTokens,
 			}
 			if w.cacheReadTokens > 0 {
@@ -311,7 +311,11 @@ func (w *toResponsesResponseWriter) Finalize() error {
 			"failed to convert upstream response")
 		return nil
 	}
-	w.inputTokens = int64(result.Usage.InputTokens)
+	// Recording keeps the total the upstream reported, not a value rebuilt
+	// from the clamped usage exposed to the client.
+	if resp.Usage != nil {
+		w.inputTokens = resp.Usage.InputTokens
+	}
 	w.outputTokens = int64(result.Usage.OutputTokens)
 	w.cacheReadTokens = int64(result.Usage.CacheReadInputTokens)
 	w.cacheCreationTokens = int64(result.Usage.CacheCreationInputTokens)
@@ -546,7 +550,7 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 					w.reasoningTokens = event.Response.Usage.OutputTokensDetails.ReasoningTokens
 				}
 			}
-			w.stopReason = responsesStatusToStopReason(event.Response.Status, responsesIncompleteReason(event.Response.IncompleteDetails))
+			w.stopReason = responsesStopReason(event.Response.Status, responsesIncompleteReason(event.Response.IncompleteDetails), len(w.toolCallStates) > 0)
 		}
 		if w.recorder != nil {
 			finishReason := messagesStopReasonToFinishReason(w.stopReason)
@@ -606,6 +610,11 @@ func buildChatCompletionFromResponsesResponse(resp *types.ResponsesResponse, mod
 	}
 
 	finishReason := responsesStatusToFinishReason(resp.Status)
+	// Match the stop reason sent to the client (and the streaming path): a
+	// completed response that made tool calls ends with tool_calls.
+	if resp.Status == "completed" && len(toolCalls) > 0 {
+		finishReason = "tool_calls"
+	}
 	msg := openai.ChatCompletionMessage{
 		Role:    "assistant",
 		Content: content,
