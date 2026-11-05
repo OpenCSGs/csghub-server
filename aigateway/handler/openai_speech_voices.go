@@ -30,7 +30,7 @@ func (h *OpenAIHandlerImpl) ListVoices(c *gin.Context) {
 	modelID := strings.TrimSpace(c.Query("model"))
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Model cannot be empty, pass it as the 'model' query parameter", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "Model cannot be empty, pass it as the 'model' query parameter", Type: types.ErrTypeInvalidRequest,
 		}})
 		return
 	}
@@ -97,31 +97,31 @@ func (h *OpenAIHandlerImpl) uploadOrUpdateVoice(c *gin.Context) {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
 			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": types.Error{
-				Code: "invalid_request_error", Message: fmt.Sprintf("request body too large, limit is %d bytes", maxVoiceUploadBytes), Type: "invalid_request_error",
+				Code: types.ErrCodeInvalidRequest, Message: fmt.Sprintf("request body too large, limit is %d bytes", maxVoiceUploadBytes), Type: types.ErrTypeInvalidRequest,
 			}})
 			return
 		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "invalid multipart form: " + err.Error(), Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "invalid multipart form: " + err.Error(), Type: types.ErrTypeInvalidRequest,
 		}})
 		return
 	}
 	if form == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "request must be multipart/form-data", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "request must be multipart/form-data", Type: types.ErrTypeInvalidRequest,
 		}})
 		return
 	}
 	modelID := strings.TrimSpace(firstMultipartValue(form, "model"))
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Model cannot be empty", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: types.MsgModelEmpty, Type: types.ErrTypeInvalidRequest,
 		}})
 		return
 	}
 	if len(form.File["audio_sample"]) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "audio_sample cannot be empty", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "audio_sample cannot be empty", Type: types.ErrTypeInvalidRequest,
 		}})
 		return
 	}
@@ -135,7 +135,7 @@ func (h *OpenAIHandlerImpl) uploadOrUpdateVoice(c *gin.Context) {
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to rewrite voices request", slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "internal_error", Message: err.Error(), Type: "internal_error",
+			Code: types.ErrCodeInternal, Message: err.Error(), Type: types.ErrTypeServer,
 		}})
 		return
 	}
@@ -165,14 +165,14 @@ func (h *OpenAIHandlerImpl) DeleteVoice(c *gin.Context) {
 	modelID := strings.TrimSpace(c.Query("model"))
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Model cannot be empty, pass it as the 'model' query parameter", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "Model cannot be empty, pass it as the 'model' query parameter", Type: types.ErrTypeInvalidRequest,
 		}})
 		return
 	}
 	voiceName := strings.TrimSpace(c.Param("name"))
 	if voiceName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Voice name cannot be empty", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "Voice name cannot be empty", Type: types.ErrTypeInvalidRequest,
 		}})
 		return
 	}
@@ -197,7 +197,7 @@ func (h *OpenAIHandlerImpl) resolveVoicesTarget(c *gin.Context, modelID string, 
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	ctx := c.Request.Context()
 
-	modelTarget, err := h.resolveModelTarget(ctx, nsUUID, modelID, c.Request.Header)
+	modelTarget, err := h.resolveModelTarget(resolveModelTargetReq{C: c, ModelID: modelID, Headers: c.Request.Header})
 	if err != nil {
 		handleModelTargetError(c, ctx, modelID, "failed to get voices target address", err)
 		return nil, false
@@ -208,13 +208,13 @@ func (h *OpenAIHandlerImpl) resolveVoicesTarget(c *gin.Context, modelID string, 
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to check voice management permission", slog.String("model_id", modelID), slog.Any("error", err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-				Code: "internal_error", Message: "failed to check permission: " + err.Error(), Type: "internal_error",
+				Code: types.ErrCodeInternal, Message: "failed to check permission: " + err.Error(), Type: types.ErrTypeServer,
 			}})
 			return nil, false
 		}
 		if !allowed {
 			c.JSON(http.StatusForbidden, gin.H{"error": types.Error{
-				Code: "insufficient_permissions", Message: "only the model owner or admins can manage voices", Type: "invalid_request_error",
+				Code: types.ErrCodeInsufficientPermissions, Message: "only the model owner or admins can manage voices", Type: types.ErrTypeInvalidRequest,
 			}})
 			return nil, false
 		}
@@ -237,7 +237,9 @@ func (h *OpenAIHandlerImpl) proxyVoicesRequest(c *gin.Context, modelID string, m
 	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
+			Code: types.ErrCodeInternal, Message: types.MsgInternalError, Type: types.ErrTypeServer,
+		}})
 		return
 	}
 

@@ -20,7 +20,6 @@ type AccountingClient interface {
 	ListBillsByUserIDAndDate(req types.ActStatementsReq) (any, error)
 	ListBillsDetailByUserID(req types.AcctBillsDetailReq) (any, error)
 	RechargeAccountingUser(userID string, req types.RechargeReq) (any, error)
-	PresentAccountingUser(userID string, req types.ActivityReq) (any, error)
 	CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (any, error)
 	GetQuotaByID(currentUser string) (any, error)
 	CreateQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (any, error)
@@ -41,11 +40,11 @@ type AccountingClient interface {
 	TokenReportIndex(req types.TokenReportReq) (any, error)
 	ListPresents(req types.PresentsIndexReq) (any, error)
 	GetOrderDetailByID(currentUser string, id int64) (any, error)
-	GetVoucherDashboard(req types.VoucherDashboardReq) (any, error)
 	OffLinePrice(req types.AcctPriceOffLineReq) (any, error)
 	QueryStatisticsByUserID(req types.AcctBillsReq) (any, error)
 	QueryStatisticsDetailByUserID(req types.AcctBillsDetailReq) (any, error)
 	GetStatisticsSummary(req types.AcctBillsReq) (any, error)
+	// token plan
 	CreateTokenPlan(req types.AcctTokenPlanCreateReq) (any, error)
 	GetTokenPlan(req types.AcctTokenPlanGetReq) (any, error)
 	UpdateTokenPlan(req types.AcctTokenPlanUpdateReq) (any, error)
@@ -54,11 +53,27 @@ type AccountingClient interface {
 	SummaryTokenPlans() (any, error)
 	ListPlansForNS(req types.AcctTokenPlanNSListReq) (any, error)
 	ListHistoryForNS(req types.AcctTokenPlanHistoryReq) (any, error)
+	ListPeriodsForNS(req types.AcctTokenPlanPeriodsReq) (*types.AcctTokenPlanPeriodsResp, error)
+	ListInstancesForAdmin(req types.AcctTokenPlanInstanceListReq) (*types.AcctTokenPlanInstanceListResp, error)
+	ListPeriodsForInstance(req types.AcctTokenPlanInstancePeriodsReq) (*types.AcctTokenPlanPeriodsResp, error)
 	PurchasePlanForNS(req types.AcctTokenPlanPurchaseReq) (any, error)
 	GetCurrentSubForNS(req types.AcctTokenPlanNSGetReq) (any, error)
 	CancelPlanForNS(req types.AcctTokenPlanCancelReq) (any, error)
 	UpgradePlanForNS(req types.AcctTokenPlanUpgradeReq) (any, error)
 	UpdatePlanForNS(req types.AcctTokenPlanUpdateNSReq) (any, error)
+	// voucher
+	CreateVoucher(req types.CreateVoucherReq) (any, error)
+	ListVouchers(req types.VoucherFilter) (any, error)
+	GetVoucher(currentUser string, id int64) (any, error)
+	UpdateVoucher(req types.UpdateVoucherReq, id int64) (any, error)
+	RevokeVoucher(currentUser string, id int64) (any, error)
+	GetVoucherDashboardForNS(req types.VoucherDashboardReq) (any, error)
+	GetVoucherBillForNS(req types.VoucherBillReq) (any, error)
+	ListVouchersForNS(req types.VoucherNamespaceFilter) (any, error)
+	GetVoucherDashboard(req types.VoucherDashboardReq) (any, error)
+	// present activity
+	PresentAccountingUser(userID string, req types.ActivityReq) (any, error)
+	PresentNewRegisterUser(userID string, req types.NewUserPresentReq) (any, error)
 }
 type accountingClientImpl struct {
 	remote    *url.URL
@@ -121,8 +136,15 @@ func (ac *accountingClientImpl) doRequest(method, subPath string, data any) (*ht
 		if mapOK {
 			code, codeOK := errMap["code"].(string)
 			if codeOK && errorx.IsValidErrorCode(code) {
-				return nil, errorx.ParseError(code, errorx.NewCustomError("SYS-ERR", 0, err, nil),
-					errorx.Ctx().Set("detail", errData))
+				errCtx := errorx.Ctx().Set("detail", errData)
+				// Surface the downstream context (e.g. plan_name) so the
+				// localized API layer can render the same message template.
+				if downstreamCtx, ok := errMap["context"].(map[string]any); ok {
+					for key, value := range downstreamCtx {
+						errCtx = errCtx.Set(key, value)
+					}
+				}
+				return nil, errorx.ParseError(code, errorx.NewCustomError("SYS-ERR", 0, err, nil), errCtx)
 			}
 		}
 		return nil, fmt.Errorf("unexpected http status and error: %d, %v", resp.StatusCode, errData)

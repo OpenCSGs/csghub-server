@@ -32,6 +32,10 @@ type Upstream struct {
 	// as-is. When false, the URL is a base URL and the client protocol path
 	// is appended for natively supported API formats.
 	IsFullURL bool `bun:",notnull,default:false" json:"is_full_url"`
+	// Priority is the routing channel tier of this upstream: higher numbers
+	// are preferred for non-low-priority callers. Zero (the default) marks
+	// the low-priority channel every caller may reach.
+	Priority int `bun:",notnull,default:0" json:"priority"`
 	// SupportedEndpoints maps a protocol (chat/responses/messages) to an
 	// optional per-protocol endpoint URL; an empty value means "use the main
 	// URL field".

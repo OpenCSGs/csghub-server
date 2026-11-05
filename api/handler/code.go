@@ -91,6 +91,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 			return
 		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) ||
 			errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) ||
+			errors.Is(err, errorx.ErrMirrorSourceURLInvalid) ||
 			errors.Is(err, errorx.ErrBadRequest) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
@@ -282,6 +283,7 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 // @Param        need_multi_sync query bool false "need multi sync" default(false)
 // @Success      200  {object}  types.Response{data=types.Code} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.Response "Resource not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /codes/{namespace}/{name} [get]
 func (h *CodeHandler) Show(ctx *gin.Context) {
@@ -308,6 +310,10 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 
 	detail, err := h.code.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
+		if errors.Is(err, errorx.ErrRepoNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return

@@ -333,30 +333,40 @@ func TestSpaceComponent_Index(t *testing.T) {
 
 }
 
-func TestSpaceComponent_IndexWithStatusUsesFilteredRepositoryQuery(t *testing.T) {
+func TestSpaceComponent_IndexIncludesDeploymentIdentity(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
-	filter := &types.RepoFilter{Sort: "z", Username: "user", Status: SpaceStatusNoAppFile}
-	repos := []*database.Repository{
-		{ID: 123, Name: "r1", User: database.User{Username: "user"}},
-		{ID: 124, Name: "r2", User: database.User{Username: "user"}},
-	}
-	spaces := []database.Space{
-		{ID: 11, RepositoryID: 123},
-		{ID: 12, RepositoryID: 124},
+	filter := &types.RepoFilter{SpaceSDK: types.MCPSERVER.Name, Status: SpaceStatusRunning}
+	repo := &database.Repository{
+		ID:   123,
+		Name: "file-parser",
+		Path: "luojun/file-parser",
+		User: database.User{},
 	}
 
-	sc.mocks.components.repo.EXPECT().
-		PublicToUser(ctx, types.SpaceRepo, "user", filter, 10, 1).
-		Return(repos, 2, nil)
-	sc.mocks.stores.SpaceMock().EXPECT().
-		ByRepoIDs(ctx, []int64{123, 124}).
-		Return(spaces, nil)
+	sc.mocks.components.repo.EXPECT().PublicToUser(
+		ctx, types.SpaceRepo, "", filter, 20, 1,
+	).Return([]*database.Repository{repo}, 1, nil).Once()
+	sc.mocks.stores.SpaceMock().EXPECT().ByRepoIDs(ctx, []int64{123}).Return([]database.Space{{
+		ID:           7,
+		RepositoryID: 123,
+		Repository:   repo,
+		HasAppFile:   true,
+		Sdk:          types.MCPSERVER.Name,
+	}}, nil).Once()
+	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{7}).
+		Return(map[int64]*database.Deploy{
+			7: {ID: 88, ClusterID: "cluster-1", SvcName: "u-luojun-file-parser", Status: 23},
+		}, nil).Once()
 
-	data, total, err := sc.Index(ctx, filter, 10, 1, false)
+	spaces, total, err := sc.Index(ctx, filter, 20, 1, false)
+
 	require.NoError(t, err)
-	require.Len(t, data, 2)
-	require.Equal(t, 2, total)
+	require.Equal(t, 1, total)
+	require.Len(t, spaces, 1)
+	require.Equal(t, "u-luojun-file-parser", spaces[0].SvcName)
+	require.Equal(t, int64(88), spaces[0].DeployID)
+	require.Equal(t, "cluster-1", spaces[0].ClusterID)
 }
 
 func TestSpaceComponent_Index_HalfCreatedRepos(t *testing.T) {
@@ -1474,4 +1484,30 @@ func TestSpaceComponent_CreateWithFiles(t *testing.T) {
 		require.NoError(t, err)
 		wg.Wait()
 	})
+}
+
+func TestSpaceComponent_IndexWithStatusUsesFilteredRepositoryQuery(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+	filter := &types.RepoFilter{Sort: "z", Username: "user", Status: SpaceStatusNoAppFile}
+	repos := []*database.Repository{
+		{ID: 123, Name: "r1", User: database.User{Username: "user"}},
+		{ID: 124, Name: "r2", User: database.User{Username: "user"}},
+	}
+	spaces := []database.Space{
+		{ID: 11, RepositoryID: 123},
+		{ID: 12, RepositoryID: 124},
+	}
+
+	sc.mocks.components.repo.EXPECT().
+		PublicToUser(ctx, types.SpaceRepo, "user", filter, 10, 1).
+		Return(repos, 2, nil)
+	sc.mocks.stores.SpaceMock().EXPECT().
+		ByRepoIDs(ctx, []int64{123, 124}).
+		Return(spaces, nil)
+
+	data, total, err := sc.Index(ctx, filter, 10, 1, false)
+	require.NoError(t, err)
+	require.Len(t, data, 2)
+	require.Equal(t, 2, total)
 }

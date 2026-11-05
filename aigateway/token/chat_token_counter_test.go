@@ -13,7 +13,6 @@ import (
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
-	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func TestChatTokenCounter_Usage_WithCompletion(t *testing.T) {
@@ -44,6 +43,8 @@ func TestChatTokenCounter_Usage_WithCompletion(t *testing.T) {
 }
 
 func TestChatTokenCounter_Usage_WithCompletionImagePrompt(t *testing.T) {
+	// Image input must not change the usage: upstream usage already includes
+	// image tokens and billing stays token-based.
 	counter := token.NewLLMTokenCounter(nil)
 	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
 		openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
@@ -64,37 +65,34 @@ func TestChatTokenCounter_Usage_WithCompletionImagePrompt(t *testing.T) {
 	usage, err := counter.Usage(context.Background())
 
 	assert.NoError(t, err)
-	assert.Equal(t, string(commontypes.DataTypeImage), usage.DataType)
-	assert.Equal(t, int64(1), usage.CompletionRC)
+	assert.Empty(t, usage.DataType)
+	assert.Equal(t, int64(0), usage.CompletionRC)
+	assert.Equal(t, int64(10), usage.PromptTokens)
+	assert.Equal(t, int64(20), usage.CompletionTokens)
+	assert.Equal(t, int64(30), usage.TotalTokens)
 }
 
-func TestChatTokenCounter_Usage_KeepsFirstPromptModalType(t *testing.T) {
+func TestChatTokenCounter_Usage_FallbackCountsPromptImages(t *testing.T) {
+	// Without upstream usage, every input image contributes a fixed token
+	// estimate to the prompt.
 	counter := token.NewLLMTokenCounter(nil)
 	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
 		openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
-			openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: "https://example.com/image.png"}),
+			openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: "https://example.com/one.png"}),
+			openai.TextContentPart("and this one"),
+			openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: "https://example.com/two.png"}),
 		}),
-	})
-	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
-		openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
-			openai.InputAudioContentPart(openai.ChatCompletionContentPartInputAudioInputAudioParam{Data: "audio-data"}),
-		}),
-	})
-	counter.Completion(types.ChatCompletion{
-		ChatCompletion: openai.ChatCompletion{
-			Usage: openai.CompletionUsage{
-				PromptTokens:     10,
-				CompletionTokens: 20,
-				TotalTokens:      30,
-			},
-		},
 	})
 
 	usage, err := counter.Usage(context.Background())
 
 	assert.NoError(t, err)
-	assert.Equal(t, string(commontypes.DataTypeImage), usage.DataType)
-	assert.Equal(t, int64(1), usage.CompletionRC)
+	assert.Empty(t, usage.DataType)
+	assert.Equal(t, int64(0), usage.CompletionRC)
+	// 3 (text approx) + 3 (between) + 2 images * 1024
+	assert.Equal(t, int64(2054), usage.PromptTokens)
+	assert.Equal(t, int64(0), usage.CompletionTokens)
+	assert.Equal(t, int64(2054), usage.TotalTokens)
 }
 
 func TestChatTokenCounter_Usage_WithCompletionAudioPromptSeconds(t *testing.T) {
@@ -126,9 +124,12 @@ func TestChatTokenCounter_Usage_WithCompletionAudioPromptSeconds(t *testing.T) {
 	usage, err := counter.Usage(context.Background())
 
 	assert.NoError(t, err)
-	assert.Equal(t, string(commontypes.DataTypeAudio), usage.DataType)
-	assert.Equal(t, int64(1), usage.CompletionRC)
+	assert.Empty(t, usage.DataType)
+	assert.Equal(t, int64(0), usage.CompletionRC)
 	assert.Equal(t, float64(7.5), usage.Duration)
+	assert.Equal(t, int64(10), usage.PromptTokens)
+	assert.Equal(t, int64(20), usage.CompletionTokens)
+	assert.Equal(t, int64(30), usage.TotalTokens)
 }
 
 func TestChatTokenCounter_Usage_WithChunksContainingUsage(t *testing.T) {
@@ -201,9 +202,12 @@ func TestChatTokenCounter_Usage_WithChunkSecondsString(t *testing.T) {
 	usage, err := counter.Usage(context.Background())
 
 	assert.NoError(t, err)
-	assert.Equal(t, string(commontypes.DataTypeAudio), usage.DataType)
-	assert.Equal(t, int64(1), usage.CompletionRC)
+	assert.Empty(t, usage.DataType)
+	assert.Equal(t, int64(0), usage.CompletionRC)
 	assert.Equal(t, float64(4.25), usage.Duration)
+	assert.Equal(t, int64(15), usage.PromptTokens)
+	assert.Equal(t, int64(25), usage.CompletionTokens)
+	assert.Equal(t, int64(40), usage.TotalTokens)
 }
 
 func TestChatTokenCounter_Usage_WithTokenizer(t *testing.T) {
@@ -563,9 +567,10 @@ func TestChatTokenCounter_Usage_WithImageAudioFileContentParts(t *testing.T) {
 
 	// Verify results
 	assert.NoError(t, err)
-	assert.Equal(t, int64(13), usage.PromptTokens)    // 10 (text content) + 3 (between)
+	assert.Equal(t, int64(1037), usage.PromptTokens)  // 10 (text) + 3 (between) + 1 image * 1024 fallback
 	assert.Equal(t, int64(8), usage.CompletionTokens) // 8 (completion)
-	assert.Equal(t, int64(21), usage.TotalTokens)     // 13 + 8
+	assert.Equal(t, int64(1045), usage.TotalTokens)   // 1037 + 8
+	assert.Empty(t, usage.DataType)                   // audio/file parts are not estimated
 
 	// Verify tokenizer was called correctly
 	tokenizer.AssertExpectations(t)

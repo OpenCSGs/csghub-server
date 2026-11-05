@@ -81,7 +81,7 @@ func TestAccessTokenStore_Delete(t *testing.T) {
 
 	ctx := context.TODO()
 	atStore := database.NewAccessTokenStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	user := &database.User{
 		NickName: "nickname",
@@ -121,7 +121,7 @@ func TestAccessTokenStore_IsExist(t *testing.T) {
 
 	ctx := context.TODO()
 	atStore := database.NewAccessTokenStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	user := &database.User{
 		NickName: "nickname1",

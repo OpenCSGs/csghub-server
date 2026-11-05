@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -11,12 +14,62 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
+
+// TestNeedAdminUsesSuperAdminGrant verifies role names cannot replace the trusted user-service grant.
+func TestNeedAdminUsesSuperAdminGrant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name, username, role string
+		superAdmin           bool
+		wantStatus           int
+	}{
+		{name: "anonymous", wantStatus: http.StatusUnauthorized},
+		{name: "module administrator", username: "alice", role: "asset_admin", wantStatus: http.StatusForbidden},
+		{name: "legacy administrator name", username: "alice", role: "admin", wantStatus: http.StatusForbidden},
+		{name: "legacy super user name", username: "alice", role: "super_user", wantStatus: http.StatusForbidden},
+		{name: "custom role with global grant", username: "alice", role: "maintainer", superAdmin: true, wantStatus: http.StatusNoContent},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.NotEmpty(t, tc.username, "anonymous requests must not query the user service")
+				assert.Equal(t, "/api/v1/user/"+tc.username, r.URL.Path)
+				assert.Equal(t, tc.username, r.URL.Query().Get("current_user"))
+				w.Header().Set("Content-Type", "application/json")
+				err := json.NewEncoder(w).Encode(httpbase.R{Data: &rpc.User{
+					Username: tc.username, Roles: []string{tc.role}, SuperAdmin: tc.superAdmin,
+				}})
+				assert.NoError(t, err)
+			}))
+			defer server.Close()
+			address, err := url.Parse(server.URL)
+			require.NoError(t, err)
+			port, err := strconv.Atoi(address.Port())
+			require.NoError(t, err)
+			cfg := &config.Config{}
+			cfg.User.Host = address.Scheme + "://" + address.Hostname()
+			cfg.User.Port = port
+			router := gin.New()
+			router.Use(func(ctx *gin.Context) { httpbase.SetCurrentUser(ctx, tc.username) })
+			called := false
+			router.GET("/admin", NeedAdmin(cfg), func(ctx *gin.Context) {
+				called = true
+				ctx.Status(http.StatusNoContent)
+			})
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin", nil))
+			require.Equal(t, tc.wantStatus, response.Code, response.Body.String())
+			require.Equal(t, tc.wantStatus == http.StatusNoContent, called)
+		})
+	}
+}
 
 func TestRestrictMultiSyncTokenToRead(t *testing.T) {
 	gin.SetMode(gin.TestMode)

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	commontrace "opencsg.com/csghub-server/common/utils/trace"
 )
@@ -61,6 +62,16 @@ func (o *Orchestrator) preProcess(c *gin.Context) {
 // calls HandlePlanError so the protocol handler can render its own error
 // response format.
 func (o *Orchestrator) Dispatch(c *gin.Context, extractor MetadataExtractor, handler ProtocolHandler) {
+	// A request may contain several retries/fallbacks. Keep its turn receipt
+	// open across those attempts, including Plan/Execute error paths.
+	defer func() {
+		if c.Request == nil {
+			return
+		}
+		if d := types.AutoRouteDecisionFromContext(c.Request.Context()); d != nil && d.EndFeedback != nil {
+			d.EndFeedback(c.Request.Context())
+		}
+	}()
 	o.preProcess(c)
 	if pt := GetPreflightTracer(c); pt != nil {
 		defer pt.End()

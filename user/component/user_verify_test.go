@@ -28,6 +28,10 @@ func TestUserVerifyComponent_Create(t *testing.T) {
 	mockUserVerifyStore := mockdb.NewMockUserVerifyStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 
+	// SaaS resolves the authenticated owner; the other editions retain their existing behavior.
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, req.UUID).
+		Return(&database.User{UUID: req.UUID, Username: req.Username}, nil).Maybe()
+
 	expected := &database.UserVerify{
 		UUID:        req.UUID,
 		RealName:    req.RealName,
@@ -50,11 +54,13 @@ func TestUserVerifyComponent_Create(t *testing.T) {
 		userStore:       mockUserStore,
 	}
 
-	result, err := c.Create(context.Background(), req)
+	ctx := context.WithValue(context.Background(), "currentUserUUID", req.UUID)
+	result, err := c.Create(ctx, req)
 	require.NoError(t, err)
 	require.EqualValues(t, expected, result)
 }
 
+// TestUserVerifyComponent_Update dispatches notification after the atomic store operation succeeds.
 func TestUserVerifyComponent_Update(t *testing.T) {
 	mockUserVerifyStore := mockdb.NewMockUserVerifyStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
@@ -73,10 +79,6 @@ func TestUserVerifyComponent_Update(t *testing.T) {
 	mockUserVerifyStore.EXPECT().
 		UpdateUserVerify(mock.Anything, int64(1), types.VerifyStatusApproved, "Valid").
 		Return(expected, nil).Once()
-
-	mockUserStore.EXPECT().
-		UpdateVerifyStatus(mock.Anything, "uuid_1", types.VerifyStatusApproved).
-		Return(nil).Once()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -115,8 +117,10 @@ func TestUserVerifyComponent_Update(t *testing.T) {
 	wg.Wait()
 }
 
+// TestUserVerifyComponent_Get reads the authenticated owner's verification across editions.
 func TestUserVerifyComponent_Get(t *testing.T) {
 	mockUserVerifyStore := mockdb.NewMockUserVerifyStore(t)
+	mockUserStore := mockdb.NewMockUserStore(t)
 
 	expected := &database.UserVerify{
 		ID:       1,
@@ -129,12 +133,17 @@ func TestUserVerifyComponent_Get(t *testing.T) {
 	mockUserVerifyStore.EXPECT().
 		GetUserVerify(mock.Anything, expected.UUID).
 		Return(expected, nil).Once()
+	// Only SaaS resolves the owner before reading verification data.
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, expected.UUID).
+		Return(&database.User{UUID: expected.UUID, Username: expected.Username}, nil).Maybe()
 
 	c := &UserVerifyComponentImpl{
 		userVerifyStore: mockUserVerifyStore,
+		userStore:       mockUserStore,
 	}
 
-	result, err := c.Get(context.Background(), "uuid_1")
+	ctx := context.WithValue(context.Background(), "currentUserUUID", expected.UUID)
+	result, err := c.Get(ctx, "uuid_1")
 	require.NoError(t, err)
 	require.EqualValues(t, expected, result)
 }

@@ -190,6 +190,7 @@ type AgentOrchestratorStore interface {
 	CompleteDeleteOperation(ctx context.Context, operationID, deployID int64) error
 	FailDeleteOperation(ctx context.Context, operationID int64, message string) error
 	AcquireExecutionAdmission(ctx context.Context, input AcquireAgentExecutionAdmissionInput) (*AgentExecutionAdmission, error)
+	ConsumeGuestUsage(ctx context.Context, instanceID int64, guestActorID string, maxCount *int64) error
 	MarkExecutionAdmissionRunning(ctx context.Context, admissionID int64) error
 	CompleteExecutionAdmission(ctx context.Context, admissionID int64, status string, unknownCapacityHold time.Duration) error
 	HeartbeatExecutionAdmission(ctx context.Context, admissionID int64) error
@@ -698,6 +699,22 @@ func consumeGuestUsage(ctx context.Context, tx bun.IDB, logicalInstanceID int64,
 			Set("max_count", *maxCount))
 	}
 	return nil
+}
+
+// ConsumeGuestUsage counts one anonymous chat turn against the instance's guest
+// usage limit. Runtime agent shares have no execution admission, so they consume
+// through this standalone path; logical agents consume via
+// AcquireExecutionAdmission instead.
+func (s *agentOrchestratorStoreImpl) ConsumeGuestUsage(ctx context.Context, instanceID int64, guestActorID string, maxCount *int64) error {
+	if maxCount == nil {
+		return nil
+	}
+	if instanceID <= 0 || guestActorID == "" {
+		return errorx.BadRequest(fmt.Errorf("guest usage requires instance and actor"), nil)
+	}
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		return consumeGuestUsage(ctx, tx, instanceID, guestActorID, maxCount)
+	})
 }
 
 func validateReserveAgentAllocationInput(input ReserveAgentAllocationInput) error {

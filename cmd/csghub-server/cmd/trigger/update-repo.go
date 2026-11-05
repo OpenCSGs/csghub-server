@@ -55,7 +55,16 @@ var updateRepoCmd = &cobra.Command{
 			}
 			repo.Private = false
 			repo.SensitiveCheckStatus = types.SensitiveCheckPass
-			_, err = repoStore.UpdateRepo(ctx, *repo)
+			// Review status is owned by its dedicated update, not by repository settings snapshots.
+			if err := repoStore.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckPass); err != nil {
+				slog.Error("failed to update sensitive check status", "err", err, "repo_id", repo.ID)
+				continue
+			}
+			// Request immediate publication independently of the stored pending state;
+			// the Store still keeps any unfinished synchronization hidden.
+			_, err = repoStore.UpdateRepo(ctx, *repo, types.RepositoryUpdateOptions{
+				Private: new(false), DeferPublication: false,
+			})
 			if err != nil {
 				slog.Error("failed to update repo", "err", err, "repo_id", repo.ID)
 				continue

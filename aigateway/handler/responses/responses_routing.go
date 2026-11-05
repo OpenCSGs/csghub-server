@@ -193,6 +193,9 @@ func resolveHostedRouting(modelTarget RoutingTarget, parsed *url.URL) (RoutingDe
 	runtime := strings.ToLower(strings.TrimSpace(modelTarget.RuntimeFramework))
 	image := strings.ToLower(strings.TrimSpace(modelTarget.ImageID))
 	switch {
+	case isHostedLlamaCpp(runtime, image):
+		backendURL := appendEndpointPath(parsed, "v1", "responses")
+		return RoutingDecision{Mode: ResponsesModeNative, BackendURL: backendURL, Reason: "csghub_hosted_llama_cpp_native"}, nil
 	case isHostedVLLM(runtime, image) && isVLLMNativeResponsesCapable(runtime, image):
 		backendURL := appendEndpointPath(parsed, "v1", "responses")
 		return RoutingDecision{Mode: ResponsesModeNative, BackendURL: backendURL, Reason: "csghub_hosted_vllm_native"}, nil
@@ -206,6 +209,10 @@ func resolveHostedRouting(modelTarget RoutingTarget, parsed *url.URL) (RoutingDe
 	default:
 		return RoutingDecision{Mode: ResponsesModeDisabled, Reason: "unsupported_csghub_hosted_runtime"}, nil
 	}
+}
+
+func isHostedLlamaCpp(runtime, image string) bool {
+	return strings.Contains(runtime, "llama.cpp") || strings.Contains(image, "llama.cpp")
 }
 
 func isHostedVLLM(runtime, image string) bool {

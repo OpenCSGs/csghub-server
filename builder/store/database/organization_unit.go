@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
 	"github.com/uptrace/bun/driver/pgdriver"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -138,6 +139,8 @@ type ListOrganizationUnitInput struct {
 
 // organizationUnitStoreImpl uses one database connection for all hierarchy transactions.
 type organizationUnitStoreImpl struct {
+	// rebacTupleJobClient records permission changes on this Store's business transaction.
+	rebacTupleJobClient           RebacTupleJobClient
 	db                            *DB
 	repositoryDeletionJobClient   RepositoryDeletionJobClient
 	organizationDeletionJobClient OrganizationDeletionJobClient
@@ -162,16 +165,18 @@ func NewOrganizationUnitStoreWithDB(db *DB) OrganizationUnitStore {
 
 // NewOrganizationUnitStoreWithDBAndDeletionJobClient creates a hierarchy Store with transactional repository deletion jobs.
 func NewOrganizationUnitStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) OrganizationUnitStore {
-	return &organizationUnitStoreImpl{db: db, repositoryDeletionJobClient: jobClient}
+	return NewOrganizationUnitStoreWithDBAndJobClients(db, jobClient, nil, nil)
 }
 
 // NewOrganizationUnitStoreWithDBAndDeletionJobClients creates a hierarchy
 // store with transactional repository and organization cleanup jobs.
 func NewOrganizationUnitStoreWithDBAndDeletionJobClients(db *DB, repositoryJobClient RepositoryDeletionJobClient, organizationJobClient OrganizationDeletionJobClient) OrganizationUnitStore {
-	return &organizationUnitStoreImpl{
-		db: db, repositoryDeletionJobClient: repositoryJobClient,
-		organizationDeletionJobClient: organizationJobClient,
-	}
+	return NewOrganizationUnitStoreWithDBAndJobClients(db, repositoryJobClient, organizationJobClient, nil)
+}
+
+// NewOrganizationUnitStoreWithDBAndJobClients injects hierarchy cleanup and permission job producers.
+func NewOrganizationUnitStoreWithDBAndJobClients(db *DB, repositoryJobs RepositoryDeletionJobClient, organizationJobs OrganizationDeletionJobClient, tupleJobs RebacTupleJobClient) OrganizationUnitStore {
+	return &organizationUnitStoreImpl{db: db, repositoryDeletionJobClient: repositoryJobs, organizationDeletionJobClient: organizationJobs, rebacTupleJobClient: tupleJobs}
 }
 
 // FindActiveHierarchicalRoot loads the unique active hierarchy root independently of user membership.
@@ -205,6 +210,11 @@ func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input Create
 	input.Organization.IsHierarchical = true
 	input.Namespace.NamespaceType = OrgNamespace
 	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if input.CreatorUserID != 0 {
+			if err := lockUserRebacTx(ctx, tx, input.CreatorUserID); err != nil {
+				return err
+			}
+		}
 		if tx.Dialect().Name() == dialect.PG {
 			if _, err := tx.NewRaw("SELECT pg_advisory_xact_lock(?)", hierarchicalRootOrganizationLockKey).Exec(ctx); err != nil {
 				return fmt.Errorf("lock hierarchical root organization creation: %w", err)
@@ -252,7 +262,7 @@ func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input Create
 		}).Exec(ctx); err != nil {
 			return fmt.Errorf("create root organization closure: %w", err)
 		}
-		return nil
+		return enqueueOrganizationCreationTx(ctx, tx, s.rebacTupleJobClient, *input.Organization, *input.Namespace, input.CreatorUserID)
 	})
 	if err != nil {
 		if errors.Is(err, errorx.ErrOrganizationAlreadyExists) || isHierarchicalRootOrganizationConflict(err) {
@@ -274,6 +284,7 @@ func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input Create
 func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input DeleteRootOrganizationInput) (*types.DeleteRootOrganizationResp, error) {
 	result := &types.DeleteRootOrganizationResp{}
 	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var events []types.RebacTuple
 		var root Organization
 		if err := tx.NewSelect().Model(&root).WhereAllWithDeleted().
 			Where("organization.uuid = ? AND organization.is_hierarchical = TRUE", input.OrganizationUUID).
@@ -334,7 +345,7 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 		if err != nil {
 			return err
 		}
-		deletedRepositories, err := deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient)
+		deletedRepositories, err := deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient, &events)
 		if err != nil {
 			return err
 		}
@@ -397,7 +408,16 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 				return fmt.Errorf("enqueue hierarchy organization deletion: %w", err)
 			}
 		}
-		return nil
+		event, err := organizationDeletionTupleTx(ctx, tx, OrganizationDeletionJobInput{
+			OrganizationIDs:               result.DeletedOrganizationIDs,
+			DeletedHierarchyRelationships: result.DeletedHierarchyRelationships,
+			DeletedReBACRelationships:     result.DeletedReBACRelationships,
+		})
+		if err != nil {
+			return err
+		}
+		events = append(events, event)
+		return enqueueRebacTuple(ctx, tx, s.rebacTupleJobClient, events...)
 	})
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
@@ -675,7 +695,7 @@ func (s *organizationUnitStoreImpl) Create(ctx context.Context, input CreateOrga
 				return fmt.Errorf("create organization unit ancestor closure: %w", err)
 			}
 		}
-		return nil
+		return s.enqueueHierarchyCreationTx(ctx, tx, input)
 	})
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
@@ -834,6 +854,7 @@ func loadOrganizationHierarchyRelationships(
 func (s *organizationUnitStoreImpl) Delete(ctx context.Context, input DeleteOrganizationUnitInput) (*types.DeleteOrganizationUnitResp, error) {
 	result := &types.DeleteOrganizationUnitResp{}
 	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var events []types.RebacTuple
 		// Retain the hierarchy write lock even when retrying after root deletion.
 		var root Organization
 		if err := tx.NewSelect().Model(&root).WhereAllWithDeleted().
@@ -919,7 +940,7 @@ func (s *organizationUnitStoreImpl) Delete(ctx context.Context, input DeleteOrga
 		if err != nil {
 			return err
 		}
-		deletedRepositories, err := deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient)
+		deletedRepositories, err := deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient, &events)
 		if err != nil {
 			return err
 		}
@@ -981,7 +1002,16 @@ func (s *organizationUnitStoreImpl) Delete(ctx context.Context, input DeleteOrga
 				return fmt.Errorf("enqueue organization subtree deletion: %w", err)
 			}
 		}
-		return nil
+		event, err := organizationDeletionTupleTx(ctx, tx, OrganizationDeletionJobInput{
+			OrganizationIDs:               result.DeletedOrganizationIDs,
+			DeletedHierarchyRelationships: result.DeletedHierarchyRelationships,
+			DeletedReBACRelationships:     result.DeletedReBACRelationships,
+		})
+		if err != nil {
+			return err
+		}
+		events = append(events, event)
+		return enqueueRebacTuple(ctx, tx, s.rebacTupleJobClient, events...)
 	})
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
@@ -1191,4 +1221,22 @@ func (s *organizationUnitStoreImpl) loadDeletedSubtree(ctx context.Context, tx b
 		return err
 	}
 	return softDeleteOrganizationNamespaces(ctx, tx, result.DeletedOrganizationIDs)
+}
+
+// enqueueHierarchyCreationTx snapshots both directions of a newly inserted edge.
+func (s *organizationUnitStoreImpl) enqueueHierarchyCreationTx(ctx context.Context, tx bun.Tx, input CreateOrganizationUnitInput) error {
+	parentUUID := ""
+	if input.ParentUnitUUID != nil {
+		parentUUID = *input.ParentUnitUUID
+	} else {
+		if err := tx.NewSelect().Model((*Organization)(nil)).Column("uuid").Where("id = ?", input.RootOrganizationID).Scan(ctx, &parentUUID); err != nil {
+			return err
+		}
+	}
+	childUUID := input.Organization.UUID.String()
+	return enqueueRebacTuple(ctx, tx, s.rebacTupleJobClient, types.NewRebacTuple("organization.hierarchy.create", types.TupleOperation{Relationships: []rebac.Relationship{
+		namespaceTuple(*input.Namespace, childUUID),
+		{Subject: rebac.NewSubject(rebac.ObjectTypeOrganization, parentUUID), Relation: rebac.RelationParent, Object: rebac.OrganizationObject(childUUID)},
+		{Subject: rebac.NewSubject(rebac.ObjectTypeOrganization, childUUID), Relation: rebac.RelationChild, Object: rebac.OrganizationObject(parentUUID)},
+	}}))
 }

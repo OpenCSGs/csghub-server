@@ -5,6 +5,7 @@ const errMCPGatewayPrefix = "MCPGW-ERR"
 const (
 	gatewayMCPServerNameAlreadyExists = iota
 	gatewayMCPServerInvalidName
+	gatewayMCPServerBackendSourceInvalid
 )
 
 var (
@@ -32,6 +33,18 @@ var (
 	//
 	// zh-HK: MCP服務器名稱無效：必須以字母或數字開頭，只能包含字母、數字、下劃線或連字符，且最多32個字符
 	ErrGatewayMCPServerInvalidName error = CustomError{prefix: errMCPGatewayPrefix, code: gatewayMCPServerInvalidName}
+	// MCP server backend source is invalid
+	//
+	// Description: Exactly one MCP server backend source must be provided.
+	//
+	// Description_ZH: 必须且只能指定一个MCP服务器后端来源。
+	//
+	// en-US: exactly one of url or svc_name must be provided
+	//
+	// zh-CN: 必须且只能提供 url 或 svc_name 中的一个
+	//
+	// zh-HK: 必須且只能提供 url 或 svc_name 中的一個
+	ErrGatewayMCPServerBackendSourceInvalid error = CustomError{prefix: errMCPGatewayPrefix, code: gatewayMCPServerBackendSourceInvalid}
 )
 
 func GatewayMCPServerNameAlreadyExists(err error, ctx context) error {

@@ -8,6 +8,8 @@ const (
 	licenseFeatureDisabled
 	licenseLimitExceeded
 	invalidLicenseExtra
+	customerLicenseNotFound
+	licenseProductMismatch
 )
 
 var (
@@ -71,6 +73,24 @@ var (
 	//
 	// zh-HK: 許可證擴展數據無效。
 	ErrInvalidLicenseExtra error = CustomError{prefix: errLicensePrefix, code: invalidLicenseExtra}
+	// customer license not found
+	//
+	// Description: No current license for the requested product belongs to the authenticated customer.
+	//
+	// Description_ZH: 当前用户没有所请求产品的有效许可证。
+	//
+	// en-US: No current customer license found for the requested product
+	//
+	// zh-CN: 未找到当前用户所请求产品的有效许可证
+	//
+	// zh-HK: 未找到目前使用者所請求產品的有效許可證
+	ErrCustomerLicenseNotFound error = CustomError{prefix: errLicensePrefix, code: customerLicenseNotFound}
+	// Description: The signed license product does not match the platform product.
+	// Description_ZH: 签名许可证的产品与平台产品不匹配。
+	// en-US: License product {{.actual}} does not match expected product {{.expected}}
+	// zh-CN: 许可证产品 {{.actual}} 与预期产品 {{.expected}} 不匹配
+	// zh-HK: 許可證產品 {{.actual}} 與預期產品 {{.expected}} 不符
+	ErrLicenseProductMismatch error = CustomError{prefix: errLicensePrefix, code: licenseProductMismatch}
 )
 
 // NewInvalidLicenseExtraError wraps the underlying validation detail (unknown
@@ -78,4 +98,12 @@ var (
 // message while remaining identifiable via errors.Is(err, ErrInvalidLicenseExtra).
 func NewInvalidLicenseExtraError(err error) error {
 	return NewCustomError(errLicensePrefix, invalidLicenseExtra, err, nil)
+}
+
+func CustomerLicenseNotFound(err error, errCtx context) error {
+	return NewCustomError(errLicensePrefix, customerLicenseNotFound, err, errCtx)
+}
+
+func LicenseProductMismatch(expected, actual string) error {
+	return NewCustomError(errLicensePrefix, licenseProductMismatch, nil, Ctx().Set("expected", expected).Set("actual", actual))
 }

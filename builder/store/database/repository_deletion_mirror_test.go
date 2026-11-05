@@ -14,8 +14,9 @@ func TestRepositoryDeletionMirrorTaskStoreFindsTaskForSoftDeletedRepository(t *t
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.Background()
-	repoStore := database.NewRepoStoreWithDB(db)
-	repo, err := repoStore.CreateRepo(ctx, database.Repository{GitPath: "models_ns/deleting"})
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path: "ns/deleting", GitPath: "models_ns/deleting"}))
 	require.NoError(t, err)
 	mirror, err := database.NewMirrorStoreWithDB(db).Create(ctx, &database.Mirror{
 		SourceUrl: "https://example.com/repo.git", RepositoryID: repo.ID,

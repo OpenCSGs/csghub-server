@@ -13,57 +13,11 @@ import (
 	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
-
-// expectOrganizationMemberReBACReconciliation configures direct role checks and resulting tuple mutations.
-func expectOrganizationMemberReBACReconciliation(
-	t *testing.T,
-	authorizer *mockrebac.MockAuthorizer,
-	organizationUUID, userUUID string,
-	currentRelations map[rebac.Relation]bool,
-	desiredRelation rebac.Relation,
-) {
-	t.Helper()
-	checks := make([]rebac.BatchCheckItem, 0, len(organizationMemberRelations))
-	results := make(map[string]rebac.BatchCheckOutcome, len(organizationMemberRelations))
-	writes := make([]rebac.Relationship, 0, 1)
-	deletes := make([]rebac.Relationship, 0, len(organizationMemberRelations))
-	for relationIndex, relation := range organizationMemberRelations {
-		correlationID := organizationMemberCorrelationID(0, relationIndex)
-		checks = append(checks, rebac.BatchCheckItem{
-			CorrelationID: correlationID,
-			Check: rebac.CheckRequest{
-				Subject:     rebac.UserSubject(userUUID),
-				Relation:    relation,
-				Object:      rebac.OrganizationObject(organizationUUID),
-				Consistency: rebac.ConsistencyHigher,
-			},
-		})
-		allowed := currentRelations[relation]
-		results[correlationID] = rebac.BatchCheckOutcome{Decision: rebac.Decision{Allowed: allowed}}
-		relationship := rebac.Relationship{
-			Subject: rebac.UserSubject(userUUID), Relation: relation, Object: rebac.OrganizationObject(organizationUUID),
-		}
-		if allowed && relation != desiredRelation {
-			deletes = append(deletes, relationship)
-		}
-		if !allowed && relation == desiredRelation {
-			writes = append(writes, relationship)
-		}
-	}
-	authorizer.EXPECT().BatchCheck(mock.Anything, rebac.BatchCheckRequest{Checks: checks}).Return(rebac.BatchCheckResult{Results: results}, nil).Once()
-	if len(deletes) > 0 {
-		authorizer.EXPECT().Delete(mock.Anything, deletes).Return(nil).Once()
-	}
-	if len(writes) > 0 {
-		authorizer.EXPECT().Write(mock.Anything, writes).Return(nil).Once()
-	}
-}
 
 func TestMemberComponent_GetMemberRole(t *testing.T) {
 	t.Run("get member role for exsisting member", func(t *testing.T) {
@@ -195,8 +149,6 @@ func TestMemberComponent_Delete(t *testing.T) {
 		// delete user membership
 		mockMemberStore.EXPECT().Delete(mock.Anything, org.ID, user.ID).Return(nil).Once()
 		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
-		expectOrganizationMemberReBACReconciliation(t, mockAuthorizer, org.UUID.String(), user.UUID,
-			map[rebac.Relation]bool{rebac.RelationAdmin: true}, "")
 		mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -275,8 +227,6 @@ func TestMemberComponent_Delete(t *testing.T) {
 		// delete user membership
 		mockMemberStore.EXPECT().Delete(mock.Anything, org.ID, user.ID).Return(nil).Once()
 		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
-		expectOrganizationMemberReBACReconciliation(t, mockAuthorizer, org.UUID.String(), user.UUID,
-			map[rebac.Relation]bool{rebac.RelationReader: true}, "")
 		mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -644,8 +594,6 @@ func TestMemberComponent_ChangeMemberRole(t *testing.T) {
 		mockMemberStore.EXPECT().Update(mock.Anything, org.ID, user.ID, string(types.UserWrite)).Return(nil).Once()
 		mockMemberStore.EXPECT().UserUUIDsByOrganizationID(mock.Anything, org.ID).Return([]string{"op", "user1"}, nil).Once()
 		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
-		expectOrganizationMemberReBACReconciliation(t, mockAuthorizer, org.UUID.String(), user.UUID,
-			map[rebac.Relation]bool{rebac.RelationReader: true}, rebac.RelationWriter)
 		mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
 
 		var wg sync.WaitGroup

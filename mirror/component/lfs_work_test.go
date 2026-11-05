@@ -2,20 +2,25 @@ package component
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/riverqueue/river"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
 // fakeLFSTaskStore records LFS worker task state transitions.
 type fakeLFSTaskStore struct {
-	task    *database.MirrorTask
-	actions []string
+	task          *database.MirrorTask
+	actions       []string
+	failUpdateErr error
 }
 
 // FindByID returns the configured task.
@@ -36,6 +41,9 @@ func (s *fakeLFSTaskStore) UpdateStatusAndRepoSyncStatus(ctx context.Context, ta
 	case database.MirrorSuccess:
 		task.Status = types.MirrorLfsSyncFinished
 	case database.MirrorFail:
+		if s.failUpdateErr != nil {
+			return task, s.failUpdateErr
+		}
 		task.Status = types.MirrorLfsSyncFailed
 	case database.MirrorCancel:
 		task.Status = types.MirrorCanceled
@@ -54,6 +62,7 @@ type fakeLFSSyncer struct {
 	err                    error
 	started                chan context.Context
 	returnCauseAfterCancel bool
+	beforeReturn           func()
 }
 
 // SyncLFS runs the fake LFS sync result.
@@ -67,7 +76,86 @@ func (s *fakeLFSSyncer) SyncLFS(ctx context.Context, task *database.MirrorTask) 
 		}
 		return ctx.Err()
 	}
+	if s.beforeReturn != nil {
+		s.beforeReturn()
+	}
 	return s.err
+}
+
+// TestLFSWorker_WorkPreservesSyncErrorWhenFailureUpdateFails prevents persistence errors from hiding real sync failures.
+func TestLFSWorker_WorkPreservesSyncErrorWhenFailureUpdateFails(t *testing.T) {
+	for _, paused := range []bool{false, true} {
+		name := "database failure"
+		if paused {
+			name = "queue pause during sync failure"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			syncErr := errors.New("LFS download failed")
+			updateErr := errors.New("database unavailable")
+			var beforeReturn func()
+			if paused {
+				updateErr = context.Canceled
+				beforeReturn = func() { cancel(river.ErrQueuePaused) }
+			}
+			task := repoWorkerTask(types.MirrorRepoSyncFinished)
+			store := &fakeLFSTaskStore{task: task, failUpdateErr: updateErr}
+			worker := &lfsWorker{
+				mirrorTaskStore: store,
+				syncer:          &fakeLFSSyncer{err: syncErr, beforeReturn: beforeReturn},
+			}
+
+			err := worker.Work(ctx, riverJob(lfsArgsFromTask(task)))
+
+			require.ErrorIs(t, err, syncErr)
+			require.ErrorIs(t, err, updateErr)
+			require.ErrorContains(t, err, "mark LFS sync failed")
+			require.False(t, isQueuePauseCancellation(ctx, err))
+			require.Equal(t, []string{database.MirrorContinue, database.MirrorFail}, store.actions)
+			require.Equal(t, types.MirrorLfsSyncStart, store.task.Status)
+		})
+	}
+}
+
+// TestLFSWorker_GRPCPause distinguishes pure RPC cancellation from joined sync failures through the full Work path.
+func TestLFSWorker_GRPCPause(t *testing.T) {
+	rpcCanceled := errorx.ErrGitGetLfsPointersFailed(status.Error(codes.Canceled, "scan canceled"), errorx.Ctx())
+	checkpointErr := errors.New("checkpoint failed")
+	for _, tc := range []struct {
+		name      string
+		syncErr   error
+		wantPause bool
+	}{
+		{name: "pure RPC cancellation", syncErr: rpcCanceled, wantPause: true},
+		{name: "joined business failure", syncErr: errors.Join(rpcCanceled, checkpointErr)},
+		{name: "RPC unavailable", syncErr: status.Error(codes.Unavailable, "Gitaly unavailable")},
+		{name: "RPC timeout", syncErr: status.Error(codes.DeadlineExceeded, "scan timed out")},
+		{name: "RPC permission denied", syncErr: status.Error(codes.PermissionDenied, "access denied")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			task := repoWorkerTask(types.MirrorRepoSyncFinished)
+			store := &fakeLFSTaskStore{task: task, failUpdateErr: context.Canceled}
+			worker := &lfsWorker{mirrorTaskStore: store, syncer: &fakeLFSSyncer{
+				err: tc.syncErr, beforeReturn: func() { cancel(river.ErrQueuePaused) },
+			}}
+
+			err := worker.Work(ctx, riverJob(lfsArgsFromTask(task)))
+
+			if tc.wantPause {
+				require.ErrorIs(t, err, river.ErrQueuePaused)
+				require.Equal(t, []string{database.MirrorContinue, database.MirrorPause}, store.actions)
+				require.Equal(t, types.MirrorRepoSyncFinished, store.task.Status)
+			} else {
+				require.ErrorIs(t, err, tc.syncErr)
+				require.ErrorIs(t, err, context.Canceled)
+				require.False(t, isQueuePauseCancellation(ctx, err))
+				require.Equal(t, []string{database.MirrorContinue, database.MirrorFail}, store.actions)
+			}
+		})
+	}
 }
 
 func TestLFSWorker_WorkCompletesLFSTask(t *testing.T) {
@@ -227,7 +315,8 @@ func TestLFSWorkerFirstAttemptUsesRiverAttempt(t *testing.T) {
 	require.Equal(t, job.Attempt, store.task.RetryCount)
 }
 
-func TestLFSWorker_WorkSnoozesWhenContextDeadlineStopsSync(t *testing.T) {
+// TestLFSWorker_WorkReturnsContextDeadline verifies timeouts remain ordinary retryable errors.
+func TestLFSWorker_WorkReturnsContextDeadline(t *testing.T) {
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 	defer cancel()
 	task := repoWorkerTask(types.MirrorRepoSyncFinished)
@@ -240,9 +329,7 @@ func TestLFSWorker_WorkSnoozesWhenContextDeadlineStopsSync(t *testing.T) {
 
 	err := worker.Work(ctx, riverJob(lfsArgsFromTask(task)))
 
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, time.Duration(0), snoozeErr.Duration)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Equal(t, []string{database.MirrorContinue}, store.actions)
 	require.Equal(t, types.MirrorLfsSyncStart, store.task.Status)
 }
@@ -271,6 +358,7 @@ func TestNewLFSRiverConfigUsesConfiguredMaxWorkers(t *testing.T) {
 	require.Equal(t, 3, config.Queues[workhub.MirrorLFSQueue].MaxWorkers)
 	require.Equal(t, 1, config.Queues[workhub.MirrorLFSUrgentQueue].MaxWorkers)
 	require.IsType(t, &mirrorJobErrorHandler{}, config.ErrorHandler)
+	require.NotNil(t, config.JobLease)
 	require.Len(t, config.Queues, 2)
 	_, consumesRepo := config.Queues[workhub.MirrorRepoQueue]
 	require.False(t, consumesRepo)
@@ -312,33 +400,8 @@ func TestLFSWorker_StaleUrgentJobPreemptsBeforeTaskCheck(t *testing.T) {
 	require.Equal(t, 1, controller.removeCalls)
 }
 
-// TestLFSWorker_ManagerClosedUsesNormalRetryDelay verifies rejected normal jobs use the shared retry delay.
-func TestLFSWorker_ManagerClosedUsesNormalRetryDelay(t *testing.T) {
-	output := captureMirrorWorkerLogs(t)
-	manager := newWorkerTestManagerForQueue(t, workhub.MirrorLFSQueue)
-	manager.Close(workhub.ErrWorkerShutdown)
-	task := repoWorkerTask(types.MirrorRepoSyncFinished)
-	worker := &lfsWorker{
-		mirrorTaskStore: &fakeLFSTaskStore{task: task},
-		urgentManager:   manager,
-		syncer:          &fakeLFSSyncer{},
-	}
-	job := riverJob(lfsArgsFromTask(task))
-	job.Queue = workhub.MirrorLFSQueue
-
-	err := worker.Work(context.Background(), job)
-
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, urgentJobDelay, snoozeErr.Duration)
-	logs := output.String()
-	requireWorkerJobLogPair(t, logs, "[lfs] work start", "[lfs] work exit")
-	exitLog := requireSingleWorkerExitLog(t, logs, "[lfs] work exit", "INFO")
-	require.Contains(t, exitLog, `"success":false`)
-	require.Contains(t, exitLog, `"error":"JobSnoozeError: 1m0s"`)
-}
-
-func TestLFSWorker_NormalJobSnoozesWhenPreempted(t *testing.T) {
+// TestLFSWorker_NormalJobReturnsPauseCancellation verifies LFS interruption returns River's pause marker.
+func TestLFSWorker_NormalJobReturnsPauseCancellation(t *testing.T) {
 	output := captureMirrorWorkerLogs(t)
 	manager := newWorkerTestManagerForQueue(t, workhub.MirrorLFSQueue)
 	task := repoWorkerTask(types.MirrorRepoSyncFinished)
@@ -352,60 +415,25 @@ func TestLFSWorker_NormalJobSnoozesWhenPreempted(t *testing.T) {
 	job := riverJob(lfsArgsFromTask(task))
 	job.Queue = workhub.MirrorLFSQueue
 
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
 	workResult := make(chan error, 1)
-	go func() { workResult <- worker.Work(context.Background(), job) }()
+	go func() { workResult <- worker.Work(ctx, job) }()
 	workCtx := <-started
 
-	urgentResult := make(chan error, 1)
-	var urgentDone func()
-	go func() {
-		var err error
-		urgentDone, err = manager.BeginUrgent(context.Background())
-		urgentResult <- err
-	}()
-
+	cancel(river.ErrQueuePaused)
 	<-workCtx.Done()
 	err := <-workResult
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, time.Minute, snoozeErr.Duration)
+	require.True(t, isQueuePauseCancellation(ctx, err))
 	require.Equal(t, []string{database.MirrorContinue, database.MirrorPause}, store.actions)
 	require.Equal(t, types.MirrorRepoSyncFinished, store.task.Status)
-	require.NoError(t, <-urgentResult)
-	urgentDone()
 	exitLog := requireSingleWorkerExitLog(t, output.String(), "[lfs] work exit", "INFO")
 	require.Contains(t, exitLog, `"success":false`)
-	require.Contains(t, exitLog, `"error":"JobSnoozeError: 1m0s"`)
+	require.Contains(t, exitLog, `"error":"queue paused"`)
 }
 
-// TestLFSWorker_NormalJobLogsWhenUrgentWorkBlocksExecution verifies delayed normal jobs remain observable.
-func TestLFSWorker_NormalJobLogsWhenUrgentWorkBlocksExecution(t *testing.T) {
-	output := captureMirrorWorkerLogs(t)
-	manager := newWorkerTestManagerForQueue(t, workhub.MirrorLFSQueue)
-	urgentDone, err := manager.BeginUrgent(context.Background())
-	require.NoError(t, err)
-	defer urgentDone()
-
-	task := repoWorkerTask(types.MirrorRepoSyncFinished)
-	worker := &lfsWorker{
-		mirrorTaskStore: &fakeLFSTaskStore{task: task},
-		urgentManager:   manager,
-		syncer:          &fakeLFSSyncer{},
-	}
-	job := riverJob(lfsArgsFromTask(task))
-	job.Queue = workhub.MirrorLFSQueue
-
-	err = worker.Work(context.Background(), job)
-
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	exitLog := requireSingleWorkerExitLog(t, output.String(), "[lfs] work exit", "INFO")
-	require.Contains(t, exitLog, `"success":false`)
-	require.Contains(t, exitLog, `"error":"JobSnoozeError: 1m0s"`)
-}
-
-// TestLFSWorker_ExplicitPreemptionCauseSnoozesWithoutFailingTask verifies explicit cancellation causes bypass failure handling.
-func TestLFSWorker_ExplicitPreemptionCauseSnoozesWithoutFailingTask(t *testing.T) {
+// TestLFSWorker_ExplicitPauseCauseDoesNotFailTask verifies explicit River pause causes bypass failure handling.
+func TestLFSWorker_ExplicitPauseCauseDoesNotFailTask(t *testing.T) {
 	manager := newWorkerTestManagerForQueue(t, workhub.MirrorLFSQueue)
 	task := repoWorkerTask(types.MirrorRepoSyncFinished)
 	store := &fakeLFSTaskStore{task: task}
@@ -421,32 +449,23 @@ func TestLFSWorker_ExplicitPreemptionCauseSnoozesWithoutFailingTask(t *testing.T
 	job := riverJob(lfsArgsFromTask(task))
 	job.Queue = workhub.MirrorLFSQueue
 
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
 	workResult := make(chan error, 1)
-	go func() { workResult <- worker.Work(context.Background(), job) }()
+	go func() { workResult <- worker.Work(ctx, job) }()
 	workCtx := <-started
 
-	urgentResult := make(chan error, 1)
-	var urgentDone func()
-	go func() {
-		var err error
-		urgentDone, err = manager.BeginUrgent(context.Background())
-		urgentResult <- err
-	}()
-
+	cancel(river.ErrQueuePaused)
 	<-workCtx.Done()
 	err := <-workResult
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, time.Minute, snoozeErr.Duration)
+	require.ErrorIs(t, err, river.ErrQueuePaused)
 	require.Equal(t, []string{database.MirrorContinue, database.MirrorPause}, store.actions)
 	require.Equal(t, types.MirrorRepoSyncFinished, store.task.Status)
-	require.NoError(t, <-urgentResult)
-	urgentDone()
 }
 
-// TestLFSWorkerTimeout verifies the real LFS worker uses the shared workhub timeout contract.
+// TestLFSWorkerTimeout verifies the real LFS worker allows up to five days per attempt.
 func TestLFSWorkerTimeout(t *testing.T) {
-	require.Equal(t, workhub.MirrorLFSJobTimeout, (&lfsWorker{}).Timeout(&river.Job[workhub.LFSArgs]{}))
+	require.Equal(t, 120*time.Hour, (&lfsWorker{}).Timeout(&river.Job[workhub.LFSArgs]{}))
 }
 
 // TestPrepareLFSTaskHandlesExecutableStatuses verifies each accepted state produces a running LFS task.

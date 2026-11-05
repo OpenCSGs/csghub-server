@@ -29,13 +29,15 @@ func NewSyncClientSettingHandler(config *config.Config) (*SyncClientSettingHandl
 // CreateSyncClientSetting  godoc
 // @Security    ApiKey
 // @Summary      Create sync client setting or update an existing sync client setting
-// @Description  Create sync client setting or update an existing sync client setting, used for admin
+// @Description  Requires asset/sync administrator permission and a valid license. Creates or updates synchronization settings.
 // @Tags         Sync
 // @Accept       json
 // @Produce      json
 // @Param        body   body  types.CreateSyncClientSettingReq true "body"
 // @Success      200  {object}  types.Response{data=database.SyncClientSetting} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /sync/client_setting [post]
 func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
@@ -61,12 +63,14 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 // GetSyncClientSetting  godoc
 // @Security    ApiKey
 // @Summary      Get sync client setting
-// @Description  Get sync client setting, used for admin
+// @Description  Requires asset/sync administrator permission and a valid license.
 // @Tags         Sync
 // @Accept       json
 // @Produce      json
 // @Success      200  {object}  types.Response{data=database.SyncClientSetting} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /sync/client_setting [get]
 func (h *SyncClientSettingHandler) Show(ctx *gin.Context) {

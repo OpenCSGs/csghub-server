@@ -12,15 +12,15 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.28.0
-export IMAGE_TAG=v0.28.0
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.31.0
+export IMAGE_TAG=v0.31.0
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm \
   --push .
 
-# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.2.1_vllm_0.28.0
-export IMAGE_TAG=rocm7.2.1_vllm_0.28.0
+# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.2.3_vllm_0.31.0
+export IMAGE_TAG=rocm7.2.3_vllm_0.31.0
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/amd-vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm-amd \
@@ -50,8 +50,11 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi-rocm \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/sglang:v0.5.14-cu130
-export IMAGE_TAG=v0.5.14-cu130
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/sglang:v0.5.22-cu130
+# The same image serves LLMs and SGLang Diffusion video models (MiniMax-H3,
+# FastH3); serve.sh switches on HF_TASK (text-to-video or image-to-video). sglang/overlays/ bundles the FastH3
+# overlay (kevin-mi/FastH3-8step-V2-overlay@308e2dd) so deploys stay offline.
+export IMAGE_TAG=v0.5.22-cu130
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/sglang:${IMAGE_TAG} \
   -f Dockerfile.sglang \
@@ -161,15 +164,29 @@ docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/tei:latest \
   -f Dockerfile.tei \
   --push .
-# For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama.cpp:b5215
-export IMAGE_TAG=b5215
+# For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama.cpp:b11785
+# b11785 drops the deprecated --mmap/--no-mmap/--mlock/--direct-io flags and the
+# LLAMA_ARG_MMAP/LLAMA_ARG_MLOCK env vars; use --load-mode (auto|none|mmap|mlock|mmap+mlock|dio)
+# instead. Deployments that pass the old flags through custom options fail to start.
+# typed-decisions deploys run llama.cpp with -b/-ub following -c (default 8192);
+# DECISION_BATCH_SIZE overrides both explicitly for models with a longer context.
+export IMAGE_TAG=b11785
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/llama.cpp:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/llama.cpp:latest \
   -f Dockerfile.llama.cpp \
   --push .
-# For Text Llama.cpp ROCm Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama.cpp-rocm:rocm7.2.2-b9787
-export IMAGE_TAG=rocm7.2.2-b9787
+# For Text Llama.cpp CPU Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama.cpp:b11785-cpu
+# The CPU image shares the llama.cpp repository, so it uses a -cpu tag instead of latest.
+export IMAGE_TAG=b11785-cpu
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/llama.cpp:${IMAGE_TAG} \
+  -f Dockerfile.llama.cpp-cpu \
+  --push .
+# For Text Llama.cpp ROCm Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama.cpp-rocm:rocm7.2.2-b11785
+# AMDGPU_TARGETS keeps the legacy gfx803/gfx900/gfx906/gfx1010 targets for parity with the
+# previous image; ROCm 7.2.2 may warn about or skip them, check the build log.
+export IMAGE_TAG=rocm7.2.2-b11785
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/llama.cpp-rocm:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/llama.cpp-rocm:latest \
@@ -215,7 +232,7 @@ docker run -d \
   -e HF_ENDPOINT=https://hub.opencsg.com \
   --gpus device=1 \
   -p 8000:8000 \
-  ${OPENCSG_ACR}/opencsghq/vllm:v0.28.0
+  ${OPENCSG_ACR}/opencsghq/vllm:v0.31.0
 
 # Run TGI
 docker run -d \
@@ -320,7 +337,7 @@ docker run -d \
   -e HF_TASK=text-to-speech \
   --gpus device=0 \
   -p 8000:8000 \
-  ${OPENCSG_ACR}/opencsghq/vllm:v0.28.0
+  ${OPENCSG_ACR}/opencsghq/vllm:v0.31.0
 
 # Call OpenAI-compatible speech API
 curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/speech \
@@ -402,8 +419,8 @@ ROCm-specific limits:
 ## inference image name, version and cuda version
 | Task| Image Name | Version | CUDA Version | Fix
 | --- | --- | --- | --- |--- |
-|text generation / embedding / reranking / text to speech| vllm | v0.28.0 | 13.0 |pooling runner support for embedding and reranking; vllm-omni 0.28.0 for text-to-speech (/v1/audio/speech)|
-|text generation / embedding / reranking| amd-vllm | rocm7.2.1_vllm_0.28.0 | - |ROCm 7.2.1, vLLM 0.28.0|
+|text generation / embedding / reranking / text to speech| vllm | v0.31.0 | 13.0 |pooling runner support for embedding and reranking; vllm-omni 0.31.0rc1 for text-to-speech (/v1/audio/speech)|
+|text generation / embedding / reranking| amd-vllm | rocm7.2.3_vllm_0.31.0 | - |ROCm 7.2.3, vLLM 0.31.0|
 |text generation| vllm | v0.8.5 | 12.4 |fix hf hub timestamp|
 |text generation| vllm-cpu | v0.24.0 | - |vLLM 0.24.0, supports --enable-prompt-tokens-details|
 |text generation| tgi | 2.2 | 12.1 |- |
@@ -419,10 +436,12 @@ ROCm-specific limits:
 |image generation / editing| diffusers | 0.38.0 | 12.8 |legacy runtime retained for existing pipelines|
 |image generation / editing| diffusers-rocm | 0.39.0 | - |diffusers 0.39.0, transformers 5.13.0, ROCm 7.2.2|
 |image generation / editing| diffusers-rocm | 0.38.0 | - |legacy runtime retained, ROCm 7.2.2|
-|text generation| sglang | v0.5.14-cu130 | 13.0 |tool calling enabled by default|
+|text generation| sglang | v0.5.22-cu130 | 13.0 |tool calling enabled by default|
+|video generation| sglang | v0.5.22-cu130 | 13.0 |SGLang Diffusion for MiniMax-H3 text-to-video with audio, same image as text generation|
 |text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
-|text generation| llama.cpp | b5215 | - |- |
-|text generation| llama.cpp-rocm | rocm7.2.2-b9787 | - |ROCm 7.2.2, llama.cpp b9787, official wide range ROCm targets|
+|text generation| llama.cpp | b11785 | 12.4 |llama.cpp b11785, supports /v1/systemone for typed decision models|
+|text generation| llama.cpp | b11785-cpu | - |llama.cpp b11785 CPU build|
+|text generation| llama.cpp-rocm | rocm7.2.2-b11785 | - |ROCm 7.2.2, llama.cpp b11785, official wide range ROCm targets|
 |text generation| tei | 1.6 | - |- |
 |text to audio| audiofly | 1.0 | 12.1 |iFLYTEK AudioFly LDM model with OpenAI speech API wrapper|
 |text to audio| audiofly-rocm | 1.0 | - |iFLYTEK AudioFly LDM model, ROCm 7.2.2|

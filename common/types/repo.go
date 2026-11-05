@@ -39,6 +39,17 @@ type (
 
 type SensitiveCheckStatus int
 
+// RepositoryUpdateOptions carries explicit visibility intent and its persistence guard.
+// Omitted visibility preserves the existing model setting during metadata updates.
+type RepositoryUpdateOptions struct {
+	Private *bool
+	// DeferPublication keeps this explicit public request pending even if synchronization
+	// finishes before persistence. It is request intent, not the stored PendingPublish value.
+	DeferPublication bool
+	// RequireSensitiveCheckPass rechecks a manual public request under the repository row lock.
+	RequireSensitiveCheckPass bool
+}
+
 // String returns a string representation of the sensitive check status.
 //
 // It returns one of "Fail", "Pending", "Pass", "Skip", "Exception", or "Unknown".
@@ -123,12 +134,18 @@ const (
 	VideoText2Text               PipelineTask = "video-text-to-text"
 	TextToSpeech                 PipelineTask = "text-to-speech"
 	TextToAudio                  PipelineTask = "text-to-audio"
+	// Text2VideoSynthesis is the tag name carried by video models mirrored from
+	// upstream (e.g. Hugging Face). Keep it as an alias of Text2Video.
+	Text2VideoSynthesis PipelineTask = "text-to-video-synthesis"
 	// AutomaticSpeechRecognition is the Hugging Face pipeline task name. Keep
 	// AutoSpeechRecognition as a legacy tag alias for existing seeded data.
 	AutomaticSpeechRecognition  PipelineTask    = "automatic-speech-recognition"
 	AutoSpeechRecognition       PipelineTask    = "auto-speech-recognition"
 	OpticalCharacterRecognition PipelineTask    = "optical-character-recognition"
+	TypedDecisions              PipelineTask    = "typed-decisions"
 	LlamaCpp                    InferenceEngine = "llama.cpp"
+	AMDLlamaCpp                 InferenceEngine = "amd-llama.cpp"
+	Laya                        InferenceEngine = "laya"
 	TEI                         InferenceEngine = "tei"
 	Ktransformers               InferenceEngine = "ktransformers"
 
@@ -330,6 +347,8 @@ type RuntimeFramework struct {
 }
 
 type RuntimeFrameworkV2 struct {
+	// ID identifies the framework group across repositories; it equals FrameName.
+	ID           string             `json:"id"`
 	FrameName    string             `json:"frame_name"`
 	ComputeTypes []string           `json:"compute_types"`
 	Versions     []RuntimeFramework `json:"versions"`

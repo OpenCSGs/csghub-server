@@ -10,12 +10,8 @@ import (
 	"github.com/riverqueue/river"
 )
 
-var (
-	// ErrUrgentPreempt indicates that normal mirror work yielded to urgent work.
-	ErrUrgentPreempt = errors.New("mirror work preempted by urgent job")
-	// ErrWorkerShutdown indicates that the owning work client is shutting down.
-	ErrWorkerShutdown = errors.New("mirror worker shutting down")
-)
+// ErrWorkerShutdown indicates that the owning work client is shutting down.
+var ErrWorkerShutdown = errors.New("mirror worker shutting down")
 
 // UrgentState is the process-local execution state for one mirror work client.
 type UrgentState string
@@ -51,17 +47,6 @@ type UrgentManagerConfig struct {
 	UrgentIdleDelay time.Duration
 }
 
-type normalRegistration struct {
-	cancel context.CancelCauseFunc
-}
-
-type preemptionCycle struct {
-	ctx     context.Context
-	cancel  context.CancelCauseFunc
-	barrier chan struct{}
-	err     error
-}
-
 // UrgentManager coordinates normal and urgent work within one River work client.
 type UrgentManager struct {
 	mu sync.Mutex
@@ -78,21 +63,16 @@ type UrgentManager struct {
 	closeOnce     sync.Once
 
 	state              UrgentState
-	normals            map[uint64]normalRegistration
-	nextNormalID       uint64
-	normalDrained      chan struct{}
 	urgentReservations int
-	cycle              *preemptionCycle
-	queueRemoved       bool
-	idleTimer          *time.Timer
-	timerGeneration    uint64
+	// cycle closes only after River confirms removal; shutdown is signaled by managerCtx.
+	cycle           chan struct{}
+	idleTimer       *time.Timer
+	timerGeneration uint64
 }
 
 // NewUrgentManager creates a manager in the NORMAL state.
 func NewUrgentManager(config UrgentManagerConfig) *UrgentManager {
 	managerCtx, cancelManager := context.WithCancelCause(context.Background())
-	drained := make(chan struct{})
-	close(drained)
 	return &UrgentManager{
 		queueController:   config.QueueController,
 		normalQueue:       config.NormalQueue,
@@ -101,47 +81,6 @@ func NewUrgentManager(config UrgentManagerConfig) *UrgentManager {
 		managerCtx:        managerCtx,
 		cancelManager:     cancelManager,
 		state:             UrgentStateNormal,
-		normals:           make(map[uint64]normalRegistration),
-		normalDrained:     drained,
-	}
-}
-
-// BeginNormal atomically admits and registers one normal work execution.
-func (m *UrgentManager) BeginNormal(riverCtx context.Context) (context.Context, func(), bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.state != UrgentStateNormal {
-		return nil, nil, false
-	}
-
-	ctx, cancel := context.WithCancelCause(riverCtx)
-	if len(m.normals) == 0 {
-		m.normalDrained = make(chan struct{})
-	}
-	m.nextNormalID++
-	id := m.nextNormalID
-	m.normals[id] = normalRegistration{cancel: cancel}
-
-	var once sync.Once
-	done := func() {
-		once.Do(func() {
-			cancel(nil)
-			m.finishNormal(id)
-		})
-	}
-	return ctx, done, true
-}
-
-// finishNormal unregisters one normal execution and closes the drain barrier when none remain.
-func (m *UrgentManager) finishNormal(id uint64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.normals[id]; !ok {
-		return
-	}
-	delete(m.normals, id)
-	if len(m.normals) == 0 {
-		close(m.normalDrained)
 	}
 }
 
@@ -151,6 +90,10 @@ func (m *UrgentManager) BeginUrgent(jobCtx context.Context) (func(), error) {
 		return nil, err
 	}
 	m.transitionMu.Lock()
+	if err := context.Cause(jobCtx); err != nil {
+		m.transitionMu.Unlock()
+		return nil, err
+	}
 	cycle, shouldStart, done, err := m.reserveUrgent()
 	m.transitionMu.Unlock()
 	if err != nil {
@@ -164,10 +107,14 @@ func (m *UrgentManager) BeginUrgent(jobCtx context.Context) (func(), error) {
 	}
 
 	select {
-	case <-cycle.barrier:
-		if cycle.err != nil {
+	case <-cycle:
+		if err := context.Cause(m.managerCtx); err != nil {
 			done()
-			return nil, cycle.err
+			return nil, err
+		}
+		if err := context.Cause(jobCtx); err != nil {
+			done()
+			return nil, err
 		}
 		return done, nil
 	case <-jobCtx.Done():
@@ -180,11 +127,11 @@ func (m *UrgentManager) BeginUrgent(jobCtx context.Context) (func(), error) {
 }
 
 // reserveUrgent records one urgent reservation and returns the shared preemption cycle and release callback.
-func (m *UrgentManager) reserveUrgent() (*preemptionCycle, bool, func(), error) {
+func (m *UrgentManager) reserveUrgent() (chan struct{}, bool, func(), error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.state == UrgentStateClosed {
-		return nil, false, nil, context.Cause(m.managerCtx)
+	if err := context.Cause(m.managerCtx); err != nil {
+		return nil, false, nil, err
 	}
 
 	m.urgentReservations++
@@ -194,18 +141,11 @@ func (m *UrgentManager) reserveUrgent() (*preemptionCycle, bool, func(), error) 
 		m.idleTimer = nil
 	}
 
-	var cycle *preemptionCycle
+	var cycle chan struct{}
 	shouldStart := false
 	switch m.state {
 	case UrgentStateNormal:
-		cycleCtx, cancelCycle := context.WithCancelCause(m.managerCtx)
-		cycle = &preemptionCycle{
-			ctx:     cycleCtx,
-			cancel:  cancelCycle,
-			barrier: make(chan struct{}),
-		}
-		m.cycle = cycle
-		m.state = UrgentStatePreempting
+		cycle = m.newPreemptionCycleLocked()
 		shouldStart = true
 	case UrgentStatePreempting:
 		cycle = m.cycle
@@ -217,7 +157,6 @@ func (m *UrgentManager) reserveUrgent() (*preemptionCycle, bool, func(), error) 
 		slog.String("queue", m.normalQueue),
 		slog.String("state", string(m.state)),
 		slog.Int("urgent_reservations", m.urgentReservations),
-		slog.Int("normal_work_count", len(m.normals)),
 		slog.Bool("starts_preemption", shouldStart),
 	)
 
@@ -228,139 +167,79 @@ func (m *UrgentManager) reserveUrgent() (*preemptionCycle, bool, func(), error) 
 	return cycle, shouldStart, done, nil
 }
 
-// runPreemptionCycle cancels normal work, removes its queue, and opens the urgent execution barrier.
-func (m *UrgentManager) runPreemptionCycle(cycle *preemptionCycle) {
-	m.mu.Lock()
-	cancels := make([]context.CancelCauseFunc, 0, len(m.normals))
-	for _, normal := range m.normals {
-		cancels = append(cancels, normal.cancel)
-	}
-	drained := m.normalDrained
-	state := m.state
-	urgentReservations := m.urgentReservations
-	m.mu.Unlock()
-	slog.Info("preempting normal work",
-		slog.String("queue", m.normalQueue),
-		slog.String("state", string(state)),
-		slog.Int("urgent_reservations", urgentReservations),
-		slog.Int("normal_work_count", len(cancels)),
-	)
-
-	for _, cancel := range cancels {
-		cancel(ErrUrgentPreempt)
-	}
-
-	removeStartedAt := time.Now()
-	err := m.queueController.RemoveQueue(cycle.ctx, m.normalQueue)
-	removeDuration := time.Since(removeStartedAt)
-	m.mu.Lock()
-	removeState := m.state
-	removeReservations := m.urgentReservations
-	removeNormalWorkCount := len(m.normals)
-	m.mu.Unlock()
-	if err != nil {
-		slog.Error("failed to remove normal queue for urgent execution",
-			slog.String("queue", m.normalQueue),
-			slog.String("state", string(removeState)),
-			slog.Int("urgent_reservations", removeReservations),
-			slog.Int("normal_work_count", removeNormalWorkCount),
-			slog.Duration("remove_duration", removeDuration),
-			slog.String("error", err.Error()),
-		)
-	} else {
-		slog.Info("normal queue removed for urgent execution",
-			slog.String("queue", m.normalQueue),
-			slog.String("state", string(removeState)),
-			slog.Int("urgent_reservations", removeReservations),
-			slog.Int("normal_work_count", removeNormalWorkCount),
-			slog.Duration("remove_duration", removeDuration),
-		)
-	}
-	if err == nil {
-		select {
-		case <-drained:
-			m.mu.Lock()
-			drainedState := m.state
-			drainedReservations := m.urgentReservations
-			drainedNormalWorkCount := len(m.normals)
-			m.mu.Unlock()
-			slog.Info("normal work drained for urgent execution",
-				slog.String("queue", m.normalQueue),
-				slog.String("state", string(drainedState)),
-				slog.Int("urgent_reservations", drainedReservations),
-				slog.Int("normal_work_count", drainedNormalWorkCount),
-			)
-		case <-cycle.ctx.Done():
-			err = context.Cause(cycle.ctx)
-		}
-	}
-	abandoned := errors.Is(context.Cause(cycle.ctx), context.Canceled) && context.Cause(m.managerCtx) == nil
-	if abandoned {
-		err = m.reconcileNormalQueueRemoval()
-		if err == nil {
-			select {
-			case <-drained:
-			case <-m.managerCtx.Done():
-				err = context.Cause(m.managerCtx)
-			}
-		}
-	}
-
-	m.mu.Lock()
-	transitioned := false
-	if m.cycle == cycle {
-		cycle.err = err
-		if err == nil && m.state != UrgentStateClosed {
-			m.queueRemoved = true
-			m.state = UrgentStateUrgent
-			transitioned = true
-			if m.urgentReservations == 0 {
-				m.startIdleTimerLocked()
-			}
-		} else if err != nil && m.state != UrgentStateClosed {
-			m.cycle = nil
-			m.queueRemoved = false
-			m.state = UrgentStateNormal
-		}
-		close(cycle.barrier)
-	}
-	state = m.state
-	urgentReservations = m.urgentReservations
-	normalWorkCount := len(m.normals)
-	m.mu.Unlock()
-	if err != nil {
-		slog.Error("urgent work preemption failed",
-			slog.String("queue", m.normalQueue),
-			slog.String("state", string(state)),
-			slog.Int("urgent_reservations", urgentReservations),
-			slog.Int("normal_work_count", normalWorkCount),
-			slog.String("error", err.Error()),
-		)
-	} else if transitioned {
-		slog.Info("urgent execution ready",
-			slog.String("queue", m.normalQueue),
-			slog.String("state", string(state)),
-			slog.Int("urgent_reservations", urgentReservations),
-			slog.Int("normal_work_count", normalWorkCount),
-		)
-	}
+// newPreemptionCycleLocked gates urgent work until the normal producer is fully removed; m.mu must be held.
+func (m *UrgentManager) newPreemptionCycleLocked() chan struct{} {
+	cycle := make(chan struct{})
+	m.cycle = cycle
+	m.state = UrgentStatePreempting
+	return cycle
 }
 
-// reconcileNormalQueueRemoval completes a River queue removal interrupted by an abandoned preemption cycle.
-func (m *UrgentManager) reconcileNormalQueueRemoval() error {
-	err := m.queueController.RemoveQueue(m.managerCtx, m.normalQueue)
-	var notFoundErr *river.QueueNotFoundError
-	if errors.As(err, &notFoundErr) {
-		return nil
+// runPreemptionCycle waits for River to interrupt and settle local normal claims before admitting urgent work.
+func (m *UrgentManager) runPreemptionCycle(cycle chan struct{}) {
+	slog.Info("preempting normal work", slog.String("queue", m.normalQueue))
+	started := time.Now()
+	if err := m.removeNormalQueue(); err != nil {
+		slog.Error("failed to remove normal queue for urgent execution",
+			slog.String("queue", m.normalQueue), slog.Duration("remove_duration", time.Since(started)), slog.Any("error", err))
+		return
 	}
-	return err
+
+	m.mu.Lock()
+	if m.cycle == cycle && m.state != UrgentStateClosed && m.managerCtx.Err() == nil {
+		m.state = UrgentStateUrgent
+		if m.urgentReservations == 0 {
+			m.startIdleTimerLocked()
+		}
+		close(cycle)
+	}
+	state := m.state
+	reservations := m.urgentReservations
+	m.mu.Unlock()
+
+	slog.Info("normal queue removed for urgent execution",
+		slog.String("queue", m.normalQueue), slog.String("state", string(state)),
+		slog.Int("urgent_reservations", reservations), slog.Duration("remove_duration", time.Since(started)))
+}
+
+const (
+	// normalQueueRemoveTimeout bounds each River removal attempt, including claim settlement.
+	normalQueueRemoveTimeout = 30 * time.Second
+	// normalQueueRemoveRetryDelay prevents a failed producer removal from spinning.
+	normalQueueRemoveRetryDelay = time.Second
+)
+
+// removeNormalQueue retries bounded attempts until River confirms removal or the manager closes.
+// Urgent waiter cancellation does not interrupt this operation because it cannot undo a removal already started.
+// An absent producer is already settled.
+func (m *UrgentManager) removeNormalQueue() error {
+	for {
+		if err := context.Cause(m.managerCtx); err != nil {
+			return err
+		}
+		ctx, cancel := context.WithTimeout(m.managerCtx, normalQueueRemoveTimeout)
+		err := m.queueController.RemoveQueue(ctx, m.normalQueue)
+		cancel()
+		var notFoundErr *river.QueueNotFoundError
+		if err == nil || errors.As(err, &notFoundErr) {
+			return nil
+		}
+		slog.Warn("normal queue removal remains incomplete", slog.String("queue", m.normalQueue), slog.Any("error", err))
+		timer := time.NewTimer(normalQueueRemoveRetryDelay)
+		select {
+		case <-m.managerCtx.Done():
+			timer.Stop()
+			return context.Cause(m.managerCtx)
+		case <-timer.C:
+		}
+	}
 }
 
 // releaseUrgent releases one reservation and schedules normal queue restoration after the final urgent job.
 func (m *UrgentManager) releaseUrgent() {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.urgentReservations == 0 {
-		m.mu.Unlock()
 		return
 	}
 	m.urgentReservations--
@@ -368,42 +247,11 @@ func (m *UrgentManager) releaseUrgent() {
 		slog.String("queue", m.normalQueue),
 		slog.String("state", string(m.state)),
 		slog.Int("urgent_reservations", m.urgentReservations),
-		slog.Int("normal_work_count", len(m.normals)),
 	)
-	if m.urgentReservations != 0 || m.state == UrgentStateClosed {
-		m.mu.Unlock()
-		return
+	// An in-progress removal owns its own completion and schedules restoration if no waiters remain.
+	if m.urgentReservations == 0 && m.state == UrgentStateUrgent {
+		m.startIdleTimerLocked()
 	}
-	if m.state == UrgentStatePreempting {
-		cycle := m.cycle
-		m.mu.Unlock()
-		m.cancelAbandonedPreemption(cycle)
-		return
-	}
-	if m.state != UrgentStateUrgent {
-		m.mu.Unlock()
-		return
-	}
-
-	m.startIdleTimerLocked()
-	m.mu.Unlock()
-}
-
-// cancelAbandonedPreemption cancels the current cycle only if no newer urgent reservation still needs it.
-func (m *UrgentManager) cancelAbandonedPreemption(cycle *preemptionCycle) {
-	if cycle == nil {
-		return
-	}
-	m.transitionMu.Lock()
-	m.mu.Lock()
-	shouldCancel := m.cycle == cycle &&
-		m.state == UrgentStatePreempting &&
-		m.urgentReservations == 0
-	m.mu.Unlock()
-	if shouldCancel {
-		cycle.cancel(context.Canceled)
-	}
-	m.transitionMu.Unlock()
 }
 
 // startIdleTimerLocked enters URGENT_IDLE and schedules queue restoration while m.mu is held.
@@ -413,7 +261,6 @@ func (m *UrgentManager) startIdleTimerLocked() {
 		slog.String("queue", m.normalQueue),
 		slog.String("state", string(m.state)),
 		slog.Int("urgent_reservations", m.urgentReservations),
-		slog.Int("normal_work_count", len(m.normals)),
 		slog.Duration("idle_delay", m.urgentIdleDelay),
 	)
 	m.timerGeneration++
@@ -430,7 +277,7 @@ func (m *UrgentManager) restoreNormal(generation uint64) {
 	defer m.transitionMu.Unlock()
 
 	m.mu.Lock()
-	valid := m.state == UrgentStateUrgentIdle &&
+	valid := m.state == UrgentStateUrgentIdle && m.managerCtx.Err() == nil &&
 		m.urgentReservations == 0 &&
 		generation == m.timerGeneration
 	m.mu.Unlock()
@@ -439,42 +286,31 @@ func (m *UrgentManager) restoreNormal(generation uint64) {
 	}
 
 	if err := m.queueController.AddQueue(m.normalQueue, m.normalQueueConfig); err != nil {
-		// River registers a producer before starting it, so a failed Add can leave a stopped producer behind.
-		if cleanupErr := m.reconcileNormalQueueRemoval(); cleanupErr != nil {
-			err = errors.Join(err, cleanupErr)
-		}
+		// A failed Add may leave a registered producer. Reuse the removal barrier
+		// without holding transitionMu during database retries or blocking new reservations.
 		m.mu.Lock()
-		state := m.state
-		urgentReservations := m.urgentReservations
-		normalWorkCount := len(m.normals)
-		retryScheduled := false
-		if m.state == UrgentStateUrgentIdle &&
-			m.urgentReservations == 0 &&
-			generation == m.timerGeneration {
-			m.idleTimer = time.AfterFunc(m.urgentIdleDelay, func() {
-				m.restoreNormal(generation)
-			})
-			retryScheduled = true
+		var cycle chan struct{}
+		if m.state == UrgentStateUrgentIdle && m.managerCtx.Err() == nil &&
+			m.urgentReservations == 0 && generation == m.timerGeneration {
+			m.timerGeneration++
+			m.idleTimer = nil
+			cycle = m.newPreemptionCycleLocked()
 		}
 		m.mu.Unlock()
+		if cycle != nil {
+			go m.runPreemptionCycle(cycle)
+		}
 		slog.Error("failed to restore normal queue",
-			slog.String("queue", m.normalQueue),
-			slog.String("state", string(state)),
-			slog.Int("urgent_reservations", urgentReservations),
-			slog.Int("normal_work_count", normalWorkCount),
-			slog.Bool("retry_scheduled", retryScheduled),
-			slog.Duration("retry_delay", m.urgentIdleDelay),
-			slog.String("error", err.Error()),
-		)
+			slog.String("queue", m.normalQueue), slog.Bool("retry_scheduled", cycle != nil),
+			slog.Duration("retry_delay", m.urgentIdleDelay), slog.Any("error", err))
 		return
 	}
 
 	m.mu.Lock()
 	restored := false
-	if m.state == UrgentStateUrgentIdle &&
+	if m.state == UrgentStateUrgentIdle && m.managerCtx.Err() == nil &&
 		m.urgentReservations == 0 &&
 		generation == m.timerGeneration {
-		m.queueRemoved = false
 		m.cycle = nil
 		m.idleTimer = nil
 		m.state = UrgentStateNormal
@@ -482,14 +318,12 @@ func (m *UrgentManager) restoreNormal(generation uint64) {
 	}
 	state := m.state
 	urgentReservations := m.urgentReservations
-	normalWorkCount := len(m.normals)
 	m.mu.Unlock()
 	if restored {
 		slog.Info("normal queue restored",
 			slog.String("queue", m.normalQueue),
 			slog.String("state", string(state)),
 			slog.Int("urgent_reservations", urgentReservations),
-			slog.Int("normal_work_count", normalWorkCount),
 		)
 	}
 }
@@ -500,6 +334,8 @@ func (m *UrgentManager) Close(cause error) {
 		cause = ErrWorkerShutdown
 	}
 	m.closeOnce.Do(func() {
+		// Unblock removal retries before waiting for a restoration holding transitionMu.
+		m.cancelManager(cause)
 		m.transitionMu.Lock()
 		m.mu.Lock()
 		previousState := m.state
@@ -508,24 +344,18 @@ func (m *UrgentManager) Close(cause error) {
 		timer := m.idleTimer
 		cycle := m.cycle
 		urgentReservations := m.urgentReservations
-		normalWorkCount := len(m.normals)
-		queueRemoved := m.queueRemoved
+		queueRemoved := previousState == UrgentStateUrgent || previousState == UrgentStateUrgentIdle
 		m.idleTimer = nil
 		m.mu.Unlock()
 		if timer != nil {
 			timer.Stop()
 		}
-		if cycle != nil {
-			cycle.cancel(cause)
-		}
-		m.cancelManager(cause)
 		m.transitionMu.Unlock()
 		slog.Info("urgent manager closed",
 			slog.String("queue", m.normalQueue),
 			slog.String("state", string(UrgentStateClosed)),
 			slog.String("previous_state", string(previousState)),
 			slog.Int("urgent_reservations", urgentReservations),
-			slog.Int("normal_work_count", normalWorkCount),
 			slog.Bool("queue_removed", queueRemoved),
 			slog.Bool("idle_timer_active", timer != nil),
 			slog.Bool("preemption_cycle_active", cycle != nil),

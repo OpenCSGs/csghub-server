@@ -124,6 +124,49 @@ func OKWithTotal(c *gin.Context, data interface{}, total int) {
 	c.PureJSON(http.StatusOK, respData)
 }
 
+// OKWithTotalAmount responds the client with standard JSON for a paginated
+// result whose matching records also have a summed amount. The amount is
+// carried in cents by the billing period listing.
+func OKWithTotalAmount(c *gin.Context, data interface{}, total int, totalAmount int64) {
+	normalizedData := normalizeEmptySlice(data)
+	respData := R{
+		Msg:         "OK",
+		Data:        normalizedData,
+		Total:       total,
+		TotalAmount: totalAmount,
+	}
+	if c.Request == nil || c.Request.Header == nil {
+		c.PureJSON(http.StatusOK, respData)
+		return
+	}
+	lang := c.GetHeader("Accept-Language")
+	modifiedData := i18n.TranslateInterface(normalizedData, lang)
+	respData.Data = modifiedData
+	c.PureJSON(http.StatusOK, respData)
+}
+
+// OKWithTotalAmountAndCost responds the client with standard JSON for a
+// paginated result whose matching records also have a summed amount and a
+// summed cost. Both sums are floats because they are reported in yuan.
+func OKWithTotalAmountAndCost(c *gin.Context, data interface{}, total int, totalAmount int64, totalCost float64) {
+	normalizedData := normalizeEmptySlice(data)
+	respData := R{
+		Msg:         "OK",
+		Data:        normalizedData,
+		Total:       total,
+		TotalAmount: totalAmount,
+		TotalCost:   &totalCost,
+	}
+	if c.Request == nil || c.Request.Header == nil {
+		c.PureJSON(http.StatusOK, respData)
+		return
+	}
+	lang := c.GetHeader("Accept-Language")
+	modifiedData := i18n.TranslateInterface(normalizedData, lang)
+	respData.Data = modifiedData
+	c.PureJSON(http.StatusOK, respData)
+}
+
 // BadRequest responds with a JSON-formatted error message.
 //
 // Example:
@@ -348,11 +391,13 @@ func GoneError(c *gin.Context, err error) {
 
 // R is the response envelope
 type R struct {
-	Code    string `json:"code,omitempty"`
-	Msg     string `json:"msg"`
-	Data    any    `json:"data,omitempty"`
-	Total   int    `json:"total,omitempty"` // Total number of items, used in paginated responses
-	TraceID string `json:"trace_id,omitempty"`
+	Code        string   `json:"code,omitempty"`
+	Msg         string   `json:"msg"`
+	Data        any      `json:"data,omitempty"`
+	Total       int      `json:"total,omitempty"` // Total number of items, used in paginated responses
+	TotalAmount int64    `json:"total_amount,omitempty"`
+	TotalCost   *float64 `json:"total_cost,omitempty"`
+	TraceID     string   `json:"trace_id,omitempty"`
 	// error context msg
 	Context map[string]interface{} `json:"context,omitempty"`
 }

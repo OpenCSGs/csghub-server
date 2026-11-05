@@ -7,7 +7,10 @@ func IsUseVoucher(scene types.SceneType) bool {
 	case types.SceneModelInference,
 		types.SceneSpace,
 		types.SceneModelFinetune,
-		types.SceneEvaluation:
+		types.SceneEvaluation,
+		// token scenes are payable with token and universal vouchers
+		types.SceneModelServerless,
+		types.SceneMultiModalServerless:
 		return true
 	default:
 		return false
@@ -112,13 +115,12 @@ func IsNeedCheckMeteringInMinute(scene types.SceneType, valueType types.ChargeVa
 }
 
 func IsNeedCheckUserSubscription(scene types.SceneType) bool {
+	// to check user subscription for hardware compute resource
 	switch types.SceneType(scene) {
 	case types.SceneModelInference,
 		types.SceneSpace,
 		types.SceneModelFinetune,
-		types.SceneEvaluation,
-		types.SceneModelServerless,
-		types.SceneStarship:
+		types.SceneEvaluation:
 		return true
 	default:
 		return false
@@ -152,4 +154,13 @@ func IsChargeScene(scene types.SceneType) bool {
 // SQL "scene NOT IN (...)" filters during rollup.
 func ChargeSceneValues() []int {
 	return []int{int(types.ScenePortalCharge), int(types.SceneCashCharge)}
+}
+
+// APIConsumptionSceneValues returns the scene values that represent API
+// (serverless token) consumption rather than compute resource consumption. The
+// admin consumption report (compute resource operations report) excludes them;
+// they are surfaced in the token report (model API operations report) instead.
+// Mirrors IsGetTokenID, which selects these same two scenes for token billing.
+func APIConsumptionSceneValues() []int {
+	return []int{int(types.SceneModelServerless), int(types.SceneMultiModalServerless)}
 }

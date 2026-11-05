@@ -1,9 +1,13 @@
 package component
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -217,6 +222,8 @@ func TestGetMetadataFromSafetensors_Error(t *testing.T) {
 	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "config.json", Path: "config.json"},
 		{Name: "model.safetensors", Path: "model.safetensors"}}, Cursor: ""}, nil)
 
+	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, mock.Anything).Return(`{"architectures":["Qwen3ForCausalLM"]}`, nil).Once()
+
 	//internalDownloadFile
 	rc.mocks.components.repo.EXPECT().InternalDownloadFile(
 		ctx, mock.AnythingOfType("*types.GetFileReq"),
@@ -253,6 +260,44 @@ func TestGetMetadataFromSafetensors_className(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, modelInfo)
 	require.False(t, modelInfo.ParamsValid)
+}
+
+func TestGetMetadataFromSafetensors_classNameFromModelIndexFiles(t *testing.T) {
+	cases := []struct {
+		name      string
+		files     []string
+		wantIndex string
+	}{
+		{"modular index only", []string{"modular_model_index.json"}, "modular_model_index.json"},
+		{"model index wins", []string{"modular_model_index.json", "model_index.json"}, "model_index.json"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.TODO()
+			rc := initializeTestRuntimeArchComponent(ctx, t)
+			files := []*types.File{{Name: "diffusion_pytorch_model.safetensors", Path: "transformer/diffusion_pytorch_model.safetensors"}}
+			for _, f := range tc.files {
+				files = append(files, &types.File{Name: f, Path: f})
+			}
+			rc.mocks.gitServer.EXPECT().GetTree(
+				mock.Anything, mock.Anything,
+			).Return(&types.GetRepoFileTreeResp{Files: files, Cursor: ""}, nil)
+			rc.mocks.components.repo.EXPECT().InternalDownloadFile(
+				ctx, mock.AnythingOfType("*types.GetFileReq"),
+			).Return(nil, 0, "test", nil)
+			rc.mocks.gitServer.EXPECT().GetRepoFileRaw(
+				mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool { return req.Path == tc.wantIndex }),
+			).Return(`{"_class_name": "MiniMaxH3ModularPipeline"}`, nil)
+
+			modelInfo, err := rc.GetMetadataFromSafetensors(ctx, &database.Repository{
+				Path:           "FastVideo/FastVideo-FastH3-8-Step-V2",
+				DefaultBranch:  "main",
+				RepositoryType: types.ModelRepo,
+			})
+			require.NoError(t, err)
+			require.Equal(t, "MiniMaxH3ModularPipeline", modelInfo.ClassName)
+		})
+	}
 }
 
 const paddleInferTestConfig = `Global:
@@ -843,17 +888,17 @@ var engineArgsUnsupportedByVersion = map[string]map[string][]string{
 		"v0.8.5":  {"async-scheduling"},
 		"v0.9.2":  {"async-scheduling"},
 		"v0.24.0": {"swap-space", "guided-decoding-backend"},
-		"v0.28.0": {"swap-space", "guided-decoding-backend"},
+		"v0.31.0": {"swap-space", "guided-decoding-backend"},
 	},
 	"amd-vllm.json": {
-		"0.28.0": {"swap-space", "guided-decoding-backend"},
+		"0.31.0": {"swap-space", "guided-decoding-backend"},
 	},
 	"ascend-vllm.json": {
 		"v0.27.1rc1":      {"swap-space"},
 		"v0.27.1rc1-310p": {"swap-space"},
 	},
 	"sglang.json": {
-		"v0.5.14": {"enable-ep-moe"},
+		"v0.5.22": {"enable-ep-moe"},
 	},
 	"nvidia-sglang.json": {
 		"25.12-py3": {"enable-ep-moe"},
@@ -867,7 +912,7 @@ var engineArgsSupportedByVersion = map[string]map[string][]string{
 		"v0.8.5":  {"swap-space", "guided-decoding-backend"},
 		"v0.9.2":  {"swap-space", "guided-decoding-backend"},
 		"v0.24.0": {"async-scheduling"},
-		"v0.28.0": {"async-scheduling"},
+		"v0.31.0": {"async-scheduling"},
 	},
 }
 
@@ -1024,4 +1069,183 @@ func TestHasMTPWeightsFromIndex(t *testing.T) {
 		rc := initializeTestRuntimeArchComponent(ctx, t)
 		require.False(t, rc.hasMTPWeights(ctx, repo, &types.ModelConfig{NumHiddenLayers: 61}))
 	})
+}
+
+// ggufFile builds a GGUF v3 file of the given architecture with one F32 layer
+// tensor, enough for the parser to read metadata and estimate a run.
+func ggufFile(arch string, kvs ...[2]string) []byte {
+	appendString := func(b []byte, s string) []byte {
+		b = binary.LittleEndian.AppendUint64(b, uint64(len(s)))
+		return append(b, s...)
+	}
+	kvs = append([][2]string{{"general.architecture", arch}}, kvs...)
+	b := []byte("GGUF")
+	b = binary.LittleEndian.AppendUint32(b, 3)
+	b = binary.LittleEndian.AppendUint64(b, 1)
+	b = binary.LittleEndian.AppendUint64(b, uint64(len(kvs)+1))
+	for _, kv := range kvs {
+		b = appendString(b, kv[0])
+		b = binary.LittleEndian.AppendUint32(b, 8) // string
+		b = appendString(b, kv[1])
+	}
+	b = appendString(b, arch+".block_count")
+	b = binary.LittleEndian.AppendUint32(b, 4) // uint32
+	b = binary.LittleEndian.AppendUint32(b, 1)
+	// tensor info: name, n_dims, dims, type (F32), offset
+	b = appendString(b, "blk.0.attn_norm.weight")
+	b = binary.LittleEndian.AppendUint32(b, 1)
+	b = binary.LittleEndian.AppendUint64(b, 8)
+	b = binary.LittleEndian.AppendUint32(b, 0)
+	b = binary.LittleEndian.AppendUint64(b, 0)
+	for len(b)%32 != 0 {
+		b = append(b, 0)
+	}
+	return append(b, make([]byte, 8*4)...)
+}
+
+func TestGetMetadataFromGGUF_SkipsProjector(t *testing.T) {
+	contents := map[string][]byte{
+		"/Qwen3.8-27B-Q8_0.gguf":       ggufFile("qwen35"),
+		"/mmproj-Qwen3.8-27B-F16.gguf": ggufFile("clip", [2]string{"general.type", "mmproj"}, [2]string{"clip.projector_type", "qwen3vl_merger"}),
+		"/vision-projector.gguf":       ggufFile("clip", [2]string{"clip.projector_type", "qwen3vl_merger"}),
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, r.URL.Path, time.Time{}, bytes.NewReader(contents[r.URL.Path]))
+	}))
+	defer server.Close()
+
+	for _, tc := range []struct {
+		name       string
+		files      []string
+		downloaded []string
+		wantArch   string
+		wantErr    string
+	}{
+		{
+			name:       "mmproj file is skipped by name",
+			files:      []string{"Qwen3.8-27B-Q8_0.gguf", "mmproj-Qwen3.8-27B-F16.gguf"},
+			downloaded: []string{"Qwen3.8-27B-Q8_0.gguf"},
+			wantArch:   "qwen35",
+		},
+		{
+			name:       "projector file is skipped by metadata",
+			files:      []string{"Qwen3.8-27B-Q8_0.gguf", "vision-projector.gguf"},
+			downloaded: []string{"Qwen3.8-27B-Q8_0.gguf", "vision-projector.gguf"},
+			wantArch:   "qwen35",
+		},
+		{
+			name:       "projector only repo has no model gguf",
+			files:      []string{"vision-projector.gguf"},
+			downloaded: []string{"vision-projector.gguf"},
+			wantErr:    "no gguf file found",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			rc := initializeTestRuntimeArchComponent(ctx, t)
+			rc.config = &config.Config{}
+			files := make([]*types.File, 0, len(tc.files))
+			for _, f := range tc.files {
+				files = append(files, &types.File{Name: f, Path: f})
+			}
+			rc.mocks.gitServer.EXPECT().GetTree(ctx, mock.Anything).Return(&types.GetRepoFileTreeResp{Files: files}, nil)
+			for _, f := range tc.downloaded {
+				rc.mocks.components.repo.EXPECT().InternalDownloadFile(ctx, mock.MatchedBy(func(req *types.GetFileReq) bool {
+					return req.Path == f
+				})).Return(nil, 0, server.URL+"/"+f, nil).Once()
+			}
+
+			info, err := rc.GetMetadataFromGGUF(ctx, &database.Repository{
+				Path:          "CSG_AtomicChat/Qwen3.8-27B-GGUF",
+				DefaultBranch: "main",
+			})
+
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.wantArch, info.Architecture)
+			require.Len(t, info.Quantizations, 1)
+		})
+	}
+}
+
+// TestGetMetadataFromGGUF_Remote parses the headers of a real multimodal GGUF
+// repo on hub.opencsg.com. It needs network access, so it only runs when
+// CSGHUB_REMOTE_GGUF_TEST is set.
+func TestGetMetadataFromGGUF_Remote(t *testing.T) {
+	if os.Getenv("CSGHUB_REMOTE_GGUF_TEST") == "" {
+		t.Skip("set CSGHUB_REMOTE_GGUF_TEST=1 to parse remote GGUF headers")
+	}
+	const repoURL = "https://hub.opencsg.com/csg/AtomicChat/Qwen3.8-27B-GGUF/resolve/main/"
+	ctx := context.Background()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	rc.config = &config.Config{}
+	rc.config.Model.MinContextForEstimation = 4096
+
+	weights := []string{"Qwen3.8-27B-AD-Q4_K_M.gguf", "Qwen3.8-27B-Q8_0.gguf"}
+	files := []*types.File{}
+	for _, f := range append(weights, "mmproj-Qwen3.8-27B-BF16.gguf", "mmproj-Qwen3.8-27B-F16.gguf") {
+		files = append(files, &types.File{Name: f, Path: f})
+	}
+	rc.mocks.gitServer.EXPECT().GetTree(ctx, mock.Anything).Return(&types.GetRepoFileTreeResp{Files: files}, nil)
+	for _, f := range weights {
+		rc.mocks.components.repo.EXPECT().InternalDownloadFile(ctx, mock.MatchedBy(func(req *types.GetFileReq) bool {
+			return req.Path == f
+		})).Return(nil, 0, repoURL+f, nil).Once()
+	}
+
+	info, err := rc.GetMetadataFromGGUF(ctx, &database.Repository{
+		Path:          "AtomicChat/Qwen3.8-27B-GGUF",
+		DefaultBranch: "main",
+	})
+
+	require.NoError(t, err)
+	t.Logf("architecture=%s params=%.2fB quantizations=%+v", info.Architecture, info.ParamsBillions, info.Quantizations)
+	require.Equal(t, "qwen35", info.Architecture)
+	require.True(t, info.ParamsValid)
+	require.Len(t, info.Quantizations, len(weights))
+}
+
+func TestGetMetadataFromSafetensors_QuantizedParameters(t *testing.T) {
+	const header = `{"model.embed_tokens.weight":{"dtype":"U32","shape":[151936,960]},"model.embed_tokens.scales":{"dtype":"BF16","shape":[151936,40]},"model.embed_tokens.biases":{"dtype":"BF16","shape":[151936,40]}}`
+	data := binary.LittleEndian.AppendUint64(nil, uint64(len(header)))
+	data = append(data, []byte(header)...)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, "model.safetensors", time.Time{}, bytes.NewReader(data))
+	}))
+	defer server.Close()
+	for _, tc := range []struct {
+		name, config string
+		want         int64
+		files        int
+		billions     float32
+	}{
+		{"MLX", `{"architectures":["Qwen3ForCausalLM"],"quantization":{"bits":6,"group_size":128}}`, 777912320, 1, 0.78},
+		{"unsupported", `{"architectures":["Qwen3ForCausalLM"],"quantization_config":{"quant_method":"gptq","bits":6,"group_size":128}}`, 158013440, 1, 0.16},
+		{"duplicate checkpoint", `{"architectures":["Qwen3ForCausalLM"],"quantization":{"bits":6,"group_size":128}}`, 316026880, 2, 0.32},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			rc := initializeTestRuntimeArchComponent(ctx, t)
+			rc.config = &config.Config{}
+			files := []*types.File{{Name: "config.json", Path: "config.json"}, {Name: "model.safetensors", Path: "model.safetensors"}, {Name: ModelSafetensorsIndex, Path: ModelSafetensorsIndex}}
+			if tc.files == 2 {
+				files = append(files, &types.File{Name: "model.safetensors", Path: "checkpoint-100/model.safetensors"})
+			}
+			rc.mocks.gitServer.EXPECT().GetTree(ctx, mock.Anything).Return(&types.GetRepoFileTreeResp{Files: files}, nil)
+			rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, mock.Anything).Return(tc.config, nil).Once()
+			rc.mocks.components.repo.EXPECT().InternalDownloadFile(ctx, mock.Anything).Return(nil, 0, server.URL, nil).Times(tc.files)
+			rc.mocks.stores.MetadataMock().EXPECT().Upsert(ctx, mock.MatchedBy(func(m *database.Metadata) bool {
+				return m.RepositoryID == 1 && m.ModelParamsValid && m.ModelParams == tc.billions
+			})).Return(nil).Once()
+			expectUpdateModelArchType(ctx, rc)
+			got, err := rc.UpdateModelMetadata(ctx, &database.Repository{ID: 1, Path: "Qwen/Qwen3-32B-MLX-6bit", DefaultBranch: "main", Tags: []database.Tag{{Name: "safetensors", Category: "framework"}}, Metadata: database.Metadata{ModelParams: 0.16, ModelParamsValid: true}})
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got.TotalParams)
+			require.True(t, got.ParamsValid)
+			require.Equal(t, "Qwen3ForCausalLM", got.Architecture)
+		})
+	}
 }

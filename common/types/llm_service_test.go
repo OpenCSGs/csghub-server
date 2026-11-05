@@ -113,3 +113,67 @@ func TestParseUpstreamCostResourceID_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestModelIDFromResourceID(t *testing.T) {
+	tests := []struct {
+		name             string
+		resourceID       string
+		includeInference bool
+		want             string
+	}{
+		{name: "serverless accepted", resourceID: "csghub://serverless/ns/model", want: "ns/model"},
+		{name: "inference rejected by default", resourceID: "csghub://inference/ns/model", want: ""},
+		{name: "inference accepted when opted in", resourceID: "csghub://inference/ns/model", includeInference: true, want: "ns/model"},
+		{name: "thirdparty", resourceID: "thirdparty://deepseek-r1", want: "deepseek-r1"},
+		{name: "csghub no slash", resourceID: "csghub://serverless", want: ""},
+		{name: "csghub empty model", resourceID: "csghub://serverless/", want: ""},
+		{name: "csghub empty type", resourceID: "csghub:///ns/model", want: ""},
+		{name: "csghub empty type and leading slash model", resourceID: "csghub:////ns/model", want: ""},
+		{name: "thirdparty empty", resourceID: "thirdparty://", want: ""},
+		{name: "upstream scheme", resourceID: "upstream://42", want: ""},
+		{name: "empty", resourceID: "", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, ModelIDFromResourceID(tt.resourceID, tt.includeInference))
+		})
+	}
+}
+
+func TestInternalModelSyncTasks(t *testing.T) {
+	tests := []struct {
+		name string
+		task string
+		want []string
+	}{
+		{"multimodal task expands to both labels", "image-text-to-text", []string{"image-text-to-text", "text-generation"}},
+		{"whitespace padded multimodal task expands", " image-text-to-text ", []string{"image-text-to-text", "text-generation"}},
+		{"text-generation task yields a single label", "text-generation", []string{"text-generation"}},
+		{"unknown task is carried as-is", "text-to-image", []string{"text-to-image"}},
+		{"empty task yields no labels", "", nil},
+		{"typed-decisions is not expanded to text-generation", "typed-decisions", []string{"typed-decisions"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, InternalModelSyncTasks(tt.task))
+		})
+	}
+}
+
+func TestInternalModelInfo_TaskLabels(t *testing.T) {
+	t.Run("sync-owned tasks list wins", func(t *testing.T) {
+		info := &InternalModelInfo{Task: "image-text-to-text", Tasks: []string{"image-text-to-text", "text-generation"}}
+		require.Equal(t, []string{"image-text-to-text", "text-generation"}, info.TaskLabels())
+	})
+	t.Run("falls back to raw task for legacy rows", func(t *testing.T) {
+		info := &InternalModelInfo{Task: "image-text-to-text,text-generation"}
+		require.Equal(t, []string{"image-text-to-text,text-generation"}, info.TaskLabels())
+	})
+	t.Run("empty info yields no labels", func(t *testing.T) {
+		require.Nil(t, (&InternalModelInfo{}).TaskLabels())
+	})
+	t.Run("nil receiver yields no labels", func(t *testing.T) {
+		var info *InternalModelInfo
+		require.Nil(t, info.TaskLabels())
+	})
+}

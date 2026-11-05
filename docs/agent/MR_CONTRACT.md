@@ -559,6 +559,12 @@ The review agent SHOULD verify:
 
 * Does the implementation stay within the stated scope?
 * Does it unintentionally modify a listed non-goal?
+* For an EE/SAAS feature, distinguish shared foundational structures (such as
+  common types, database models and schema migrations, and configuration
+  declarations) from edition-specific behavior. Shared structures can support
+  CE-to-EE upgrades; their location alone is not an edition-scope finding.
+  Trace build constraints and callers to determine whether CE executes private
+  behavior, and check publication scope separately.
 
 ## Constraint Verification
 

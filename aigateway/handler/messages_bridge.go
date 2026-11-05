@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
@@ -35,6 +38,7 @@ func newMessagesHandlerBridge(h *OpenAIHandlerImpl) *messagesHandlerBridge {
 // anthropic.New.  The bridge implements all required interfaces.
 func (b *messagesHandlerBridge) toMessagesDeps() anthropic.Deps {
 	deps := anthropic.Deps{
+		RetainRoutingBody:  b.handler.retainAutoRoutingBody,
 		ProxyExecutor:      b,
 		UsageRecorder:      b,
 		AdmissionFinalizer: b,
@@ -53,12 +57,34 @@ func (b *messagesHandlerBridge) toMessagesDeps() anthropic.Deps {
 // --- ProxyExecutor ---
 
 func (b *messagesHandlerBridge) ServeProxy(c *gin.Context, backendURL, host string, responseWriter types.HTTPResponseWriter) {
-	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding())
+	target := types.RouteCallTargetFromContext(c.Request.Context())
+	// The planner's protocol is authoritative, including custom upstream paths.
+	if target.Protocol == "" {
+		target.Protocol = "messages"
+		if strings.Contains(backendURL, "/chat/completions") {
+			target.Protocol = "chat"
+		} else if strings.Contains(backendURL, "/responses") {
+			target.Protocol = "responses"
+		}
+	}
+	var body []byte
+	if decision := types.AutoRouteDecisionFromContext(c.Request.Context()); decision != nil && decision.Feedback != nil {
+		var readErr error
+		body, readErr = types.ReadRequestBody(c.Request.Body)
+		if readErr != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	}
+	observation := component.ObserveRouteCall(c.Request.Context(), target, body)
+	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding(), proxy.WithResponseModifier(observation.Modify))
 	if err != nil {
+		observation.Finish(err)
 		c.JSON(http.StatusBadGateway, gin.H{
 			"type": "error",
 			"error": gin.H{
-				"type":    "api_error",
+				"type":    types.ErrTypeAPI,
 				"message": "failed to create reverse proxy: " + err.Error(),
 			},
 		})
@@ -71,13 +97,14 @@ func (b *messagesHandlerBridge) ServeProxy(c *gin.Context, backendURL, host stri
 	if parsed, perr := url.Parse(backendURL); perr == nil && parsed.Path != "" {
 		apiPath = parsed.Path
 	}
-	rp.ServeHTTP(responseWriter, c.Request, apiPath, host)
+	proxyErr := rp.(proxy.ErrorReportingReverseProxy).ServeHTTPWithError(responseWriter, c.Request, apiPath, host)
+	observation.Finish(proxyErr)
 }
 
 // --- UsageRecorder ---
 
-func (b *messagesHandlerBridge) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
-	return b.handler.openaiComponent.RecordUsageFromTokenUsage(ctx, nsUUID, model, targetModelName, usage, apikey, tokenID)
+func (b *messagesHandlerBridge) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
+	return b.handler.openaiComponent.RecordUsageFromTokenUsage(ctx, nsUUID, model, targetModelName, usage, tokenID)
 }
 
 // --- AdmissionFinalizer ---

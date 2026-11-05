@@ -19,6 +19,17 @@ const (
 	SubscriptionStatusExpired  SubscriptionStatus = "expired"
 )
 
+// IsValid reports whether s is one of the known subscription statuses.
+func (s SubscriptionStatus) IsValid() bool {
+	switch s {
+	case SubscriptionStatusActive, SubscriptionStatusCanceled,
+		SubscriptionStatusClosed, SubscriptionStatusExpired:
+		return true
+	default:
+		return false
+	}
+}
+
 type BillingReasion string
 
 const (
@@ -39,14 +50,38 @@ const (
 	BillingStatusUnpaid BillingStatus = "unpaid"
 )
 
+// IsValid reports whether s is one of the known billing statuses.
+func (s BillingStatus) IsValid() bool {
+	switch s {
+	case BillingStatusPaid, BillingStatusUnpaid:
+		return true
+	default:
+		return false
+	}
+}
+
 type SubscriptionUpdateReq struct {
-	CurrentUser string      `json:"-"`
-	UserUUID    string      `json:"-"` // target user or org uuid
-	OpUserUUID  string      `json:"-"` // operator user uuid
-	EventUUID   uuid.UUID   `json:"-"`
-	SkuType     SKUType     `json:"sku_type" binding:"required,oneof=1 2"`
-	ResourceID  string      `json:"resource_id" binding:"required"`
-	SkuUnitType SkuUnitType `json:"sku_unit_type" binding:"required,oneof=month"`
+	CurrentUser string                       `json:"-"`
+	UserUUID    string                       `json:"-"` // target user or org uuid
+	OpUserUUID  string                       `json:"-"` // operator user uuid
+	EventUUID   uuid.UUID                    `json:"-"`
+	SkuType     SKUType                      `json:"sku_type" binding:"required,oneof=1 2 4"`
+	ResourceID  string                       `json:"resource_id" binding:"required"`
+	SkuUnitType SkuUnitType                  `json:"sku_unit_type" binding:"required,oneof=month"`
+	License     *SubscriptionLicenseTemplate `json:"-"`
+}
+
+type SubscriptionLicenseTemplate struct {
+	Company string
+	Email   string
+	Product LicenseProduct
+	Edition string
+	MaxUser int
+}
+
+type SubscriptionRenewReq struct {
+	EventUUID uuid.UUID
+	License   *SubscriptionLicenseTemplate
 }
 
 type SubscriptionResp struct {

@@ -89,6 +89,9 @@
   "Tag.I18nKey.relation-extraction": {
     "other": "关系抽取"
   },
+  "Tag.I18nKey.typed-decisions": {
+    "other": "类型化决策"
+  },
   "Tag.I18nKey.auto-speech-recognition": {
     "other": "自动语音识别"
   },

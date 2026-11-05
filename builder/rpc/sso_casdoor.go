@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math"
 	"strings"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
@@ -15,7 +14,8 @@ import (
 )
 
 type casdoorClientImpl struct {
-	casClient *casdoorsdk.Client
+	casClient       *casdoorsdk.Client
+	invitationQuota int
 }
 
 // casdoorOAuthError hides arbitrary SDK response text while preserving its cause.
@@ -28,10 +28,11 @@ var (
 	_ SSOInterface = (*casdoorClientImpl)(nil)
 )
 
-func NewCasdoorClient(c *casdoorsdk.AuthConfig) SSOInterface {
+func NewCasdoorClient(c *casdoorsdk.AuthConfig, invitationQuota int) SSOInterface {
 	client := casdoorsdk.NewClientWithConf(c)
 	return &casdoorClientImpl{
-		casClient: client,
+		casClient:       client,
+		invitationQuota: invitationQuota,
 	}
 }
 
@@ -141,6 +142,12 @@ func (c *casdoorClientImpl) GetOAuthToken(ctx context.Context, code, state strin
 	return token, nil
 }
 
+// BuildAuthorizationURL is not supported for casdoor, whose sign-in flow is
+// built by the frontend with the casdoor SDK and does not mandate PKCE.
+func (c *casdoorClientImpl) BuildAuthorizationURL(ctx context.Context, state string) (string, string, error) {
+	return "", "", fmt.Errorf("BuildAuthorizationURL is not supported by casdoor sso client")
+}
+
 func (c *casdoorClientImpl) DeleteUser(ctx context.Context, uuid string) error {
 	id, err := c.casClient.GetUserByUserId(uuid)
 	if err != nil {
@@ -197,7 +204,7 @@ func (c *casdoorClientImpl) CreateInvitation(ctx context.Context, code string) e
 	invitation := &casdoorsdk.Invitation{
 		Name:        fmt.Sprintf("invitation-%s", code),
 		Code:        code,
-		Quota:       math.MaxInt32,
+		Quota:       c.invitationQuota,
 		UsedCount:   0,
 		State:       "Active",
 		Application: c.casClient.ApplicationName,

@@ -3,10 +3,12 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/riverqueue/river"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/workhub"
+	"opencsg.com/csghub-server/component"
 )
 
 type testRepositoryDeletionWorker struct {
@@ -25,6 +27,8 @@ func TestNewRepositoryDeletionRiverConfig(t *testing.T) {
 		workhub.RepositoryDeletionQueue: {MaxWorkers: 3},
 	}, config.Queues)
 	require.NotNil(t, config.Workers)
+	require.NotNil(t, config.JobLease)
+	require.Equal(t, 10*time.Minute, (&component.RepositoryDeletionWorker{}).Timeout(nil))
 }
 
 func TestNewRepositoryDeletionRiverConfigDefaultsWorkerCount(t *testing.T) {

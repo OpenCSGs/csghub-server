@@ -9,6 +9,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestConfigAlipayIdentityInitialization keeps initialization enabled unless explicitly disabled.
+func TestConfigAlipayIdentityInitialization(t *testing.T) {
+	previousFile := configFile
+	SetConfigFile("")
+	t.Cleanup(func() { SetConfigFile(previousFile) })
+	for _, tc := range []struct {
+		name, value string
+		want        bool
+	}{
+		{name: "default", want: true},
+		{name: "enabled", value: "true", want: true},
+		{name: "disabled", value: "false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			const key = "OPENCSG_USER_SERVER_ENABLE_ALIPAY_IDENTITY"
+			t.Setenv(key, tc.value)
+			if tc.value == "" {
+				require.NoError(t, os.Unsetenv(key))
+			}
+			cfg, err := loadConfig()
+			require.NoError(t, err)
+			require.Equal(t, tc.want, cfg.User.EnableAlipayIdentity)
+		})
+	}
+}
+
 func TestConfig_loadConfig(t *testing.T) {
 	t.Run("frontend URL has no default", func(t *testing.T) {
 		SetConfigFile("")
@@ -128,4 +154,85 @@ func TestConfigRepositoryAccessCacheTTLTOML(t *testing.T) {
 	cfg, err := loadConfig()
 	require.NoError(t, err)
 	require.Equal(t, 75, cfg.Search.RepositoryAccessListCacheTTL)
+}
+
+func TestConfigCasdoorInvitationQuota(t *testing.T) {
+	previous := configFile
+	t.Cleanup(func() { SetConfigFile(previous) })
+	const key = "STARHUB_SERVER_CASDOOR_INVITATION_QUOTA"
+	t.Setenv(key, "")
+	require.NoError(t, os.Unsetenv(key))
+	SetConfigFile("")
+	cfg, err := loadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 50, cfg.Casdoor.InvitationQuota)
+
+	path := filepath.Join(t.TempDir(), "casdoor.toml")
+	require.NoError(t, os.WriteFile(path, []byte("[casdoor]\ninvitation_quota = 75\n"), 0600))
+	SetConfigFile(path)
+	cfg, err = loadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 75, cfg.Casdoor.InvitationQuota)
+
+	t.Setenv(key, "100")
+	cfg, err = loadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 100, cfg.Casdoor.InvitationQuota)
+}
+
+// TestConfigCORSAllowedOrigins verifies the CORS whitelist default, env and toml parsing.
+func TestConfigCORSAllowedOrigins(t *testing.T) {
+	t.Run("env list", func(t *testing.T) {
+		SetConfigFile("")
+		t.Setenv("STARHUB_SERVER_CORS_ALLOWED_ORIGINS", "https://hub.opencsg.com,https://*.opencsg.com")
+		cfg, err := loadConfig()
+		require.NoError(t, err)
+		require.Equal(t, []string{"https://hub.opencsg.com", "https://*.opencsg.com"}, cfg.CORS.AllowedOrigins)
+	})
+
+	t.Run("toml list", func(t *testing.T) {
+		previous := configFile
+		t.Cleanup(func() { SetConfigFile(previous) })
+		path := filepath.Join(t.TempDir(), "cors.toml")
+		require.NoError(t, os.WriteFile(path, []byte("[cors]\nallowed_origins = [\"https://example.com\"]\n"), 0600))
+		SetConfigFile(path)
+		cfg, err := loadConfig()
+		require.NoError(t, err)
+		require.Equal(t, []string{"https://example.com"}, cfg.CORS.AllowedOrigins)
+	})
+
+	t.Run("default list is empty and falls back to derivation", func(t *testing.T) {
+		SetConfigFile("")
+		previous, wasSet := os.LookupEnv("STARHUB_SERVER_CORS_ALLOWED_ORIGINS")
+		require.NoError(t, os.Unsetenv("STARHUB_SERVER_CORS_ALLOWED_ORIGINS"))
+		t.Cleanup(func() {
+			if wasSet {
+				_ = os.Setenv("STARHUB_SERVER_CORS_ALLOWED_ORIGINS", previous)
+			}
+		})
+		cfg, err := loadConfig()
+		require.NoError(t, err)
+		require.Empty(t, cfg.CORS.AllowedOrigins)
+	})
+}
+
+func TestRouterGenerationDefaultsAndOverrides(t *testing.T) {
+	SetConfigFile("")
+	for _, key := range []string{"OPENCSG_AIGATEWAY_ROUTER_GENERATION_ENABLED", "OPENCSG_AIGATEWAY_ROUTER_CACHE_ENVIRONMENT", "OPENCSG_AIGATEWAY_ROUTER_CACHE_NAMESPACE"} {
+		t.Setenv(key, "")
+		require.NoError(t, os.Unsetenv(key))
+	}
+	cfg, err := loadConfig()
+	require.NoError(t, err)
+	require.True(t, cfg.AIGateway.SemanticRouter.GenerationEnabled)
+	require.Equal(t, "default", cfg.AIGateway.SemanticRouter.CacheEnvironment)
+	require.Equal(t, "csghub", cfg.AIGateway.SemanticRouter.CacheNamespace)
+	t.Setenv("OPENCSG_AIGATEWAY_ROUTER_GENERATION_ENABLED", "false")
+	t.Setenv("OPENCSG_AIGATEWAY_ROUTER_CACHE_ENVIRONMENT", "stg")
+	t.Setenv("OPENCSG_AIGATEWAY_ROUTER_CACHE_NAMESPACE", "isolated")
+	cfg, err = loadConfig()
+	require.NoError(t, err)
+	require.False(t, cfg.AIGateway.SemanticRouter.GenerationEnabled)
+	require.Equal(t, "stg", cfg.AIGateway.SemanticRouter.CacheEnvironment)
+	require.Equal(t, "isolated", cfg.AIGateway.SemanticRouter.CacheNamespace)
 }

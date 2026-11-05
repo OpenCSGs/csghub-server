@@ -24,7 +24,13 @@ import (
 type extendRepoImpl struct{}
 type advancedRepoInterface interface{}
 
+// NewRepoComponent constructs repository dependencies with transactional cleanup and permission producers.
 func NewRepoComponent(config *config.Config) (RepoComponent, error) {
+	tupleJobs, err := newRebacTupleJobClient()
+	if err != nil {
+		return nil, err
+	}
+
 	c := &repoComponentImpl{}
 	repositoryAccessCache, err := storecache.NewCache(context.Background(), storecache.RedisConfig{
 		Addr:     config.Redis.Endpoint,
@@ -45,7 +51,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.repoStore = database.NewRepoStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
+	c.repoStore = database.NewRepoStoreWithDBAndJobClients(database.GetDB(), deletionJobClient, tupleJobs)
 	c.repoFileStore = database.NewRepoFileStore()
 	c.repoRelationsStore = database.NewRepoRelationsStore()
 	c.repoStatisticsStore = database.NewRepositoryStatisticsStore()
@@ -145,9 +151,9 @@ func (c *repoComponentImpl) authorizeVisibilityChange(_ database.User, _ types.R
 	return nil
 }
 
-// allowPublic adds no further restriction to public repositories in CE.
-func (c *repoComponentImpl) allowPublic(_ *database.Repository) error {
-	return nil
+// allowPublic permits CE public settings without a sensitive-check persistence guard.
+func (c *repoComponentImpl) allowPublic(_ *database.Repository) (requireSensitiveCheck bool, err error) {
+	return false, nil
 }
 
 func (c *repoComponentImpl) RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error) {

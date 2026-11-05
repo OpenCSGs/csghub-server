@@ -112,23 +112,33 @@ func TestSkillHandler_CreateMirrorAuthInvalid(t *testing.T) {
 	})
 }
 
-// TestSkillHandler_CreateMirrorSourceBadRequest verifies malformed mirror source URLs return a bad request.
+// TestSkillHandler_CreateMirrorSourceBadRequest verifies both generic and dedicated source URL errors return HTTP 400.
 func TestSkillHandler_CreateMirrorSourceBadRequest(t *testing.T) {
-	tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
-		return h.Create
-	})
-	tester.WithUser()
+	for _, tc := range []struct {
+		name string
+		err  error
+		code string
+	}{
+		{"generic request error", errorx.BadRequest(fmt.Errorf("invalid source git clone url"), errorx.Ctx()), "REQ-ERR-0"},
+		{"source URL error", errorx.MirrorSourceURLInvalid(fmt.Errorf("invalid source git clone url"), errorx.Ctx()), "MIRROR-ERR-8"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+				return h.Create
+			})
+			tester.WithUser()
 
-	req := &types.CreateSkillReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
-	badRequestErr := errorx.BadRequest(fmt.Errorf("invalid source git clone url"), errorx.Ctx())
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
-	tester.mocks.skill.EXPECT().Create(tester.Ctx(), req).Return(nil, badRequestErr)
-	tester.WithBody(t, req).Execute()
+			req := &types.CreateSkillReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+			tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+			tester.mocks.skill.EXPECT().Create(tester.Ctx(), req).Return(nil, tc.err)
+			tester.WithBody(t, req).Execute()
 
-	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
-		Code: "REQ-ERR-0",
-		Msg:  "REQ-ERR-0: invalid source git clone url",
-	})
+			tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
+				Code: tc.code,
+				Msg:  tc.code + ": invalid source git clone url",
+			})
+		})
+	}
 }
 
 func TestSkillHandler_Index(t *testing.T) {

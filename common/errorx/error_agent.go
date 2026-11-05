@@ -38,9 +38,40 @@ const (
 	agentExecutionSessionBusy
 	agentExecutionCapacityExceeded
 	agentGuestUsageLimitExceeded
+	agentTemplateFieldManaged
+	agentModelTaskUnsupported
+	agentModelFunctionCallUnsupported
+	agentDefaultModelUnavailable
+	agentAIGatewayURLInvalid
+	agentModelLookupFailed
 )
 
 var (
+	// en-US: Model {{.model}} must support text-generation for {{.instance_type}}
+	// zh-CN: 模型 {{.model}} 必须支持文本生成才能用于 {{.instance_type}}
+	// zh-HK: 模型 {{.model}} 必須支援文字生成才能用於 {{.instance_type}}
+	ErrAgentModelTaskUnsupported error = CustomError{prefix: errAgentPrefix, code: agentModelTaskUnsupported}
+
+	// en-US: Model {{.model}} must support function calling for {{.instance_type}}
+	// zh-CN: 模型 {{.model}} 必须支持函数调用才能用于 {{.instance_type}}
+	// zh-HK: 模型 {{.model}} 必須支援函數呼叫才能用於 {{.instance_type}}
+	ErrAgentModelFunctionCallUnsupported error = CustomError{prefix: errAgentPrefix, code: agentModelFunctionCallUnsupported}
+
+	// en-US: No eligible default model is available for {{.instance_type}}
+	// zh-CN: 没有适用于 {{.instance_type}} 的默认模型
+	// zh-HK: 沒有適用於 {{.instance_type}} 的預設模型
+	ErrAgentDefaultModelUnavailable error = CustomError{prefix: errAgentPrefix, code: agentDefaultModelUnavailable}
+
+	// en-US: AI Gateway model service configuration is invalid
+	// zh-CN: AI 网关模型服务配置无效
+	// zh-HK: AI 網關模型服務設定無效
+	ErrAgentAIGatewayURLInvalid error = CustomError{prefix: errAgentPrefix, code: agentAIGatewayURLInvalid}
+
+	// en-US: Failed to retrieve AI Gateway models for {{.instance_type}}
+	// zh-CN: 无法获取 {{.instance_type}} 的 AI Gateway 模型
+	// zh-HK: 無法取得 {{.instance_type}} 的 AI Gateway 模型
+	ErrAgentModelLookupFailed error = CustomError{prefix: errAgentPrefix, code: agentModelLookupFailed}
+
 	// CSGClaw subdomain is invalid. Subdomains must be 1-63 lowercase letters,
 	// digits, or hyphens and start/end with a letter or digit.
 	ErrCSGClawSubdomainInvalid error = CustomError{prefix: errAgentPrefix, code: csgclawSubdomainInvalid}
@@ -290,6 +321,19 @@ var (
 	// zh-HK: {{.template_type}} 智能體模板由程式碼倉庫托管，不能通過 API 建立
 	ErrCSGClawTemplateCreationForbidden error = CustomError{prefix: errAgentPrefix, code: csgclawTemplateCreationForbidden}
 
+	// a repository-managed agent template field cannot be modified via the API
+	//
+	// Description: A field on a repository-managed agent template is controlled by the code repository and cannot be modified via the API. The error message includes the field name.
+	//
+	// Description_ZH: 代码仓库托管的智能体模板字段由代码仓库控制，不能通过 API 修改。错误消息中包含字段名称。
+	//
+	// en-US: field {{.field}} is managed by the code repository and cannot be modified
+	//
+	// zh-CN: 字段 {{.field}} 由代码仓库托管，不能修改
+	//
+	// zh-HK: 欄位 {{.field}} 由程式碼倉庫托管，不能修改
+	ErrAgentTemplateFieldManaged error = CustomError{prefix: errAgentPrefix, code: agentTemplateFieldManaged}
+
 	// an agent provision request field is null but must not be
 	//
 	// Description: A field in the agent instance provision request metadata is null. The error message includes the agent instance type and the offending field.
@@ -331,15 +375,15 @@ var (
 
 	// a pinned llm model is not available for the agent provision request
 	//
-	// Description: The model pinned in the agent instance provision request is not in the available llm model catalog. The error message includes the model name and the agent instance type.
+	// Description: The model pinned in the agent instance provision request is not in the available text-generation model catalog. The error message includes the model name.
 	//
-	// Description_ZH: 智能体实例部署请求中指定的模型不在可用 llm 模型目录中。错误消息中包含模型名称和智能体实例类型。
+	// Description_ZH: 智能体实例部署请求中指定的模型不在可用文本生成模型目录中。错误消息中包含模型名称。
 	//
-	// en-US: llm model {{.model}} is not available for {{.instance_type}}
+	// en-US: Available text-generation model {{.model}} was not found
 	//
-	// zh-CN: llm 模型 {{.model}} 不适用于 {{.instance_type}}
+	// zh-CN: 未找到可用的文本生成模型 {{.model}}
 	//
-	// zh-HK: llm 模型 {{.model}} 不適用於 {{.instance_type}}
+	// zh-HK: 未找到可用的文字生成模型 {{.model}}
 	ErrAgentProvisionRequestModelUnavailable error = CustomError{prefix: errAgentPrefix, code: agentProvisionRequestModelUnavailable}
 
 	// csgclaw agent template not found for the repository path
@@ -673,6 +717,15 @@ func CSGClawTemplateNotFound(err error, ctx context) error {
 	}
 }
 
+func AgentTemplateFieldManaged(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentTemplateFieldManaged),
+	}
+}
+
 func AgentTemplateSensitiveCheckCreateAgentBlocked(err error, ctx context) error {
 	return CustomError{
 		prefix:  errAgentPrefix,
@@ -743,4 +796,24 @@ func AgentGuestUsageLimitExceeded(err error, ctx context) error {
 		err:     err,
 		code:    int(agentGuestUsageLimitExceeded),
 	}
+}
+
+func AgentModelTaskUnsupported(err error, ctx context) error {
+	return CustomError{prefix: errAgentPrefix, code: agentModelTaskUnsupported, err: err, context: ctx}
+}
+
+func AgentModelFunctionCallUnsupported(err error, ctx context) error {
+	return CustomError{prefix: errAgentPrefix, code: agentModelFunctionCallUnsupported, err: err, context: ctx}
+}
+
+func AgentDefaultModelUnavailable(err error, ctx context) error {
+	return CustomError{prefix: errAgentPrefix, code: agentDefaultModelUnavailable, err: err, context: ctx}
+}
+
+func AgentAIGatewayURLInvalid(err error, ctx context) error {
+	return CustomError{prefix: errAgentPrefix, code: agentAIGatewayURLInvalid, err: err, context: ctx}
+}
+
+func AgentModelLookupFailed(err error, ctx context) error {
+	return CustomError{prefix: errAgentPrefix, code: agentModelLookupFailed, err: err, context: ctx}
 }

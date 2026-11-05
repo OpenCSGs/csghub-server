@@ -117,28 +117,9 @@ func TestTiktokenTokenizerImpl(t *testing.T) {
 		// This should be a vLLM tokenizer, not tiktoken
 	})
 
-	t.Run("Nil tokenizer when no imageID and unsupported model", func(t *testing.T) {
-		// Provider set but model doesn't match "gpt" or "deepseek"
-		tk := token.NewTokenizerImpl("", "", "unknown-model", "", "some-provider")
-		assert.Nil(t, tk)
-	})
-
-	t.Run("Nil tokenizer when no imageID and no provider", func(t *testing.T) {
-		tk := token.NewTokenizerImpl("", "", "", "", "")
-		assert.Nil(t, tk)
-	})
-}
-
-func TestGeminiTokenizerImpl(t *testing.T) {
-	t.Run("returns nil when model file not found", func(t *testing.T) {
-		tk := token.NewTokenizerImpl("", "", "gemini-pro", "", "google")
-		// Without GEMINI_SP_MODEL_PATH set and default path not existing,
-		// tokenizer should return nil
-		assert.Nil(t, tk)
-	})
-
-	t.Run("returns nil for gemini provider when model file not found", func(t *testing.T) {
-		tk := token.NewTokenizerImpl("", "", "gemini-pro", "", "gemini")
-		assert.Nil(t, tk)
-	})
+	// Unmatched imageID/provider combinations used to return nil (no billing);
+	// they now get the cl100k_base fallback. Those cases are covered by
+	// TestNewTokenizerImplFallback in tokenizer_fallback_test.go, which
+	// injects an offline tokenizer because the real fallback downloads the
+	// cl100k_base BPE file on first use.
 }

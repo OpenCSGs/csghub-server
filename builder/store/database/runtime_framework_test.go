@@ -564,3 +564,51 @@ func TestRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions(t *testing.T) {
 		require.Equal(t, 0, len(result))
 	})
 }
+
+func TestRuntimeFrameworksStore_ListByArchsNameAndType_DeduplicatesByFrameworkID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
+	raStore := database.NewRuntimeArchitecturesStoreWithDB(db)
+
+	// Create a runtime framework (laya, gpu, 0.3.22)
+	rf, err := rfStore.Add(ctx, database.RuntimeFramework{
+		FrameName:     "laya",
+		FrameVersion:  "0.3.22",
+		FrameImage:    "opencsghq/laya:0.3.22",
+		ComputeType:   "gpu",
+		Type:          1,
+		Enabled:       1,
+		ContainerPort: 8000,
+		ModelFormat:   "safetensors",
+	})
+	require.Nil(t, err)
+
+	// Create two runtime architectures for the same framework: one matching
+	// by architecture_name, one matching by model_name. This simulates laya's
+	// config which declares both supported_archs and supported_models, causing
+	// the OR query (architecture_name IN ... OR model_name = ...) to match two
+	// rows for the same RuntimeFramework.
+	err = raStore.Add(ctx, database.RuntimeArchitecture{
+		RuntimeFrameworkID: rf.ID,
+		ArchitectureName:   "LayaTypedDecisions",
+	})
+	require.Nil(t, err)
+
+	err = raStore.Add(ctx, database.RuntimeArchitecture{
+		RuntimeFrameworkID: rf.ID,
+		ModelName:          "laya",
+	})
+	require.Nil(t, err)
+
+	// Query with archs=["LayaTypedDecisions"] and name="laya" — both
+	// RuntimeArchitecture rows match the OR condition, so without deduplication
+	// the same RuntimeFramework would appear twice.
+	result, err := rfStore.ListByArchsNameAndType(ctx, "laya", "safetensors", []string{"LayaTypedDecisions"}, 1)
+	require.Nil(t, err)
+	require.Len(t, result, 1, "duplicate RuntimeFramework entries should be deduplicated")
+	require.Equal(t, rf.ID, result[0].ID)
+	require.Equal(t, "laya", result[0].FrameName)
+}

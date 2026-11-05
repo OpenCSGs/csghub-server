@@ -74,7 +74,6 @@ func (h *Handler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 		Model:         req.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -167,7 +166,6 @@ func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.
 	// trace completion, and LLM training log publishing.
 	h.runPostProcessAsync(c.Request.Context(), postProcessInput{
 		NSUUID:          meta.TenantID,
-		ApiKey:          httpbase.GetAccessToken(c),
 		TokenID:         httpbase.GetCurrentTokenID(c),
 		Model:           modelOf(p),
 		TargetModelName: targetModelName(p),
@@ -245,6 +243,11 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 			return
 		case types.PlanErrModelUnavailable:
 			writeError(c, http.StatusServiceUnavailable, ErrTypeModelUnavailable, err.Error())
+			return
+		case types.PlanErrUpstreamPriorityDenied:
+			// The caller's user-tag priority admits no available upstream of
+			// this model: a client-facing 403, not an outage.
+			writeError(c, http.StatusForbidden, ErrTypePermission, err.Error())
 			return
 		case types.PlanErrInsufficientBalance:
 			writeError(c, http.StatusPaymentRequired, ErrTypeInsufficientBal,
@@ -378,7 +381,7 @@ func (h *Handler) runPostProcessAsync(ctx context.Context, input postProcessInpu
 
 		// Record usage (only on successful status).
 		if h.UsageRecorder != nil && input.Model != nil && input.Usage != nil && isSuccessfulStatus(input.StatusCode) {
-			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.toUsage(), input.ApiKey, input.TokenID); err != nil {
+			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.toUsage(), input.TokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 			}
 		}

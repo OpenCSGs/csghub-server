@@ -94,6 +94,9 @@ type Planner interface {
 // returns, covering both the success and error paths so every protocol
 // handler no longer needs to call SetMetricsModelTarget individually.
 type MetricsEnricher interface {
+	// SetRequestModel records the model ID the client asked for, before
+	// automatic routing replaces it with the concrete model.
+	SetRequestModel(c *gin.Context, requestModel string)
 	SetModelTarget(c *gin.Context, modelID string, target *types.ModelTarget, isStream bool)
 }
 

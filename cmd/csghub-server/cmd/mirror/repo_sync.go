@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
+	sharedcomponent "opencsg.com/csghub-server/component"
 	mirrorcomponent "opencsg.com/csghub-server/mirror/component"
 	"opencsg.com/csghub-server/mirror/reposyncer"
 	"opencsg.com/csghub-server/mirror/router"
@@ -75,11 +76,19 @@ var repoSyncCmd = &cobra.Command{
 			return fmt.Errorf("failed to create workhub job client: %w", err)
 		}
 
+		reporter := sharedcomponent.NewMirrorMetricsReporter(cfg, "repo")
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			reporter.Stop(ctx)
+		}()
+
 		repoWorkClient, err := mirrorcomponent.NewRepoWorkClient(context.Background(), cfg.Database.DSN, mirrorcomponent.RepoWorkDeps{
 			MirrorTaskStore: database.NewMirrorTaskJobStore(),
 			Syncer:          repoSyncer,
 			LFSJobClient:    workhub.NewMirrorLFSJobClient(jobClient, workhub.MirrorJobClientConfig{MaxRetryCount: cfg.Mirror.MaxRetryCount}),
 			MaxWorkers:      cfg.Mirror.WorkerNumber,
+			Reporter:        reporter,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create repo workhub client: %w", err)
@@ -87,7 +96,9 @@ var repoSyncCmd = &cobra.Command{
 		if err := repoWorkClient.Start(context.Background()); err != nil {
 			return fmt.Errorf("failed to start repo workhub client: %w", err)
 		}
+		reporter.SetState("ready")
 		defer func() {
+			reporter.SetState("stopping")
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := repoWorkClient.Stop(ctx); err != nil {

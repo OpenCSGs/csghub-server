@@ -7,23 +7,27 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
-// Jev error type constants.  System One has no documented error envelope of
-// its own, so the gateway renders errors in the OpenAI-compatible shape used
-// across its other endpoints: {"error": {"code", "message", "type"}}.
+// Jev error type constants, aliased onto the shared aigateway vocabulary so
+// the wire values have a single definition point.  System One has no
+// documented error envelope of its own, so the gateway renders errors in the
+// OpenAI-compatible shape used across its other endpoints:
+// {"error": {"code", "message", "type"}} — and this renderer mirrors the
+// code value into the type, so the specific-value aliases below point at the
+// shared code vocabulary.
 const (
-	ErrTypeInvalidRequest   = "invalid_request_error"
-	ErrTypeAuthentication   = "authentication_error"
-	ErrTypePermission       = "permission_error"
-	ErrTypeNotFound         = "not_found_error"
-	ErrTypeRateLimit        = "rate_limit_error"
-	ErrTypeTimeout          = "timeout_error"
-	ErrTypeAPI              = "api_error"
-	ErrTypeUnsupported      = "unsupported_feature"
-	ErrTypeContentPolicy    = "content_policy_violation"
-	ErrTypeInsufficientBal  = "insufficient_balance"
-	ErrTypeInternal         = "internal_error"
-	ErrTypeModelNotFound    = "model_not_found"
-	ErrTypeModelUnavailable = "model_unavailable"
+	ErrTypeInvalidRequest   = types.ErrTypeInvalidRequest
+	ErrTypeAuthentication   = types.ErrTypeAuthentication
+	ErrTypePermission       = types.ErrTypePermission
+	ErrTypeNotFound         = types.ErrTypeNotFound
+	ErrTypeRateLimit        = types.ErrTypeRateLimit
+	ErrTypeTimeout          = types.ErrTypeTimeout
+	ErrTypeAPI              = types.ErrTypeAPI
+	ErrTypeUnsupported      = types.ErrCodeUnsupportedFeature
+	ErrTypeContentPolicy    = types.ErrCodeContentPolicyViolation
+	ErrTypeInsufficientBal  = types.ErrCodeInsufficientBalance
+	ErrTypeInternal         = types.ErrCodeInternal
+	ErrTypeModelNotFound    = types.ErrCodeModelNotFound
+	ErrTypeModelUnavailable = types.ErrCodeModelUnavailable
 )
 
 // writeError sends a gateway error response in the OpenAI-compatible shape.

@@ -17,22 +17,26 @@ import (
 	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/database/migrations"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
 
+// TestRepoStore_UpdateDescriptionIfEmpty verifies that existing descriptions are preserved.
 func TestRepoStore_UpdateDescriptionIfEmpty(t *testing.T) {
 	ctx := context.Background()
 	db := tests.InitTestDB()
-	store := database.NewRepoStoreWithDB(db)
-	repo, err := store.CreateRepo(ctx, database.Repository{
+	defer db.Close()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         123,
 		Path:           "description-owner/description-repo",
 		GitPath:        "models_description-owner/description-repo",
 		Name:           "description-repo",
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.NoError(t, err)
 
 	descriptionStore := store.(database.RepoDescriptionStore)
@@ -47,6 +51,36 @@ func TestRepoStore_UpdateDescriptionIfEmpty(t *testing.T) {
 	got, err := store.FindById(ctx, repo.ID)
 	require.NoError(t, err)
 	require.Equal(t, "generated description", got.Description)
+}
+
+func TestRepoStore_UpdateRepoPreservesXnetMigrationIntent(t *testing.T) {
+	ctx := context.Background()
+	db := tests.InitTestDB()
+	defer db.Close()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+
+	for _, intent := range []database.XnetMigrationIntent{database.XnetMigrationActive, database.XnetMigrationPaused} {
+		t.Run(string(intent), func(t *testing.T) {
+			repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+				UserID: 991, Path: "intent-owner/" + string(intent), GitPath: "models_intent-owner/" + string(intent),
+				Name: string(intent), RepositoryType: types.ModelRepo,
+			}))
+			require.NoError(t, err)
+			_, err = db.Core.NewUpdate().Model((*database.Repository)(nil)).
+				Set("xnet_migration_intent = ?", intent).Where("id = ?", repo.ID).Exec(ctx)
+			require.NoError(t, err)
+
+			repo.XnetMigrationIntent = database.XnetMigrationInactive
+			repo.Nickname = "unrelated update"
+			_, err = store.UpdateRepo(ctx, *repo)
+			require.NoError(t, err)
+
+			var reloaded database.Repository
+			require.NoError(t, db.Core.NewSelect().Model(&reloaded).Where("id = ?", repo.ID).Scan(ctx))
+			require.Equal(t, intent, reloaded.XnetMigrationIntent)
+			require.Equal(t, "unrelated update", reloaded.Nickname)
+		})
+	}
 }
 
 type updateNamespaceLockHook struct {
@@ -160,10 +194,12 @@ func TestRepositoryGitalyPath(t *testing.T) {
 
 func TestRepoStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
+	seedTupleNamespace(t, db, "u")
+	seedTupleNamespace(t, db, "bars_u")
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	_, err := store.CreateRepo(ctx, database.Repository{
 		Name:           "repo1",
@@ -264,6 +300,7 @@ func TestRepoStore_CRUD(t *testing.T) {
 
 }
 
+// TestRepoStore_UpdateRepoSerializesMoveWithOrganizationDeletion includes a concurrent move in deletion cleanup.
 func TestRepoStore_UpdateRepoSerializesMoveWithOrganizationDeletion(t *testing.T) {
 	db := tests.InitTransactionTestDB()
 	defer db.Close()
@@ -272,14 +309,14 @@ func TestRepoStore_UpdateRepoSerializesMoveWithOrganizationDeletion(t *testing.T
 	user := createOrganizationUnitMemberTestUser(t, ctx, db, "repository-move-delete-user")
 	orgPath := "repository-move-delete-target"
 	orgUUID := uuid.New()
-	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
-	repoStore := database.NewRepoStoreWithDB(db)
+	orgStore := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	require.NoError(t, orgStore.Create(ctx,
 		&database.Organization{Name: orgPath, Nickname: orgPath, UUID: orgUUID, UserID: user.ID},
 		&database.Namespace{Path: orgPath, UUID: orgUUID.String(), UserID: user.ID},
 	))
 	_, err := db.Core.NewInsert().Model(&database.Namespace{
-		Path: "repository-move-delete-source", UUID: uuid.NewString(), UserID: user.ID,
+		Path: "repository-move-delete-source", UUID: uuid.NewString(), UserID: user.ID, NamespaceType: database.UserNamespace,
 	}).Exec(ctx)
 	require.NoError(t, err)
 	repo, err := repoStore.CreateRepo(ctx, database.Repository{
@@ -360,6 +397,7 @@ func TestRepoStore_UpdateRepoSerializesMoveWithOrganizationDeletion(t *testing.T
 	require.Equal(t, "repository-move-delete-source/repo-after-delete", repoAfterDelete.Path)
 }
 
+// TestRepoStore_UpdateRepoMoveOutUsesNamespaceBeforeRepositoryLockOrder preserves lock ordering during a move out.
 func TestRepoStore_UpdateRepoMoveOutUsesNamespaceBeforeRepositoryLockOrder(t *testing.T) {
 	db := tests.InitTransactionTestDB()
 	defer db.Close()
@@ -369,8 +407,8 @@ func TestRepoStore_UpdateRepoMoveOutUsesNamespaceBeforeRepositoryLockOrder(t *te
 	sourcePath := "repository-move-out-source"
 	targetPath := "repository-move-out-target"
 	orgUUID := uuid.New()
-	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
-	repoStore := database.NewRepoStoreWithDB(db)
+	orgStore := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	require.NoError(t, orgStore.Create(ctx,
 		&database.Organization{Name: sourcePath, Nickname: sourcePath, UUID: orgUUID, UserID: user.ID},
 		&database.Namespace{Path: sourcePath, UUID: orgUUID.String(), UserID: user.ID},
@@ -438,8 +476,8 @@ func TestRepoStore_MixedCaseCrossNamespaceMoveSerializesWithRootDeletion(t *test
 	defer db.Close()
 	ctx := context.Background()
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "mixed-case-root-delete-user")
-	unitStore := database.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
-	repoStore := database.NewRepoStoreWithDB(db)
+	unitStore := database.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	rootUUID := uuid.New()
 	root, err := unitStore.CreateRoot(ctx, database.CreateRootOrganizationInput{
 		Organization: &database.Organization{Name: "mixedCaseMiddle", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
@@ -500,13 +538,14 @@ func TestRepoStore_UpdateRepoFileDownloads(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := store.CreateRepo(ctx, database.Repository{
+	repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:    "u/bar",
 		Name:    "repo1",
 		UserID:  123,
 		GitPath: "foos_u/bar",
-	})
+	}))
 	require.Nil(t, err)
 
 	dt := time.Date(2022, 12, 11, 0, 0, 0, 0, time.UTC)
@@ -538,13 +577,14 @@ func TestRepoStore_UpdateRepoCloneDownloads(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := store.CreateRepo(ctx, database.Repository{
+	repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:    "u/bar",
 		Name:    "repo1",
 		UserID:  123,
 		GitPath: "foos_u/bar",
-	})
+	}))
 	require.Nil(t, err)
 
 	dt := time.Date(2022, 12, 11, 0, 0, 0, 0, time.UTC)
@@ -577,11 +617,12 @@ func TestRepoStore_Tags(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	repo, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:   "fixtures/repo1",
 		Name:   "repo1",
 		UserID: 123,
-	})
+	}))
 	require.Nil(t, err)
 
 	tag := &database.Tag{
@@ -625,14 +666,14 @@ func TestRepoStore_SetUpdateTimeByPath(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	repo, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "repo1",
 		UserID:         123,
 		GitPath:        "models_u/bar",
 		RepositoryType: types.ModelRepo,
 		Path:           "u/bar",
-	})
+	}))
 	require.Nil(t, err)
 
 	dt := time.Date(2022, 12, 6, 1, 2, 0, 0, time.UTC)
@@ -657,10 +698,10 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 	config.Search.RepoSearchLimit = 10
 	config.Database.Driver = "pg"
 	config.Database.SearchConfiguration = "opencsgchinese"
-	rs := database.NewRepoStoreWithCache(config, db, cache.NewCacheWithClient(ctx, redisClient))
+	rs := database.NewRepoStoreWithCacheAndRebacTupleJobClient(config, db, cache.NewCacheWithClient(ctx, redisClient), tests.NewFixtureRebacTupleJobClient(db))
 	userName := "user_name_" + uuid.NewString()
 	repoName := "repo_name_" + uuid.NewString()
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName, repoName),
 		GitPath:        fmt.Sprintf("datasets_%s/%s", userName, repoName),
@@ -670,7 +711,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Description:    "ww",
 		Private:        false,
 		RepositoryType: types.DatasetRepo,
-	})
+	}))
 	require.Empty(t, err)
 	require.NotNil(t, repo)
 	ds := database.NewDatasetStoreWithDB(db)
@@ -791,7 +832,9 @@ func defineTestCases(hasZhparser bool) []repoSearchCase {
 	return append(zhparserCases, commonCases...)
 }
 
-func setupTestRepositories(ctx context.Context, store database.RepoStore, db *database.DB) ([]*database.Repository, error) {
+// setupTestRepositories prepares searchable repositories with their namespace owners.
+func setupTestRepositories(t *testing.T, ctx context.Context, store database.RepoStore, db *database.DB) ([]*database.Repository, error) {
+	t.Helper()
 	repos := []*database.Repository{
 		{
 			Name:           "ChineseMedicalBooksCollection",
@@ -883,7 +926,7 @@ func setupTestRepositories(ctx context.Context, store database.RepoStore, db *da
 
 	for _, repo := range repos {
 		repo.GitPath = repo.Path
-		rn, err := store.CreateRepo(ctx, *repo)
+		rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, *repo))
 		if err != nil {
 			return nil, err
 		}
@@ -933,9 +976,9 @@ func TestRepoStore_PublicToUserSearch_Sqlite(t *testing.T) {
 	config.Search.RepoSearchCacheTTL = 300
 	config.Search.RepoSearchLimit = 10
 	config.Database.Driver = "sqlite"
-	store := database.NewRepoStoreWithCache(config, db, cache.NewCacheWithClient(ctx, redisClient))
+	store := database.NewRepoStoreWithCacheAndRebacTupleJobClient(config, db, cache.NewCacheWithClient(ctx, redisClient), tests.NewFixtureRebacTupleJobClient(db))
 
-	_, err := setupTestRepositories(ctx, store, db)
+	_, err := setupTestRepositories(t, ctx, store, db)
 	require.Nil(t, err)
 	cases := []repoSearchCase{
 		{
@@ -981,11 +1024,11 @@ func TestRepoStore_PublicToUserWithAccessFiltersPrivateRepositories(t *testing.T
 	config := &config.Config{}
 	config.Database.Driver = "sqlite"
 	config.Search.RepoSearchLimit = 20
-	store := database.NewRepoStoreWithCache(config, db, nil)
+	store := database.NewRepoStoreWithCacheAndRebacTupleJobClient(config, db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	_, err := setupTestRepositories(ctx, store, db)
+	_, err := setupTestRepositories(t, ctx, store, db)
 	require.NoError(t, err)
-	privateRepo, err := store.CreateRepo(ctx, database.Repository{
+	privateRepo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "private-repo",
 		Path:           "other/private-repo",
 		GitPath:        "other/private-repo",
@@ -993,7 +1036,7 @@ func TestRepoStore_PublicToUserWithAccessFiltersPrivateRepositories(t *testing.T
 		UserID:         123,
 		RepositoryType: types.CodeRepo,
 		Private:        true,
-	})
+	}))
 	require.NoError(t, err)
 	_, err = db.Core.NewInsert().Model(&database.Code{RepositoryID: privateRepo.ID}).Exec(ctx)
 	require.NoError(t, err)
@@ -1031,9 +1074,9 @@ func TestRepoStore_PublicToUserSearch(t *testing.T) {
 	config.Search.RepoSearchLimit = 10
 	config.Database.Driver = "pg"
 	config.Database.SearchConfiguration = "opencsgchinese"
-	store := database.NewRepoStoreWithCache(config, db, cache.NewCacheWithClient(ctx, redisClient))
+	store := database.NewRepoStoreWithCacheAndRebacTupleJobClient(config, db, cache.NewCacheWithClient(ctx, redisClient), tests.NewFixtureRebacTupleJobClient(db))
 
-	_, err := setupTestRepositories(ctx, store, db)
+	_, err := setupTestRepositories(t, ctx, store, db)
 	require.Nil(t, err)
 	hasZhparser, err := tests.CheckZhparser(ctx, db.BunDB, "pg")
 	require.NoError(t, err)
@@ -1129,7 +1172,7 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 			config.Search.RepoSearchLimit = 10
 			config.Database.Driver = "pg"
 			config.Database.SearchConfiguration = "opencsgchinese"
-			store := database.NewRepoStoreWithCache(config, db, cache.NewCacheWithClient(ctx, redisClient))
+			store := database.NewRepoStoreWithCacheAndRebacTupleJobClient(config, db, cache.NewCacheWithClient(ctx, redisClient), tests.NewFixtureRebacTupleJobClient(db))
 			recomStore := database.NewRecomStoreWithDB(db)
 
 			repos := []*database.Repository{
@@ -1169,7 +1212,7 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				repo.GitPath = repo.Path
 				// Use the same update time to verify ID provides deterministic tie-breaking.
 				repo.UpdatedAt = fixedUpdatedAt
-				rn, err := store.CreateRepo(ctx, *repo)
+				rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, *repo))
 				require.Nil(t, err)
 
 				// Create corresponding record in codes table for CodeRepo
@@ -1236,7 +1279,7 @@ func TestRepoStore_PublicToUserComplianceStatus(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	modelStore := database.NewModelStoreWithDB(db)
 	recomStore := database.NewRecomStoreWithDB(db)
 	repositories := []database.Repository{
@@ -1259,7 +1302,7 @@ func TestRepoStore_PublicToUserComplianceStatus(t *testing.T) {
 	}
 
 	for index, repository := range repositories {
-		repo, err := store.CreateRepo(ctx, repository)
+		repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, repository))
 		require.NoError(t, err)
 		_, err = modelStore.Create(ctx, database.Model{RepositoryID: repo.ID})
 		require.NoError(t, err)
@@ -1290,7 +1333,7 @@ func TestRepoStore_PublicToUserOwnerFilter(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	repos := []database.Repository{
 		{Name: "match", Path: "owner/match", GitPath: "owner/match", UserID: 123, RepositoryType: types.CodeRepo},
 		{Name: "other", Path: "other/match", GitPath: "other/match", UserID: 123, RepositoryType: types.CodeRepo},
@@ -1298,7 +1341,7 @@ func TestRepoStore_PublicToUserOwnerFilter(t *testing.T) {
 		{Name: "underscore-other", Path: "ownerX/match", GitPath: "ownerX/match", UserID: 123, RepositoryType: types.CodeRepo},
 	}
 	for _, repo := range repos {
-		created, err := store.CreateRepo(ctx, repo)
+		created, err := store.CreateRepo(ctx, withTupleNamespace(t, db, repo))
 		require.Nil(t, err)
 		_, err = db.Core.NewInsert().Model(&database.Code{RepositoryID: created.ID}).Exec(ctx)
 		require.Nil(t, err)
@@ -1328,17 +1371,17 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	modelStore := database.NewModelStoreWithDB(db)
 	datasetStore := database.NewDatasetStoreWithDB(db)
 
-	smallModel, err := store.CreateRepo(ctx, database.Repository{
+	smallModel, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "small-model",
 		Path:           "test/small-model",
 		GitPath:        "models_test/small-model",
 		UserID:         123,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Nil(t, err)
 	_, err = modelStore.Create(ctx, database.Model{RepositoryID: smallModel.ID})
 	require.Nil(t, err)
@@ -1349,13 +1392,13 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	}).Exec(ctx)
 	require.Nil(t, err)
 
-	largeModel, err := store.CreateRepo(ctx, database.Repository{
+	largeModel, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "large-model",
 		Path:           "test/large-model",
 		GitPath:        "models_test/large-model",
 		UserID:         123,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Nil(t, err)
 	_, err = modelStore.Create(ctx, database.Model{RepositoryID: largeModel.ID})
 	require.Nil(t, err)
@@ -1366,13 +1409,13 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	}).Exec(ctx)
 	require.Nil(t, err)
 
-	validZeroModel, err := store.CreateRepo(ctx, database.Repository{
+	validZeroModel, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "valid-zero-model",
 		Path:           "test/valid-zero-model",
 		GitPath:        "models_test/valid-zero-model",
 		UserID:         123,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Nil(t, err)
 	_, err = modelStore.Create(ctx, database.Model{RepositoryID: validZeroModel.ID})
 	require.Nil(t, err)
@@ -1383,13 +1426,13 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	}).Exec(ctx)
 	require.Nil(t, err)
 
-	invalidZeroModel, err := store.CreateRepo(ctx, database.Repository{
+	invalidZeroModel, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "invalid-zero-model",
 		Path:           "test/invalid-zero-model",
 		GitPath:        "models_test/invalid-zero-model",
 		UserID:         123,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Nil(t, err)
 	_, err = modelStore.Create(ctx, database.Model{RepositoryID: invalidZeroModel.ID})
 	require.Nil(t, err)
@@ -1400,13 +1443,13 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	}).Exec(ctx)
 	require.Nil(t, err)
 
-	noMetadataModel, err := store.CreateRepo(ctx, database.Repository{
+	noMetadataModel, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "no-metadata-model",
 		Path:           "test/no-metadata-model",
 		GitPath:        "models_test/no-metadata-model",
 		UserID:         123,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Nil(t, err)
 	_, err = modelStore.Create(ctx, database.Model{RepositoryID: noMetadataModel.ID})
 	require.Nil(t, err)
@@ -1433,14 +1476,14 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	require.Equal(t, 1, count)
 	require.Equal(t, "large-model", repos[0].Name)
 
-	smallDataset, err := store.CreateRepo(ctx, database.Repository{
+	smallDataset, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "small-dataset",
 		Path:           "test/small-dataset",
 		GitPath:        "datasets_test/small-dataset",
 		UserID:         123,
 		RepositoryType: types.DatasetRepo,
 		DefaultBranch:  "main",
-	})
+	}))
 	require.Nil(t, err)
 	_, err = datasetStore.Create(ctx, database.Dataset{RepositoryID: smallDataset.ID})
 	require.Nil(t, err)
@@ -1451,14 +1494,14 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	}).Exec(ctx)
 	require.Nil(t, err)
 
-	largeDataset, err := store.CreateRepo(ctx, database.Repository{
+	largeDataset, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "large-dataset",
 		Path:           "test/large-dataset",
 		GitPath:        "datasets_test/large-dataset",
 		UserID:         123,
 		RepositoryType: types.DatasetRepo,
 		DefaultBranch:  "main",
-	})
+	}))
 	require.Nil(t, err)
 	_, err = datasetStore.Create(ctx, database.Dataset{RepositoryID: largeDataset.ID})
 	require.Nil(t, err)
@@ -1469,14 +1512,14 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	}).Exec(ctx)
 	require.Nil(t, err)
 
-	nonDefaultBranchDataset, err := store.CreateRepo(ctx, database.Repository{
+	nonDefaultBranchDataset, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:           "non-default-branch-dataset",
 		Path:           "test/non-default-branch-dataset",
 		GitPath:        "datasets_test/non-default-branch-dataset",
 		UserID:         123,
 		RepositoryType: types.DatasetRepo,
 		DefaultBranch:  "main",
-	})
+	}))
 	require.Nil(t, err)
 	_, err = datasetStore.Create(ctx, database.Dataset{RepositoryID: nonDefaultBranchDataset.ID})
 	require.Nil(t, err)
@@ -1504,12 +1547,12 @@ func TestRepoStore_IsMirrorRepo(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	rn, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:        "codes_ns/n",
 		RepositoryType: types.CodeRepo,
 		Path:           "ns/n",
-	})
+	}))
 	require.Nil(t, err)
 	mi := &database.Mirror{RepositoryID: rn.ID}
 	_, err = db.Core.NewInsert().Model(mi).Exec(ctx)
@@ -1528,18 +1571,19 @@ func TestRepoStore_WithMirror(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	rn, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:    "ns/n",
 		GitPath: "codes_ns/n",
-	})
+	}))
 	require.Nil(t, err)
 	mi := &database.Mirror{RepositoryID: rn.ID}
 	_, err = db.Core.NewInsert().Model(mi).Exec(ctx)
 	require.Nil(t, err)
-	_, err = store.CreateRepo(ctx, database.Repository{
+	_, err = store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath: "codes_ns2/n",
-		Path:    "zzz",
-	})
+		Path:    "fixtures/zzz",
+	}))
 	require.Nil(t, err)
 	rs, count, err := store.WithMirror(ctx, 10, 1)
 	require.Nil(t, err)
@@ -1553,15 +1597,15 @@ func TestRepoStore_ListRepoByDeployType(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	rn1, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	rn1, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		ID:             1,
 		UserID:         123,
 		Path:           "ns/n",
 		GitPath:        "models_ns/n",
 		RepositoryType: types.ModelRepo,
 		Private:        true,
-	})
+	}))
 	require.Nil(t, err)
 
 	_, err = db.Core.NewInsert().Model(&database.Metadata{
@@ -1613,23 +1657,23 @@ func TestRepoStore_ListRepoByDeployType(t *testing.T) {
 	}).Exec(ctx)
 	require.Nil(t, err)
 
-	_, err = store.CreateRepo(ctx, database.Repository{
+	_, err = store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		ID:             2,
 		UserID:         123,
 		Path:           "ns/n2",
 		GitPath:        "models_ns/n2",
 		RepositoryType: types.ModelRepo,
 		Private:        false,
-	})
+	}))
 	require.Nil(t, err)
-	_, err = store.CreateRepo(ctx, database.Repository{
+	_, err = store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		ID:             3,
 		UserID:         123,
 		Path:           "ns/n3",
 		GitPath:        "models_ns/n3",
 		RepositoryType: types.ModelRepo,
 		Private:        false,
-	})
+	}))
 	require.Nil(t, err)
 	rs, count, err := store.ListRepoByDeployType(ctx, types.ModelRepo, 123, "", "", 1, 10, 1)
 	require.Nil(t, err)
@@ -1643,19 +1687,19 @@ func TestRepoStore_CleanRelationsByRepoID(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	rn, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:        "codes_ns/n",
 		Path:           "ns/n",
 		RepositoryType: types.CodeRepo,
-	})
+	}))
 	require.Nil(t, err)
 
-	rn1, err := store.CreateRepo(ctx, database.Repository{
+	rn1, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:        "codes_ns/n1",
 		Path:           "ns/n1",
 		RepositoryType: types.CodeRepo,
-	})
+	}))
 	require.Nil(t, err)
 
 	_, err = db.Core.NewInsert().Model(&database.RepositoriesRuntimeFramework{
@@ -1773,35 +1817,138 @@ func TestRepoStore_DeleteAllTags(t *testing.T) {
 	require.Equal(t, 0, count)
 }
 
+// TestRepoStore_UpdateLicenseByTag preserves missing-tag behavior and model/dataset compliance classification.
 func TestRepoStore_UpdateLicenseByTag(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	rn, err := store.CreateRepo(ctx, database.Repository{
-		GitPath: "codes_ns/n",
-		License: "foo",
-	})
-	require.Nil(t, err)
-	tag := &database.Tag{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	tag := database.Tag{
 		Category: "license",
 		Name:     "MIT",
 	}
-	_, err = db.Core.NewInsert().Model(tag).Exec(ctx, tag)
-	require.Nil(t, err)
-	rtags := []database.RepositoryTag{
-		{TagID: tag.ID, RepositoryID: rn.ID, Count: 1},
+	_, err := db.Core.NewInsert().Model(&tag).Exec(ctx)
+	require.NoError(t, err)
+	for _, repoType := range []types.RepositoryType{types.CodeRepo, types.ModelRepo, types.DatasetRepo} {
+		for _, withTag := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/with_tag_%t", repoType, withTag), func(t *testing.T) {
+				name := fmt.Sprintf("%s-%t", repoType, withTag)
+				repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+					Path: "license-tags/" + name, GitPath: fmt.Sprintf("%ss_license-tags/%s", repoType, name),
+					Name: name, RepositoryType: repoType, License: "foo", Private: true,
+					PendingPublish: repoType == types.ModelRepo,
+				}))
+				require.NoError(t, err)
+				if withTag {
+					require.NoError(t, store.BatchCreateRepoTags(ctx, []database.RepositoryTag{{TagID: tag.ID, RepositoryID: repo.ID}}))
+				}
+				want, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				if withTag {
+					want.License = "MIT"
+					if types.SupportsLicenseCompliance(repoType) {
+						want.ComplianceStatus = types.ComplianceStatusCompliant
+						want.CommercialPermission = types.CommercialPermissionAllowed
+					}
+				} else if types.SupportsLicenseCompliance(repoType) {
+					want.License = ""
+				}
+				require.NoError(t, store.UpdateLicenseByTag(ctx, repo.ID))
+				got, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.Equal(t, want, got)
+			})
+		}
 	}
-	err = store.BatchCreateRepoTags(ctx, rtags)
-	require.Nil(t, err)
+}
 
-	err = store.UpdateLicenseByTag(ctx, rn.ID)
-	require.Nil(t, err)
+// licenseTagUpdateContextKey scopes the paused tag query to one background writer.
+type licenseTagUpdateContextKey struct{}
 
-	rn, err = store.FindById(ctx, rn.ID)
-	require.Nil(t, err)
-	require.Equal(t, "MIT", rn.License)
+// licenseTagUpdateHook pauses license lookup after the repository snapshot has been read.
+type licenseTagUpdateHook struct {
+	ready  chan struct{}
+	resume chan struct{}
+}
+
+// BeforeQuery lets a real settings transaction commit before the stale license writer continues.
+func (h *licenseTagUpdateHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if ctx.Value(licenseTagUpdateContextKey{}) == h && strings.Contains(event.Query, `FROM "tags" AS "tag"`) {
+		close(h.ready)
+		select {
+		case <-h.resume:
+		case <-ctx.Done():
+		}
+	}
+	return ctx
+}
+
+// AfterQuery completes the Bun query hook contract without changing query results.
+func (h *licenseTagUpdateHook) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// TestRepoStore_UpdateLicenseByTagPreservesConcurrentSettings verifies a stale
+// license writer changes only the license after a user's visibility update commits.
+func TestRepoStore_UpdateLicenseByTagPreservesConcurrentSettings(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	for _, repoType := range []types.RepositoryType{
+		types.CodeRepo, types.PromptRepo, types.MCPServerRepo,
+		types.SkillRepo, types.SpaceRepo, types.TemplateRepo,
+	} {
+		tag := database.Tag{Category: "license", Name: "MIT", Scope: types.TagScope(repoType)}
+		_, err := db.Core.NewInsert().Model(&tag).Exec(context.Background())
+		require.NoError(t, err)
+		for _, private := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/private_%t", repoType, private), func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				name := fmt.Sprintf("%s-%t", repoType, private)
+				repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+					Path: "license-race/" + name, GitPath: fmt.Sprintf("%ss_license-race/%s", repoType, name),
+					Name: name, RepositoryType: repoType, Private: !private, License: "old-license",
+					SyncStatus: types.SyncStatusPending,
+				}))
+				require.NoError(t, err)
+				require.NoError(t, store.BatchCreateRepoTags(ctx, []database.RepositoryTag{{TagID: tag.ID, RepositoryID: repo.ID}}))
+				hook := &licenseTagUpdateHook{ready: make(chan struct{}), resume: make(chan struct{})}
+				db.BunDB.AddQueryHook(hook)
+				resume := sync.OnceFunc(func() { close(hook.resume) })
+				defer resume()
+				finished := make(chan error, 1)
+				go func() {
+					finished <- store.UpdateLicenseByTag(context.WithValue(ctx, licenseTagUpdateContextKey{}, hook), repo.ID)
+				}()
+				select {
+				case <-hook.ready:
+				case <-ctx.Done():
+					t.Fatal("license writer did not reach the lookup after reading its repository snapshot")
+				}
+				configured := *repo
+				configured.Private = private
+				configured.Description = "user description"
+				configured.Nickname = "user nickname"
+				configured.SyncStatus = types.SyncStatusCompleted
+				_, err = store.UpdateRepo(ctx, configured)
+				require.NoError(t, err)
+				want, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.Equal(t, private, want.Private)
+				want.License = "MIT"
+				resume()
+				select {
+				case err := <-finished:
+					require.NoError(t, err)
+				case <-ctx.Done():
+					t.Fatal("license writer did not finish after the settings update committed")
+				}
+				got, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.Equal(t, want, got, "only the license may change after the settings update")
+			})
+		}
+	}
 }
 
 func TestRepoStore_GetRepoRuntimeByID(t *testing.T) {
@@ -1809,12 +1956,12 @@ func TestRepoStore_GetRepoRuntimeByID(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	repo, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:           "codes_ns/n",
 		License:        "foo",
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Nil(t, err)
 
 	rf := &database.RepositoriesRuntimeFramework{
@@ -1839,31 +1986,31 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	repos := []*database.Repository{
 		{
-			Name: "rp1", Path: "rp1", UserID: 123, RepositoryType: types.CodeRepo,
+			Name: "rp1", Path: "fixtures/rp1", UserID: 123, RepositoryType: types.CodeRepo,
 			SensitiveCheckStatus: types.SensitiveCheckPending,
 			Source:               types.HuggingfaceSource,
 		},
 		{
-			Name: "rp2", Path: "rp2", UserID: 123, RepositoryType: types.CodeRepo,
+			Name: "rp2", Path: "fixtures/rp2", UserID: 123, RepositoryType: types.CodeRepo,
 			SensitiveCheckStatus: types.SensitiveCheckPending,
 			Source:               types.HuggingfaceSource,
 		},
 		{
-			Name: "rp3", Path: "rp3", UserID: 123, RepositoryType: types.CodeRepo,
+			Name: "rp3", Path: "fixtures/rp3", UserID: 123, RepositoryType: types.CodeRepo,
 			SensitiveCheckStatus: types.SensitiveCheckPending,
 			Source:               types.HuggingfaceSource,
 		},
 		{
-			Name: "rp4", Path: "rp4", UserID: 456, RepositoryType: types.CodeRepo,
+			Name: "rp4", Path: "fixtures/rp4", UserID: 456, RepositoryType: types.CodeRepo,
 			SensitiveCheckStatus: types.SensitiveCheckPass,
 			Source:               types.HuggingfaceSource,
 		},
 		{
-			Name: "rp5", Path: "rp5", UserID: 456, RepositoryType: types.DatasetRepo,
+			Name: "rp5", Path: "fixtures/rp5", UserID: 456, RepositoryType: types.DatasetRepo,
 			SensitiveCheckStatus: types.SensitiveCheckPending,
 		},
 	}
@@ -1879,7 +2026,7 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	rids := []int64{}
 	for _, repo := range repos {
 		repo.GitPath = repo.Path
-		rn, err := store.CreateRepo(ctx, *repo)
+		rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, *repo))
 		require.Nil(t, err)
 		rids = append(rids, rn.ID)
 	}
@@ -2005,8 +2152,8 @@ func TestRepoStore_FindMirrorReposByUserAndSource(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	repoStore := database.NewRepoStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	mirrorStore := database.NewMirrorStoreWithDB(db)
 	mirrorSouceStore := database.NewMirrorSourceStoreWithDB(db)
 
@@ -2056,8 +2203,8 @@ func TestRepoStore_UpdateSourcePath(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	repoStore := database.NewRepoStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	namespace := &database.Namespace{
 		Path: "test",
@@ -2099,18 +2246,19 @@ func TestRepoStore_FindMirrorReposWithBatch(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	rn, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:    "ns/n",
 		GitPath: "codes_ns/n",
-	})
+	}))
 	require.Nil(t, err)
 	mi := &database.Mirror{RepositoryID: rn.ID}
 	_, err = db.Core.NewInsert().Model(mi).Exec(ctx)
 	require.Nil(t, err)
-	_, err = store.CreateRepo(ctx, database.Repository{
+	_, err = store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath: "codes_ns2/n",
-		Path:    "zzz",
-	})
+		Path:    "fixtures/zzz",
+	}))
 	require.Nil(t, err)
 	rs, err := store.FindMirrorReposWithBatch(ctx, 10, 1)
 	require.Nil(t, err)
@@ -2124,16 +2272,17 @@ func TestRepoStore_BulkUpdateSourcePath(t *testing.T) {
 	ctx := context.TODO()
 
 	var repos []*database.Repository
-	store := database.NewRepoStoreWithDB(db)
-	rn, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:    "ns/n",
 		GitPath: "codes_ns/n",
-	})
+	}))
 	require.Nil(t, err)
 
-	rn2, err := store.CreateRepo(ctx, database.Repository{
+	rn2, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath: "codes_ns2/n",
-		Path:    "zzz",
-	})
+		Path:    "fixtures/zzz",
+	}))
 	require.Nil(t, err)
 
 	rn.CSGPath = "abc/def"
@@ -2158,10 +2307,11 @@ func TestRepoStore_FindByMirrorSourceURL(t *testing.T) {
 	ctx := context.TODO()
 
 	sourceUrl := "https://github.com/codes_ns/n"
-	store := database.NewRepoStoreWithDB(db)
-	rn, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:    "ns/n",
 		GitPath: "codes_ns/n",
-	})
+	}))
 
 	require.Nil(t, err)
 
@@ -2183,10 +2333,11 @@ func TestRepoStore_RefreshLFSObjectsSize(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	rn, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	rn, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:    "ns/n",
 		GitPath: "codes_ns/n",
-	})
+	}))
 
 	require.Nil(t, err)
 
@@ -2214,78 +2365,23 @@ func TestRepoStore_RefreshLFSObjectsSize(t *testing.T) {
 	require.Equal(t, int64(22), repo.LFSObjectsSize)
 }
 
+// TestRepoStore_FindMirrorFinishedPrivateModelRepo selects only explicit publication intents.
 func TestRepoStore_FindMirrorFinishedPrivateModelRepo(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
-	ctx := context.TODO()
-
+	ctx := context.Background()
 	store := database.NewRepoStoreWithDB(db)
-	r, err := store.CreateRepo(ctx, database.Repository{
-		GitPath:              "codes_ns/n",
-		Path:                 "ns/n",
-		RepositoryType:       types.ModelRepo,
-		SensitiveCheckStatus: types.SensitiveCheckPass,
-		Private:              true,
-	})
-
-	require.Nil(t, err)
-
-	r1, err := store.CreateRepo(ctx, database.Repository{
-		GitPath:              "codes_ns/n1",
-		Path:                 "ns/n1",
-		RepositoryType:       types.ModelRepo,
-		SensitiveCheckStatus: types.SensitiveCheckSkip,
-		Private:              true,
-	})
-	require.Nil(t, err)
-
-	r2, err := store.CreateRepo(ctx, database.Repository{
-		GitPath:              "codes_ns/n2",
-		Path:                 "ns/n2",
-		RepositoryType:       types.ModelRepo,
-		SensitiveCheckStatus: types.SensitiveCheckFail,
-		Private:              true,
-	})
-	require.Nil(t, err)
-
-	mirrorStore := database.NewMirrorStoreWithDB(db)
-	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		RepositoryID: r.ID,
-		Status:       types.MirrorLfsSyncFinished,
-	})
-
-	require.Nil(t, err)
-
-	mirror1, err := mirrorStore.Create(ctx, &database.Mirror{
-		RepositoryID: r1.ID,
-		Status:       types.MirrorLfsSyncFinished,
-	})
-
-	require.Nil(t, err)
-
-	_, err = mirrorStore.Create(ctx, &database.Mirror{
-		RepositoryID: r2.ID,
-		Status:       types.MirrorLfsSyncFinished,
-	})
-
-	require.Nil(t, err)
-
-	mirrorTaskStore := database.NewMirrorTaskStoreWithDB(db)
-	_, err = mirrorTaskStore.Create(ctx, database.MirrorTask{
-		MirrorID: mirror.ID,
-		Status:   types.MirrorLfsSyncFinished,
-	})
-	require.Nil(t, err)
-	_, err = mirrorTaskStore.Create(ctx, database.MirrorTask{
-		MirrorID: mirror1.ID,
-		Status:   types.MirrorLfsSyncFinished,
-	})
-	require.Nil(t, err)
-
+	for i, status := range []types.SensitiveCheckStatus{types.SensitiveCheckPass, types.SensitiveCheckSkip, types.SensitiveCheckFail} {
+		repo, _ := newPublicationFixture(t, db, fmt.Sprintf("candidate-%d", i), true, status)
+		require.True(t, repo.Private)
+	}
+	_, _ = newPublicationFixture(t, db, "user-private", false, types.SensitiveCheckPass)
 	repos, err := store.FindMirrorFinishedPrivateModelRepo(ctx)
-	require.Nil(t, err)
-
-	require.Equal(t, 2, len(repos))
+	require.NoError(t, err)
+	require.Len(t, repos, 2)
+	for _, repo := range repos {
+		require.True(t, repo.PendingPublish)
+	}
 }
 
 func TestRepoStore_BatchUpdate(t *testing.T) {
@@ -2293,33 +2389,33 @@ func TestRepoStore_BatchUpdate(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	r, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	r, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:              "codes_ns/n",
 		Path:                 "ns/n",
 		RepositoryType:       types.ModelRepo,
 		SensitiveCheckStatus: types.SensitiveCheckPass,
 		Private:              true,
-	})
+	}))
 
 	require.Nil(t, err)
 
-	r1, err := store.CreateRepo(ctx, database.Repository{
+	r1, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:              "codes_ns/n1",
 		Path:                 "ns/n1",
 		RepositoryType:       types.ModelRepo,
 		SensitiveCheckStatus: types.SensitiveCheckPass,
 		Private:              true,
-	})
+	}))
 	require.Nil(t, err)
 
-	r2, err := store.CreateRepo(ctx, database.Repository{
+	r2, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:              "codes_ns/n2",
 		Path:                 "ns/n2",
 		RepositoryType:       types.ModelRepo,
 		SensitiveCheckStatus: types.SensitiveCheckFail,
 		Private:              true,
-	})
+	}))
 	require.Nil(t, err)
 
 	r.Private = false
@@ -2343,33 +2439,33 @@ func TestRepoStore_FindByRepoTypeAndPaths(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewRepoStoreWithDB(db)
-	_, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	_, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:              "codes_ns/n",
 		Path:                 "ns/n",
 		RepositoryType:       types.ModelRepo,
 		SensitiveCheckStatus: types.SensitiveCheckPass,
 		Private:              true,
-	})
+	}))
 
 	require.Nil(t, err)
 
-	_, err = store.CreateRepo(ctx, database.Repository{
+	_, err = store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:              "codes_ns/n1",
 		Path:                 "ns/n1",
 		RepositoryType:       types.ModelRepo,
 		SensitiveCheckStatus: types.SensitiveCheckPass,
 		Private:              true,
-	})
+	}))
 	require.Nil(t, err)
 
-	_, err = store.CreateRepo(ctx, database.Repository{
+	_, err = store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		GitPath:              "codes_ns/n2",
 		Path:                 "ns/n2",
 		RepositoryType:       types.DatasetRepo,
 		SensitiveCheckStatus: types.SensitiveCheckFail,
 		Private:              true,
-	})
+	}))
 	require.Nil(t, err)
 
 	repos, err := store.FindByRepoTypeAndPaths(ctx, types.ModelRepo, []string{"ns/n", "ns/n1", "ns/n2"})
@@ -2383,16 +2479,43 @@ func TestRepoStore_FindByRepoTypeAndPaths(t *testing.T) {
 	require.ElementsMatch(t, []string{"codes_ns/n", "codes_ns/n1"}, actualPaths)
 }
 
+// TestRepoStore_FindWithMirror verifies repository lookup loads its mirror association.
+func TestRepoStore_FindWithMirror(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		GitPath:        "models_ns/mirrored",
+		Path:           "ns/mirrored",
+		RepositoryType: types.ModelRepo,
+	}))
+	require.NoError(t, err)
+
+	mirrorStore := database.NewMirrorStoreWithDB(db)
+	_, err = mirrorStore.Create(ctx, &database.Mirror{
+		SourceUrl:    "https://huggingface.co/source/mirrored.git",
+		RepositoryID: repo.ID,
+	})
+	require.NoError(t, err)
+
+	got, err := repoStore.FindWithMirror(ctx, types.ModelRepo, "ns", "mirrored")
+	require.NoError(t, err)
+	require.Equal(t, repo.ID, got.ID)
+	require.NotNil(t, got.Mirror)
+}
+
 func TestRepoStore_PublicToUserMirror(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
 
 	// insert a new repo
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	userName := "user_name_" + uuid.NewString()
 	repoName := "repo_name_" + uuid.NewString()
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName, repoName),
 		GitPath:        fmt.Sprintf("datasets_%s/%s", userName, repoName),
@@ -2403,7 +2526,7 @@ func TestRepoStore_PublicToUserMirror(t *testing.T) {
 		Private:        false,
 		RepositoryType: types.DatasetRepo,
 		Source:         "local",
-	})
+	}))
 	require.Nil(t, err)
 	require.NotNil(t, repo)
 
@@ -2416,7 +2539,7 @@ func TestRepoStore_PublicToUserMirror(t *testing.T) {
 
 	userName1 := "user_name_" + uuid.NewString()
 	repoName1 := "repo_name_" + uuid.NewString()
-	repo1, err := rs.CreateRepo(ctx, database.Repository{
+	repo1, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName1, repoName1),
 		GitPath:        fmt.Sprintf("datasets_%s/%s", userName1, repoName1),
@@ -2427,7 +2550,7 @@ func TestRepoStore_PublicToUserMirror(t *testing.T) {
 		Private:        false,
 		RepositoryType: types.DatasetRepo,
 		Source:         "opencsg",
-	})
+	}))
 	require.Nil(t, err)
 	require.NotNil(t, repo1)
 
@@ -2467,7 +2590,7 @@ func TestRepoStore_FindUnhashedRepos(t *testing.T) {
 	ctx := context.TODO()
 
 	// insert a new repo
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	for i := 0; i < 10; i++ {
 		_, err := db.Operator.Core.NewInsert().Model(&database.Repository{
 			UserID:         1,
@@ -2487,7 +2610,7 @@ func TestRepoStore_FindUnhashedRepos(t *testing.T) {
 
 	userName1 := "user_name_" + uuid.NewString()
 	repoName1 := "repo_name_" + uuid.NewString()
-	repo1, err := rs.CreateRepo(ctx, database.Repository{
+	repo1, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName1, repoName1),
 		GitPath:        fmt.Sprintf("datasets_%s/%s", userName1, repoName1),
@@ -2498,7 +2621,7 @@ func TestRepoStore_FindUnhashedRepos(t *testing.T) {
 		Private:        false,
 		RepositoryType: types.DatasetRepo,
 		Source:         "opencsg",
-	})
+	}))
 	require.Nil(t, err)
 	require.NotNil(t, repo1)
 
@@ -2526,8 +2649,8 @@ func TestRepoStore_PublicToUserWithCacheFailed(t *testing.T) {
 	config.Database.Driver = "pg"
 	config.Database.SearchConfiguration = "opencsgchinese"
 
-	store := database.NewRepoStoreWithCache(config, db, cache)
-	_, err := setupTestRepositories(ctx, store, db)
+	store := database.NewRepoStoreWithCacheAndRebacTupleJobClient(config, db, cache, tests.NewFixtureRebacTupleJobClient(db))
+	_, err := setupTestRepositories(t, ctx, store, db)
 	require.Nil(t, err)
 
 	c := repoSearchCase{
@@ -2557,13 +2680,14 @@ func TestRepoStore_UpdateRepoSensitiveCheckStatus(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
-	store := database.NewRepoStoreWithDB(db)
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	repo, err := store.CreateRepo(ctx, database.Repository{
+	repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:    "u/bar",
 		Name:    "repo1",
 		UserID:  123,
 		GitPath: "foos_u/bar",
-	})
+	}))
 	require.Nil(t, err)
 
 	err = store.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckPass)
@@ -2617,10 +2741,10 @@ func TestRepoStore_PostgresSearchTags(t *testing.T) {
 	cfg.Database.SearchConfiguration = "simple"
 	cfg.Search.RepoSearchLimit = 10
 	cfg.Search.RepoSearchCacheTTL = 300
-	store := database.NewRepoStoreWithCache(cfg, db, cache.NewCacheWithClient(ctx, client))
-	repo, err := store.CreateRepo(ctx, database.Repository{
+	store := database.NewRepoStoreWithCacheAndRebacTupleJobClient(cfg, db, cache.NewCacheWithClient(ctx, client), tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name: "tagsearch", Path: "owner/tagsearch", GitPath: "owner/tagsearch", RepositoryType: types.CodeRepo,
-	})
+	}))
 	require.NoError(t, err)
 	_, err = db.Core.NewInsert().Model(&database.Code{RepositoryID: repo.ID}).Exec(ctx)
 	require.NoError(t, err)
@@ -2662,4 +2786,897 @@ func TestRepoStore_PostgresSearchTags(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestRepoStore_PendingPublishMigration verifies rollback and safe defaults for existing private repositories.
+func TestRepoStore_PendingPublishMigration(t *testing.T) {
+	// DDL must use an isolated database so shared test transactions cannot block it.
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	repo, _ := newPublicationFixture(t, db, "migration-default", true, types.SensitiveCheckPass)
+	for _, migration := range migrations.Migrations.Sorted() {
+		if migration.Name != "20261018042946" {
+			continue
+		}
+		require.NoError(t, migration.Down(ctx, db.BunDB, nil))
+		var private bool
+		require.NoError(t, db.BunDB.NewRaw("SELECT private FROM repositories WHERE id = ?", repo.ID).Scan(ctx, &private))
+		require.True(t, private)
+		require.NoError(t, migration.Up(ctx, db.BunDB, nil))
+		got, err := database.NewRepoStoreWithDB(db).FindById(ctx, repo.ID)
+		require.NoError(t, err)
+		require.True(t, got.Private)
+		require.False(t, got.PendingPublish)
+		return
+	}
+	t.Fatal("pending publication migration was not registered")
+}
+
+// TestRepoStore_VisibilityWithUnchangedInheritance keeps explicit visibility requests
+// out of the inheritance no-op path without enqueueing unchanged permissions.
+func TestRepoStore_VisibilityWithUnchangedInheritance(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name    string
+		private bool
+		status  types.SensitiveCheckStatus
+	}{
+		{"cancel-publication", true, types.SensitiveCheckPass},
+		{"publish", false, types.SensitiveCheckPass},
+		{"reject-failed-check", false, types.SensitiveCheckFail},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, _ := newPublicationFixture(t, db, tc.name, true, tc.status)
+			request := *repo
+			request.TupleNamespacePath = "publication"
+			request.SensitiveCheckStatus = types.SensitiveCheckPass
+			before := tupleJobCount(t, db)
+			// An unchanged permission setting must not require a tuple producer.
+			store := database.NewRepoStoreWithDB(db)
+			result, err := store.UpdateRepo(ctx, request, types.RepositoryUpdateOptions{
+				Private: &tc.private, RequireSensitiveCheckPass: !tc.private,
+			})
+			if tc.status == types.SensitiveCheckFail {
+				require.ErrorIs(t, err, errorx.ErrSensitiveCheckNotPassed)
+				require.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.private, result.Private)
+				require.False(t, result.PendingPublish)
+			}
+			stored, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.Equal(t, tc.private || tc.status == types.SensitiveCheckFail, stored.Private)
+			require.Equal(t, tc.status == types.SensitiveCheckFail, stored.PendingPublish)
+			require.Equal(t, tc.status, stored.SensitiveCheckStatus)
+			require.Equal(t, repo.OrgInheritBlocked, stored.OrgInheritBlocked)
+			require.Equal(t, before, tupleJobCount(t, db))
+		})
+	}
+}
+
+// newPublicationFixture creates a private model with a current successful mirror task.
+func newPublicationFixture(t *testing.T, db *database.DB, name string, pending bool, status types.SensitiveCheckStatus) (*database.Repository, *database.Mirror) {
+	t.Helper()
+	ctx := context.Background()
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path: "publication/" + name, GitPath: "models_publication/" + name, Name: name,
+		RepositoryType: types.ModelRepo, Private: true, PendingPublish: pending,
+		SensitiveCheckStatus: status, SyncStatus: types.SyncStatusCompleted,
+	}))
+	require.NoError(t, err)
+	mirrorStore := database.NewMirrorStoreWithDB(db)
+	mirror, err := mirrorStore.Create(ctx, &database.Mirror{RepositoryID: repo.ID})
+	require.NoError(t, err)
+	task, err := database.NewMirrorTaskStoreWithDB(db).Create(ctx, database.MirrorTask{
+		MirrorID: mirror.ID, Status: types.MirrorLfsSyncFinished,
+	})
+	require.NoError(t, err)
+	mirror.CurrentTaskID = task.ID
+	require.NoError(t, database.NewMirrorTaskStoreWithDB(db).SetMirrorCurrentTaskID(ctx, task))
+	return repo, mirror
+}
+
+// TestRepoStore_PublishPendingModelRepo checks one-time publication and current-task eligibility.
+func TestRepoStore_PublishPendingModelRepo(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDB(db)
+	for i, tc := range []struct {
+		name       string
+		pending    bool
+		status     types.SensitiveCheckStatus
+		current    types.MirrorTaskStatus
+		wantPublic bool
+	}{
+		{name: "internal successful model", pending: true, status: types.SensitiveCheckPass, current: types.MirrorLfsSyncFinished, wantPublic: true},
+		{name: "skipped check", pending: true, status: types.SensitiveCheckSkip, current: types.MirrorLfsSyncFinished, wantPublic: true},
+		{name: "user private model", status: types.SensitiveCheckPass, current: types.MirrorLfsSyncFinished},
+		{name: "failed sensitive check", pending: true, status: types.SensitiveCheckFail, current: types.MirrorLfsSyncFinished},
+		{name: "pending sensitive check", pending: true, status: types.SensitiveCheckPending, current: types.MirrorLfsSyncFinished},
+		{name: "historical success current queued", pending: true, status: types.SensitiveCheckPass, current: types.MirrorQueued},
+		{name: "historical success current failed", pending: true, status: types.SensitiveCheckPass, current: types.MirrorLfsSyncFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, mirror := newPublicationFixture(t, db, fmt.Sprintf("publish-%d", i), tc.pending, tc.status)
+			if tc.current != types.MirrorLfsSyncFinished {
+				task, err := database.NewMirrorTaskStoreWithDB(db).Create(ctx, database.MirrorTask{MirrorID: mirror.ID, Status: tc.current})
+				require.NoError(t, err)
+				mirror.CurrentTaskID = task.ID
+				require.NoError(t, database.NewMirrorTaskStoreWithDB(db).SetMirrorCurrentTaskID(ctx, task))
+				candidates, err := store.FindMirrorFinishedPrivateModelRepo(ctx)
+				require.NoError(t, err)
+				for _, candidate := range candidates {
+					require.NotEqual(t, repo.ID, candidate.ID)
+				}
+			}
+			require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+			require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+			got, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.Equal(t, !tc.wantPublic, got.Private)
+			require.Equal(t, tc.pending && !tc.wantPublic, got.PendingPublish)
+		})
+	}
+}
+
+// TestRepoStore_PrivateSettingCancelsPendingPublish covers both unchanged private settings
+// and private settings after publication, including stale candidates and metadata snapshots.
+func TestRepoStore_PrivateSettingCancelsPendingPublish(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDB(db)
+	for _, publishFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("already_published_%t", publishFirst), func(t *testing.T) {
+			repo, _ := newPublicationFixture(t, db, fmt.Sprintf("cancel-%t", publishFirst), true, types.SensitiveCheckPass)
+			stale := *repo
+			if publishFirst {
+				require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+			}
+			got, err := store.UpdateRepo(ctx, *repo, types.RepositoryUpdateOptions{Private: new(true)})
+			require.NoError(t, err)
+			require.True(t, got.Private)
+			require.False(t, got.PendingPublish)
+			// Neither a stale scheduler candidate nor a metadata edit may undo cancellation.
+			require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+			stale.Private = false
+			stale.Description = "new description"
+			_, err = store.UpdateRepo(ctx, stale)
+			require.NoError(t, err)
+			require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+			got, err = store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.True(t, got.Private)
+			require.False(t, got.PendingPublish)
+			require.Equal(t, "new description", got.Description)
+		})
+	}
+}
+
+// TestRepoStore_UpdateRepoDefersModelPublication keeps incomplete models private
+// and preserves cancellation across the actual task requeue transaction.
+func TestRepoStore_UpdateRepoDefersModelPublication(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDB(db)
+	repo, mirror := newPublicationFixture(t, db, "defer-and-retry", false, types.SensitiveCheckPass)
+	tasks := database.NewMirrorTaskJobStoreWithDB(db)
+	_, err := tasks.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
+		MirrorID: mirror.ID, RepositoryID: repo.ID, JobClient: &fakeMirrorRepoJobClient{},
+	})
+	require.NoError(t, err)
+	got, err := store.UpdateRepo(ctx, *repo, types.RepositoryUpdateOptions{Private: new(false)})
+	require.NoError(t, err)
+	require.True(t, got.Private)
+	require.True(t, got.PendingPublish)
+	// Metadata snapshots must preserve, rather than clear, the pending request.
+	got, err = store.UpdateRepo(ctx, *repo)
+	require.NoError(t, err)
+	require.True(t, got.PendingPublish)
+	_, err = store.UpdateRepo(ctx, *got, types.RepositoryUpdateOptions{Private: new(true)})
+	require.NoError(t, err)
+	retried, err := tasks.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
+		MirrorID: mirror.ID, RepositoryID: repo.ID, JobClient: &fakeMirrorRepoJobClient{},
+	})
+	require.NoError(t, err)
+	// Finishing the retried task still must not publish a model whose owner cancelled.
+	retried, err = tasks.UpdateStatusAndRepoSyncStatus(ctx, retried, database.MirrorContinue)
+	require.NoError(t, err)
+	retried, err = tasks.UpdateStatusAndRepoSyncStatus(ctx, retried, database.MirrorNoLfsToSync)
+	require.NoError(t, err)
+	require.Equal(t, types.MirrorLfsSyncFinished, retried.Status)
+	require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+	got, err = store.FindById(ctx, repo.ID)
+	require.NoError(t, err)
+	require.True(t, got.Private)
+	require.False(t, got.PendingPublish)
+}
+
+// newMirrorDeletionFixture creates active or failed work with a pending publication request.
+func newMirrorDeletionFixture(t *testing.T, db *database.DB, name string, syncStatus types.RepositorySyncStatus) (*database.Repository, *database.Mirror) {
+	t.Helper()
+	ctx := context.Background()
+	repo, mirror := newPublicationFixture(t, db, name, true, types.SensitiveCheckPass)
+	tasks := database.NewMirrorTaskJobStoreWithDB(db)
+	task, err := tasks.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
+		MirrorID: mirror.ID, RepositoryID: repo.ID, JobClient: &fakeMirrorRepoJobClient{},
+	})
+	require.NoError(t, err)
+	if syncStatus == types.SyncStatusFailed {
+		_, err = tasks.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorFatal)
+		require.NoError(t, err)
+	}
+	repo, err = database.NewRepoStoreWithDB(db).FindById(ctx, repo.ID)
+	require.NoError(t, err)
+	return repo, mirror
+}
+
+// TestRepoStore_PublicModelAfterMirrorDelete preserves manual visibility after real active/failed mirror deletion.
+func TestRepoStore_PublicModelAfterMirrorDelete(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDB(db)
+	for _, syncStatus := range []types.RepositorySyncStatus{types.SyncStatusCanceled, types.SyncStatusFailed} {
+		t.Run(string(syncStatus), func(t *testing.T) {
+			repo, mirror := newMirrorDeletionFixture(t, db, "deleted-"+string(syncStatus), syncStatus)
+			require.NoError(t, database.NewMirrorStoreWithDB(db).DeleteWithTaskCancelTx(ctx, mirror.ID, &fakeMirrorJobCancelClient{}))
+			repo, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.True(t, repo.PendingPublish)
+			got, err := store.UpdateRepo(ctx, *repo, types.RepositoryUpdateOptions{Private: new(false)})
+			require.NoError(t, err)
+			require.False(t, got.Private)
+			require.False(t, got.PendingPublish)
+			require.Equal(t, syncStatus, got.SyncStatus)
+			persisted, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.False(t, persisted.Private)
+			require.False(t, persisted.PendingPublish)
+			_, err = store.UpdateRepo(ctx, *got, types.RepositoryUpdateOptions{Private: new(true)})
+			require.NoError(t, err)
+			_, err = store.UpdateRepo(ctx, *got)
+			require.NoError(t, err)
+			require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+			persisted, err = store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.True(t, persisted.Private)
+			require.False(t, persisted.PendingPublish)
+		})
+	}
+}
+
+// TestRepoStore_ImmediatePublicCommandFromPendingState replays the CLI's read,
+// check-status update, and explicit public request without rewriting persisted intent.
+// An immediate request must still leave unfinished synchronization hidden.
+func TestRepoStore_ImmediatePublicCommandFromPendingState(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDB(db)
+	for _, syncStatus := range []types.RepositorySyncStatus{types.SyncStatusCompleted, types.SyncStatusCanceled, types.SyncStatusFailed, types.SyncStatusPending} {
+		t.Run(string(syncStatus), func(t *testing.T) {
+			var repo *database.Repository
+			if syncStatus == types.SyncStatusCompleted {
+				repo, _ = newPublicationFixture(t, db, "command-completed", true, types.SensitiveCheckPending)
+			} else {
+				var mirror *database.Mirror
+				repo, mirror = newMirrorDeletionFixture(t, db, "command-"+string(syncStatus), syncStatus)
+				if syncStatus != types.SyncStatusPending {
+					require.NoError(t, database.NewMirrorStoreWithDB(db).DeleteWithTaskCancelTx(ctx, mirror.ID, &fakeMirrorJobCancelClient{}))
+				}
+				require.NoError(t, store.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckPending))
+			}
+			snapshot, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.True(t, snapshot.Private)
+			require.True(t, snapshot.PendingPublish)
+			snapshot.Private = false
+			snapshot.SensitiveCheckStatus = types.SensitiveCheckPass
+			require.NoError(t, store.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckPass))
+			got, err := store.UpdateRepo(ctx, *snapshot, types.RepositoryUpdateOptions{
+				Private: new(false), DeferPublication: false,
+			})
+			require.NoError(t, err)
+			unfinished := syncStatus == types.SyncStatusPending
+			require.Equal(t, unfinished, got.Private)
+			require.Equal(t, unfinished, got.PendingPublish)
+			persisted, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.Equal(t, unfinished, persisted.Private)
+			require.Equal(t, unfinished, persisted.PendingPublish)
+			require.Equal(t, syncStatus, persisted.SyncStatus)
+			require.Equal(t, types.SensitiveCheckPass, persisted.SensitiveCheckStatus)
+		})
+	}
+}
+
+// TestRepoStore_PublicModelKeepsSynchronizationHidden excludes bound terminal mirrors and pending initial bindings from the exception.
+func TestRepoStore_PublicModelKeepsSynchronizationHidden(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	for _, syncStatus := range []types.RepositorySyncStatus{types.SyncStatusPending, types.SyncStatusCanceled, types.SyncStatusFailed} {
+		t.Run(string(syncStatus), func(t *testing.T) {
+			repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+				Path: "lifecycle/" + string(syncStatus), GitPath: "models_lifecycle/" + string(syncStatus),
+				RepositoryType: types.ModelRepo, Private: true, PendingPublish: true, SyncStatus: syncStatus,
+			}))
+			require.NoError(t, err)
+			if syncStatus != types.SyncStatusPending {
+				_, err = database.NewMirrorStoreWithDB(db).Create(ctx, &database.Mirror{RepositoryID: repo.ID})
+				require.NoError(t, err)
+			}
+			got, err := store.UpdateRepo(ctx, *repo, types.RepositoryUpdateOptions{Private: new(false)})
+			require.NoError(t, err)
+			require.True(t, got.Private)
+			require.True(t, got.PendingPublish)
+		})
+	}
+}
+
+// modelVisibilityUpdateContextKey scopes the concurrency gate to one settings request.
+type modelVisibilityUpdateContextKey struct{}
+
+// sensitiveFailureUpdateContextKey identifies the competing moderation update.
+type sensitiveFailureUpdateContextKey struct{}
+
+// modelVisibilityUpdateHook pauses settings immediately before or after acquiring the row lock.
+type modelVisibilityUpdateHook struct {
+	ready         chan struct{}
+	resume        chan struct{}
+	afterLock     bool
+	reviewAttempt chan struct{}
+}
+
+// BeforeQuery permits an independent mirror transaction to commit before settings recheck the locked row.
+func (h *modelVisibilityUpdateHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if h.reviewAttempt != nil && ctx.Value(sensitiveFailureUpdateContextKey{}) == h && strings.HasPrefix(event.Query, `UPDATE "repositories"`) {
+		close(h.reviewAttempt)
+	}
+	if !h.afterLock {
+		h.pause(ctx, event)
+	}
+	return ctx
+}
+
+// pause scopes the deterministic gate to one settings request and one repository lock query.
+func (h *modelVisibilityUpdateHook) pause(ctx context.Context, event *bun.QueryEvent) {
+	if ctx.Value(modelVisibilityUpdateContextKey{}) == h && strings.Contains(event.Query, `FROM "repositories" AS "repository"`) && strings.Contains(event.Query, "FOR UPDATE") {
+		close(h.ready)
+		select {
+		case <-h.resume:
+		case <-ctx.Done():
+		}
+	}
+}
+
+// AfterQuery can retain the settings row lock while a concurrent moderation update starts.
+func (h *modelVisibilityUpdateHook) AfterQuery(ctx context.Context, event *bun.QueryEvent) {
+	if h.afterLock && event.Err == nil {
+		h.pause(ctx, event)
+	}
+}
+
+// TestRepoStore_ManualPublicSensitiveCheckGuard checks every review state and repository type.
+func TestRepoStore_ManualPublicSensitiveCheckGuard(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	// Reject malformed guards before any repository lookup or write.
+	for _, options := range [][]types.RepositoryUpdateOptions{
+		{{RequireSensitiveCheckPass: true}},
+		{{Private: new(true), RequireSensitiveCheckPass: true}},
+		{{DeferPublication: true}},
+		{{Private: new(true), DeferPublication: true}},
+		{{}, {}},
+	} {
+		_, err := store.UpdateRepo(ctx, database.Repository{}, options...)
+		require.Error(t, err)
+	}
+	for _, repoType := range []types.RepositoryType{types.ModelRepo, types.DatasetRepo, types.CodeRepo, types.SpaceRepo,
+		types.PromptRepo, types.MCPServerRepo, types.SkillRepo, types.TemplateRepo} {
+		for _, status := range []types.SensitiveCheckStatus{types.SensitiveCheckFail, types.SensitiveCheckPending,
+			types.SensitiveCheckPass, types.SensitiveCheckSkip, types.SensitiveCheckException, types.SensitiveCheckStatus(99)} {
+			t.Run(fmt.Sprintf("%s/%d", repoType, status), func(t *testing.T) {
+				name := fmt.Sprintf("guard-%s-%d", repoType, status)
+				repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{Path: "visibility/" + name, GitPath: name,
+					RepositoryType: repoType, Private: true, SensitiveCheckStatus: status, SyncStatus: types.SyncStatusCompleted}))
+				require.NoError(t, err)
+				stale := *repo
+				stale.Private = false
+				stale.SensitiveCheckStatus = types.SensitiveCheckPass
+				got, err := store.UpdateRepo(ctx, stale, types.RepositoryUpdateOptions{Private: new(false), RequireSensitiveCheckPass: true})
+				if status == types.SensitiveCheckPass {
+					require.NoError(t, err)
+					require.False(t, got.Private)
+				} else {
+					require.ErrorIs(t, err, errorx.ErrSensitiveCheckNotPassed)
+					require.Nil(t, got)
+					// Preserve the repository error code rather than exposing a generic database failure.
+					var customErr errorx.CustomError
+					require.ErrorAs(t, err, &customErr)
+					require.Equal(t, errorx.ErrSensitiveCheckNotPassed.(errorx.CustomError).Code(), customErr.Code())
+				}
+				persisted, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.Equal(t, status != types.SensitiveCheckPass, persisted.Private)
+				require.Equal(t, status, persisted.SensitiveCheckStatus)
+			})
+		}
+	}
+}
+
+// TestRepoStore_ManualPublicSerializesSensitiveFailure exercises both transaction orders.
+func TestRepoStore_ManualPublicSerializesSensitiveFailure(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	for _, syncStatus := range []types.RepositorySyncStatus{types.SyncStatusCompleted, types.SyncStatusCanceled, types.SyncStatusFailed} {
+		for _, publicFirst := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/public_first_%t", syncStatus, publicFirst), func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{Path: fmt.Sprintf("visibility/race-%s-%t", syncStatus, publicFirst),
+					GitPath: fmt.Sprintf("race-%s-%t", syncStatus, publicFirst), RepositoryType: types.ModelRepo,
+					Private: true, SensitiveCheckStatus: types.SensitiveCheckPass, SyncStatus: syncStatus}))
+				require.NoError(t, err)
+				hook := &modelVisibilityUpdateHook{ready: make(chan struct{}), resume: make(chan struct{}), afterLock: publicFirst, reviewAttempt: make(chan struct{})}
+				db.BunDB.AddQueryHook(hook)
+				resume := sync.OnceFunc(func() { close(hook.resume) })
+				defer resume()
+				publicDone := make(chan error, 1)
+				go func() {
+					_, err := store.UpdateRepo(context.WithValue(ctx, modelVisibilityUpdateContextKey{}, hook), *repo,
+						types.RepositoryUpdateOptions{Private: new(false), RequireSensitiveCheckPass: true})
+					publicDone <- err
+				}()
+				select {
+				case <-hook.ready:
+				case <-ctx.Done():
+					t.Fatal("manual public request did not reach its row-lock gate")
+				}
+				failureDone := make(chan error, 1)
+				if publicFirst {
+					go func() {
+						failureDone <- store.UpdateRepoSensitiveCheckStatus(context.WithValue(ctx, sensitiveFailureUpdateContextKey{}, hook), repo.ID, types.SensitiveCheckFail)
+					}()
+					select {
+					case <-hook.reviewAttempt:
+					case <-ctx.Done():
+						t.Fatal("moderation did not attempt its update while manual public held the row lock")
+					}
+				} else {
+					require.NoError(t, store.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckFail))
+				}
+				resume()
+				select {
+				case err := <-publicDone:
+					if publicFirst {
+						require.NoError(t, err)
+					} else {
+						require.ErrorIs(t, err, errorx.ErrSensitiveCheckNotPassed)
+					}
+				case <-ctx.Done():
+					t.Fatal("manual public request did not finish")
+				}
+				if publicFirst {
+					select {
+					case err := <-failureDone:
+						require.NoError(t, err)
+					case <-ctx.Done():
+						t.Fatal("moderation update did not finish after manual public committed")
+					}
+				}
+				got, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.True(t, got.Private)
+				require.False(t, got.PendingPublish)
+				require.Equal(t, types.SensitiveCheckFail, got.SensitiveCheckStatus)
+			})
+		}
+	}
+}
+
+// TestRepoStore_ModelPublicSettingRechecksConcurrentMirrorChanges exercises deletion,
+// rebinding, and a later private choice using real transactions with stale settings snapshots.
+func TestRepoStore_ModelPublicSettingRechecksConcurrentMirrorChanges(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	store := database.NewRepoStoreWithDB(db)
+	mirrors := database.NewMirrorStoreWithDB(db)
+	for _, syncStatus := range []types.RepositorySyncStatus{types.SyncStatusCanceled, types.SyncStatusFailed} {
+		for _, action := range []string{"delete", "rebind", "rebind_then_private"} {
+			t.Run(string(syncStatus)+"/"+action, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				repo, mirror := newMirrorDeletionFixture(t, db, "concurrent-"+string(syncStatus)+"-"+action, syncStatus)
+				if action != "delete" {
+					require.NoError(t, mirrors.DeleteWithTaskCancelTx(ctx, mirror.ID, &fakeMirrorJobCancelClient{}))
+					var err error
+					repo, err = store.FindById(ctx, repo.ID)
+					require.NoError(t, err)
+				}
+				hook := &modelVisibilityUpdateHook{ready: make(chan struct{}), resume: make(chan struct{})}
+				db.BunDB.AddQueryHook(hook)
+				resume := sync.OnceFunc(func() { close(hook.resume) })
+				defer resume()
+				finished := make(chan error, 1)
+				go func() {
+					_, err := store.UpdateRepo(context.WithValue(ctx, modelVisibilityUpdateContextKey{}, hook), *repo, types.RepositoryUpdateOptions{
+						Private: new(false), DeferPublication: action == "delete",
+					})
+					finished <- err
+				}()
+				select {
+				case <-hook.ready:
+				case <-ctx.Done():
+					t.Fatal("settings did not reach the repository row lock")
+				}
+				if action == "delete" {
+					require.NoError(t, mirrors.DeleteWithTaskCancelTx(ctx, mirror.ID, &fakeMirrorJobCancelClient{}))
+				} else {
+					var err error
+					mirror, err = database.NewMirrorRepoStoreWithDB(db, nil).CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
+						Repository: repo, Mirror: database.Mirror{SourceUrl: "https://opencsg.com/source/model.git"},
+					})
+					require.NoError(t, err)
+				}
+				resume()
+				select {
+				case err := <-finished:
+					if action == "delete" {
+						require.ErrorContains(t, err, "retry repository settings")
+					} else {
+						require.NoError(t, err)
+					}
+				case <-ctx.Done():
+					t.Fatal("settings did not finish after the mirror transaction committed")
+				}
+				got, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.True(t, got.Private)
+				require.True(t, got.PendingPublish)
+				if action == "delete" {
+					require.Equal(t, syncStatus, got.SyncStatus)
+					// A fresh request supplies immediate intent without rewriting the pending state.
+					got, err = store.UpdateRepo(ctx, *got, types.RepositoryUpdateOptions{Private: new(false)})
+					require.NoError(t, err)
+					require.False(t, got.Private)
+					require.False(t, got.PendingPublish)
+					return
+				}
+				require.Equal(t, types.SyncStatusPending, got.SyncStatus)
+				if action == "rebind_then_private" {
+					_, err = store.UpdateRepo(ctx, *got, types.RepositoryUpdateOptions{Private: new(true)})
+					require.NoError(t, err)
+				}
+				tasks := database.NewMirrorTaskStoreWithDB(db)
+				task, err := tasks.FindByID(ctx, mirror.CurrentTaskID)
+				require.NoError(t, err)
+				started, err := tasks.UpdateStatusAndRepoSyncStatus(ctx, *task, database.MirrorContinue)
+				require.NoError(t, err)
+				_, err = tasks.UpdateStatusAndRepoSyncStatus(ctx, started, database.MirrorNoLfsToSync)
+				require.NoError(t, err)
+				require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+				got, err = store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.Equal(t, action == "rebind_then_private", got.Private)
+				require.False(t, got.PendingPublish)
+			})
+		}
+	}
+}
+
+// TestRepoStore_ModelMetadataSyncPreservesVisibility prevents upstream refreshes
+// from undoing local private settings or cancelling an internal publication request.
+func TestRepoStore_ModelMetadataSyncPreservesVisibility(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	for _, pending := range []bool{true, false} {
+		repo, _ := newPublicationFixture(t, db, fmt.Sprintf("metadata-%t", pending), pending, types.SensitiveCheckPass)
+		incoming := *repo
+		incoming.Private = false
+		incoming.PendingPublish = !pending
+		incoming.SyncStatus = types.SyncStatusPending
+		incoming.SensitiveCheckStatus = types.SensitiveCheckFail
+		incoming.Description = "refreshed upstream metadata"
+		got, err := store.UpdateOrCreateRepo(ctx, incoming)
+		require.NoError(t, err)
+		require.True(t, got.Private)
+		require.Equal(t, pending, got.PendingPublish)
+		require.Equal(t, types.SyncStatusCompleted, got.SyncStatus)
+		require.Equal(t, types.SensitiveCheckPass, got.SensitiveCheckStatus)
+		require.Equal(t, incoming.Description, got.Description)
+	}
+}
+
+// TestRepoStore_NonModelMetadataSyncPreservesVisibility checks both user visibility
+// settings across repeated upstream refreshes without changing initial import defaults.
+func TestRepoStore_NonModelMetadataSyncPreservesVisibility(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	for _, repoType := range []types.RepositoryType{
+		types.DatasetRepo, types.CodeRepo, types.PromptRepo, types.MCPServerRepo,
+		types.SkillRepo, types.SpaceRepo, types.TemplateRepo,
+	} {
+		for _, private := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/private_%t", repoType, private), func(t *testing.T) {
+				name := fmt.Sprintf("%s-%t", repoType, private)
+				created, err := store.UpdateOrCreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+					Path: "metadata/" + name, GitPath: fmt.Sprintf("%ss_metadata/%s", repoType, name),
+					Name: name, RepositoryType: repoType, Private: !private,
+					SyncStatus: types.SyncStatusCompleted,
+				}))
+				require.NoError(t, err)
+				require.Equal(t, !private, created.Private)
+				// Apply the user's choice through the ordinary settings write, leaving an old upstream snapshot.
+				configured := *created
+				configured.Private = private
+				_, err = store.UpdateRepo(ctx, configured)
+				require.NoError(t, err)
+				incoming := *created
+				incoming.SyncStatus = types.SyncStatusPending
+				for revision := 1; revision <= 2; revision++ {
+					incoming.Description = fmt.Sprintf("upstream revision %d", revision)
+					got, err := store.UpdateOrCreateRepo(ctx, incoming)
+					require.NoError(t, err)
+					require.Equal(t, created.ID, got.ID)
+					require.Equal(t, private, got.Private)
+					persisted, err := store.FindById(ctx, created.ID)
+					require.NoError(t, err)
+					require.Equal(t, private, persisted.Private)
+					require.False(t, persisted.PendingPublish)
+					require.Equal(t, incoming.Description, persisted.Description)
+					require.Equal(t, types.SyncStatusPending, persisted.SyncStatus)
+				}
+			})
+		}
+	}
+}
+
+// TestRepoStore_MetadataSyncRespectsConcurrentVisibilitySetting verifies an
+// upstream refresh waiting on a real settings transaction cannot overwrite its choice.
+func TestRepoStore_MetadataSyncRespectsConcurrentVisibilitySetting(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	store := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	for _, private := range []bool{true, false} {
+		t.Run(fmt.Sprintf("private_%t", private), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			name := fmt.Sprintf("concurrent-visibility-%t", private)
+			repo, err := store.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+				Path: "metadata/" + name, GitPath: "datasets_metadata/" + name,
+				Name: name, RepositoryType: types.DatasetRepo, Private: !private,
+			}))
+			require.NoError(t, err)
+			tx, err := db.BunDB.BeginTx(ctx, nil)
+			require.NoError(t, err)
+			defer func() { _ = tx.Rollback() }()
+			_, err = tx.NewUpdate().Model(repo).Set("private = ?", private).WherePK().Exec(ctx)
+			require.NoError(t, err)
+			hook := &publicationLockHook{locking: make(chan struct{})}
+			db.BunDB.AddQueryHook(hook)
+			finished := make(chan error, 1)
+			incoming := *repo
+			incoming.Description = "concurrent upstream refresh"
+			go func() {
+				_, err := store.UpdateOrCreateRepo(ctx, incoming)
+				finished <- err
+			}()
+			select {
+			case <-hook.locking:
+			case <-ctx.Done():
+				t.Fatal("metadata synchronization did not reach the competing row lock")
+			}
+			require.NoError(t, tx.Commit())
+			select {
+			case err := <-finished:
+				require.NoError(t, err)
+			case <-ctx.Done():
+				t.Fatal("metadata synchronization did not finish after the visibility setting committed")
+			}
+			got, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.Equal(t, private, got.Private)
+			require.Equal(t, incoming.Description, got.Description)
+		})
+	}
+}
+
+// TestRepoStore_DeferredPublicRequestSurvivesConcurrentCompletion prevents a
+// settings snapshot from bypassing or overwriting checks after synchronization finishes.
+func TestRepoStore_DeferredPublicRequestSurvivesConcurrentCompletion(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	store := database.NewRepoStoreWithDB(db)
+	for _, status := range []types.SensitiveCheckStatus{types.SensitiveCheckPending, types.SensitiveCheckPass} {
+		t.Run(fmt.Sprintf("check-%d", status), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			repo, mirror := newPublicationFixture(t, db, fmt.Sprintf("completion-race-%d", status), false, status)
+			tasks := database.NewMirrorTaskJobStoreWithDB(db)
+			task, err := tasks.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
+				MirrorID: mirror.ID, RepositoryID: repo.ID, JobClient: &fakeMirrorRepoJobClient{},
+			})
+			require.NoError(t, err)
+			snapshot, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.Equal(t, types.SyncStatusPending, snapshot.SyncStatus)
+			require.False(t, snapshot.PendingPublish)
+			hook := &modelVisibilityUpdateHook{ready: make(chan struct{}), resume: make(chan struct{})}
+			db.BunDB.AddQueryHook(hook)
+			resume := sync.OnceFunc(func() { close(hook.resume) })
+			defer resume()
+			finished := make(chan error, 1)
+			go func() {
+				_, err := store.UpdateRepo(context.WithValue(ctx, modelVisibilityUpdateContextKey{}, hook), *snapshot, types.RepositoryUpdateOptions{
+					Private: new(false), DeferPublication: true,
+				})
+				finished <- err
+			}()
+			select {
+			case <-hook.ready:
+			case <-ctx.Done():
+				t.Fatal("settings did not reach the repository row lock")
+			}
+			// Complete the actual current task before settings acquire the repository lock.
+			task, err = tasks.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorContinue)
+			require.NoError(t, err)
+			_, err = tasks.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorNoLfsToSync)
+			require.NoError(t, err)
+			resume()
+			select {
+			case err := <-finished:
+				require.NoError(t, err)
+			case <-ctx.Done():
+				t.Fatal("settings did not finish after synchronization committed")
+			}
+			got, err := store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.True(t, got.Private)
+			require.True(t, got.PendingPublish)
+			require.Equal(t, types.SyncStatusCompleted, got.SyncStatus)
+			require.Equal(t, status, got.SensitiveCheckStatus)
+			require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+			got, err = store.FindById(ctx, repo.ID)
+			require.NoError(t, err)
+			require.Equal(t, status != types.SensitiveCheckPass, got.Private)
+			require.Equal(t, status != types.SensitiveCheckPass, got.PendingPublish)
+		})
+	}
+}
+
+// TestRepoStore_SensitiveFailurePreservesPendingPublish distinguishes temporary
+// moderation hiding from an explicit user cancellation of publication.
+func TestRepoStore_SensitiveFailurePreservesPendingPublish(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDB(db)
+	for _, pending := range []bool{true, false} {
+		repo, _ := newPublicationFixture(t, db, fmt.Sprintf("moderation-%t", pending), pending, types.SensitiveCheckPass)
+		require.NoError(t, store.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckFail))
+		require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+		got, err := store.FindById(ctx, repo.ID)
+		require.NoError(t, err)
+		require.True(t, got.Private)
+		require.Equal(t, pending, got.PendingPublish)
+		require.NoError(t, store.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckPass))
+		require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+		got, err = store.FindById(ctx, repo.ID)
+		require.NoError(t, err)
+		require.Equal(t, !pending, got.Private)
+		require.False(t, got.PendingPublish)
+	}
+}
+
+// TestRepoStore_DownloadUpdatesPreservePublicationState replays stale download
+// snapshots after privacy changes and publication, including both statistics paths.
+func TestRepoStore_DownloadUpdatesPreservePublicationState(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewRepoStoreWithDB(db)
+	for _, kind := range []string{"file", "clone"} {
+		for _, state := range []string{"cancel_pending", "private_after_publication", "publish_after_snapshot"} {
+			t.Run(kind+"/"+state, func(t *testing.T) {
+				repo, _ := newPublicationFixture(t, db, kind+"-"+state, true, types.SensitiveCheckPass)
+				if state == "private_after_publication" {
+					require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+				}
+				stale, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				wantPrivate := state != "publish_after_snapshot"
+				if wantPrivate {
+					_, err = store.UpdateRepo(ctx, *stale, types.RepositoryUpdateOptions{Private: new(true)})
+					require.NoError(t, err)
+				} else {
+					require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+				}
+				// The download started with the old visibility and finishes after the change.
+				if kind == "file" {
+					err = store.UpdateRepoFileDownloads(ctx, stale, time.Now(), 7)
+				} else {
+					err = store.UpdateRepoCloneDownloads(ctx, stale, time.Now(), 7)
+				}
+				require.NoError(t, err)
+				got, err := store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.Equal(t, wantPrivate, got.Private)
+				require.False(t, got.PendingPublish)
+				require.EqualValues(t, 7, got.DownloadCount)
+				require.NoError(t, store.PublishPendingModelRepo(ctx, repo.ID))
+				got, err = store.FindById(ctx, repo.ID)
+				require.NoError(t, err)
+				require.Equal(t, wantPrivate, got.Private)
+				require.False(t, got.PendingPublish)
+			})
+		}
+	}
+}
+
+// publicationLockHook signals when a repository writer reaches the row lock.
+type publicationLockHook struct {
+	locking chan struct{}
+	once    sync.Once
+}
+
+// BeforeQuery observes the repository lock without interfering with database execution.
+func (h *publicationLockHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if strings.Contains(event.Query, `FROM "repositories" AS "repository"`) && strings.Contains(event.Query, "FOR UPDATE") {
+		h.once.Do(func() { close(h.locking) })
+	}
+	return ctx
+}
+
+// AfterQuery completes the Bun query hook contract.
+func (h *publicationLockHook) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// TestRepoStore_PrivateSettingWinsAgainstWaitingPublication exercises real competing transactions.
+func TestRepoStore_PrivateSettingWinsAgainstWaitingPublication(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	repo, _ := newPublicationFixture(t, db, "concurrent-cancellation", true, types.SensitiveCheckPass)
+	store := database.NewRepoStoreWithDB(db)
+	tx, err := db.BunDB.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	_, err = tx.NewUpdate().Model(repo).Set("private = TRUE").Set("pending_publish = FALSE").WherePK().Exec(ctx)
+	require.NoError(t, err)
+	hook := &publicationLockHook{locking: make(chan struct{})}
+	db.BunDB.AddQueryHook(hook)
+	finished := make(chan error, 1)
+	go func() { finished <- store.PublishPendingModelRepo(ctx, repo.ID) }()
+	select {
+	case <-hook.locking:
+	case <-ctx.Done():
+		t.Fatal("publication did not reach the competing row lock")
+	}
+	require.NoError(t, tx.Commit())
+	select {
+	case err := <-finished:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("publication did not finish after cancellation committed")
+	}
+	got, err := store.FindById(ctx, repo.ID)
+	require.NoError(t, err)
+	require.True(t, got.Private)
+	require.False(t, got.PendingPublish)
 }

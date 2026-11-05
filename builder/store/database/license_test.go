@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"testing"
 	"time"
@@ -11,6 +12,49 @@ import (
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
+
+func TestPlatformLicenseSelectionExcludesCustomerProducts(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewLicenseStoreWithDB(db)
+	now := time.Now()
+	create := func(key, product string, start time.Time) {
+		t.Helper()
+		require.NoError(t, store.Create(ctx, database.License{
+			Key: key, Product: product, Company: "customer", Email: "customer@example.com",
+			Edition: "Enterprise", MaxUser: 1, UserUUID: "owner",
+			StartTime: start, ExpireTime: now.Add(4 * time.Hour),
+		}))
+	}
+	// Imported customer licenses have no issuer; product must still exclude them.
+	create("customer-active", "CSGLite", now.Add(-time.Hour))
+	create("customer-upcoming", "CSGLite", now.Add(time.Hour))
+	_, err := store.GetLatestActivePlatform(ctx)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	_, err = store.GetNextUpcomingPlatform(ctx)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	create("platform-active", "CSGHub", now.Add(-time.Hour))
+	create("platform-upcoming", "CSGHub", now.Add(2*time.Hour))
+	create("newer-customer-active", "CSGLite", now.Add(-time.Hour))
+	active, err := store.GetLatestActivePlatform(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "platform-active", active.Key)
+	upcoming, err := store.GetNextUpcomingPlatform(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "platform-upcoming", upcoming.Key)
+	// Existing list-status lookups continue selecting across products.
+	active, err = store.GetLatestActive(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "newer-customer-active", active.Key)
+	upcoming, err = store.GetNextUpcoming(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "customer-upcoming", upcoming.Key)
+	licenses, total, err := store.List(ctx, types.QueryLicenseReq{Per: 20, Page: 1, Product: "CSGLite"})
+	require.NoError(t, err)
+	require.Equal(t, 3, total)
+	require.Len(t, licenses, 3)
+}
 
 func TestLicenseStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
@@ -176,7 +220,7 @@ func TestLicenseStore_List(t *testing.T) {
 					Email: "admin@acme.com", Remark: "approved by bob",
 					MaxUser: 50, StartTime: time.Now(),
 					ExpireTime: time.Now().Add(time.Hour),
-					UserUUID: "user5",
+					UserUUID:   "user5",
 				},
 			}
 			for _, l := range ls {

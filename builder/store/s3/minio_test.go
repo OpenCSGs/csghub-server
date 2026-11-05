@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
+	"opencsg.com/csghub-server/common/config"
 )
 
 func TestMinIO_UploadAndValidate(t *testing.T) {
@@ -120,4 +122,61 @@ func TestMinIO_UploadAndValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// NewMinioCore with an Amazon endpoint and a configured region signs presigned
+// URLs fully offline, so these tests assert the signed host matches the
+// (load-time normalized) configured endpoint for both dualstack settings.
+func TestNewMinioCore_DualstackSigningHost(t *testing.T) {
+	newCfg := func(endpoint string, enableDualstack bool) *config.Config {
+		cfg := &config.Config{}
+		cfg.S3.Endpoint = endpoint
+		cfg.S3.AccessKeyID = "access-key"
+		cfg.S3.AccessKeySecret = "secret-key"
+		cfg.S3.Region = "us-east-2"
+		cfg.S3.EnableSSL = true
+		cfg.S3.BucketLookup = "dns"
+		cfg.S3.EnableDualstack = enableDualstack
+		return cfg
+	}
+
+	t.Run("dualstack enabled signs dualstack host", func(t *testing.T) {
+		core, err := NewMinioCore(newCfg("s3.dualstack.us-east-2.amazonaws.com", true))
+		require.NoError(t, err)
+		u, err := core.PresignHeader(context.Background(), "PUT", "test-bucket", "test-key",
+			time.Hour, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, "test-bucket.s3.dualstack.us-east-2.amazonaws.com", u.Host)
+	})
+
+	t.Run("dualstack disabled signs configured host", func(t *testing.T) {
+		core, err := NewMinioCore(newCfg("s3.us-east-2.amazonaws.com", false))
+		require.NoError(t, err)
+		u, err := core.PresignHeader(context.Background(), "PUT", "test-bucket", "test-key",
+			time.Hour, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, "test-bucket.s3.us-east-2.amazonaws.com", u.Host)
+	})
+}
+
+// An S3 Express endpoint must survive client construction unchanged: minio
+// routes directory-bucket traffic to Express endpoints, and normalizing it to a
+// regular (dualstack) S3 host would silently break that routing.
+func TestNewMinioCore_ExpressEndpointPreserved(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.S3.Endpoint = "s3express-control.us-east-2.amazonaws.com"
+	cfg.S3.AccessKeyID = "access-key"
+	cfg.S3.AccessKeySecret = "secret-key"
+	cfg.S3.Region = "us-east-2"
+	cfg.S3.EnableSSL = true
+	cfg.S3.BucketLookup = "dns"
+	cfg.S3.EnableDualstack = true
+
+	core, err := NewMinioCore(cfg)
+	require.NoError(t, err)
+	u, err := core.PresignHeader(context.Background(), "PUT", "test-bucket", "test-key",
+		time.Hour, nil, nil)
+	require.NoError(t, err)
+	require.Contains(t, u.Host, "s3express")
+	require.NotContains(t, u.Host, "dualstack")
 }

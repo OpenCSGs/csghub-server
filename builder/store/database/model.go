@@ -235,14 +235,14 @@ func (s *modelStoreImpl) FindByPath(ctx context.Context, namespace string, name 
 		Relation("Repository.Mirror.CurrentTask").
 		Relation("Repository.Metadata").
 		Relation("Repository.Statistics").
-		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
+		Where("LOWER(repository.path) = LOWER(?)", fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).
 		Scan(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().
 		Set("path", fmt.Sprintf("%s/%s", namespace, name)),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find model,error: %w", err)
+		return nil, fmt.Errorf("failed to find model,error: %w", resourceLookupError(err, namespace, name))
 	}
 	err = s.db.Operator.Core.NewSelect().
 		Model(resModel.Repository).

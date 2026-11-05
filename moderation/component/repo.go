@@ -210,7 +210,8 @@ func (c *repoComponentImpl) saveCheckResult(ctx context.Context, file *database.
 		// set repository to private and set sensitive_check_status to fail
 		file.Repository.Private = true
 		file.Repository.SensitiveCheckStatus = types.SensitiveCheckFail
-		if _, err := c.rs.UpdateRepo(ctx, *file.Repository); err != nil {
+		// Moderation temporarily hides content without cancelling an owner's publication request.
+		if err := c.rs.UpdateRepoSensitiveCheckStatus(ctx, file.Repository.ID, types.SensitiveCheckFail); err != nil {
 			slog.ErrorContext(ctx, "failed to update repo sensitive check status", slog.Any("repository_id", file.Repository.ID),
 				slog.Int64("repository_file_id", file.ID), slog.String("path", file.Path),
 				slog.Any("error", err))

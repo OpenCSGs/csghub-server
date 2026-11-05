@@ -27,3 +27,11 @@ type WritableNamespace struct {
 	Name string `json:"name"`
 	UUID string `json:"uuid"`
 }
+
+// NamespaceChoice preserves the namespace identifier shape needed by recipient selectors.
+// It excludes embedded user profiles and unrelated namespace metadata.
+type NamespaceChoice struct {
+	Path string `json:"Path"`
+	Type string `json:"Type"`
+	UUID string `json:"UUID"`
+}

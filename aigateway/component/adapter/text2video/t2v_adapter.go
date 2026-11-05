@@ -67,6 +67,7 @@ func NewRegistry() *Registry {
 			NewSeedanceAdapter(),
 			NewLongCatAdapter(),
 			NewLightX2VAdapter(),
+			NewSGLangDiffusionAdapter(),
 			NewOpenAICompatibleAdapter(),
 		},
 	}

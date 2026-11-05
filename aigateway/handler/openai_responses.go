@@ -76,12 +76,12 @@ func (h *OpenAIHandlerImpl) resolvePreviousResponseRoute(c *gin.Context, previou
 		return route, true
 	}
 	if responsespkg.IsAdapterResponseID(previousResponseID) {
-		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "adapter response ids cannot be used as previous_response_id")
+		writeResponsesError(c, http.StatusBadRequest, types.ErrCodeUnsupportedFeature, types.ErrTypeInvalidRequest, "adapter response ids cannot be used as previous_response_id")
 		return route, false
 	}
 	mapper, err := h.getResponsesIDMapper()
 	if err != nil {
-		writeResponsesError(c, http.StatusInternalServerError, "internal_error", "internal_error", err.Error())
+		writeResponsesError(c, http.StatusInternalServerError, types.ErrCodeInternal, types.ErrTypeServer, err.Error())
 		return route, false
 	}
 	claims, err := mapper.Unwrap(previousResponseID, owner)
@@ -90,7 +90,7 @@ func (h *OpenAIHandlerImpl) resolvePreviousResponseRoute(c *gin.Context, previou
 		if errors.Is(err, responsespkg.ErrResponseIDOwner) {
 			code = "response_id_forbidden"
 		}
-		writeResponsesError(c, http.StatusBadRequest, code, "invalid_request_error", err.Error())
+		writeResponsesError(c, http.StatusBadRequest, code, types.ErrTypeInvalidRequest, err.Error())
 		return route, false
 	}
 	return previousResponseRoute{
@@ -109,9 +109,9 @@ func (h *OpenAIHandlerImpl) getResponsesIDMapper() (*responsespkg.IDMapper, erro
 func adapterErrorCode(err error) string {
 	msg := err.Error()
 	if strings.HasPrefix(msg, "unsupported_feature:") {
-		return "unsupported_feature"
+		return types.ErrCodeUnsupportedFeature
 	}
-	return "invalid_request_error"
+	return types.ErrCodeInvalidRequest
 }
 
 func writeResponsesError(c *gin.Context, status int, code, typ, message string) {

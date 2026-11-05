@@ -24,14 +24,19 @@ type MeteringResource struct {
 
 // BaseModel represents the base model fields
 type BaseModel struct {
-	ID                  string         `json:"id"`
-	Object              string         `json:"object"`
-	Created             int64          `json:"created"` // organization-owner (e.g. openai)
-	OwnedBy             string         `json:"owned_by"`
-	Task                string         `json:"task"`                            // like text-generation, text-to-image etc
-	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
-	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
-	Metadata            map[string]any `json:"metadata"`
+	ID                  string `json:"id"`
+	Object              string `json:"object"`
+	Created             int64  `json:"created"` // organization-owner (e.g. openai)
+	OwnedBy             string `json:"owned_by"`
+	Task                string `json:"task"`                            // like text-generation, text-to-image etc
+	SupportFunctionCall bool   `json:"support_function_call,omitempty"` // whether the model supports function calling
+	IsPinned            *bool  `json:"is_pinned,omitempty"`             // whether the model is pinned
+	// AccessPolicy is the model access policy of the source llm config. The
+	// model-services path fills it for whitelist-mode models only (the shared
+	// conversion never sets it, so every other response is safe by
+	// construction); the frontend renders a whitelist badge from it.
+	AccessPolicy string         `json:"access_policy,omitempty"`
+	Metadata     map[string]any `json:"metadata"`
 }
 
 // InternalModelInfo represents the internal model fields
@@ -78,6 +83,10 @@ type Model struct {
 	// request (set by applyEndpointOverrides); used for cost attribution in
 	// metering, never exposed on /v1/models.
 	UpstreamID int64 `json:"-"`
+	// AutoRoute marks the virtual model that stands for automatic model
+	// selection.  It has no upstream of its own and must be replaced with
+	// a real model before any upstream is resolved.
+	AutoRoute bool `json:"-"`
 }
 
 type UpstreamAvailability struct {
@@ -102,6 +111,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			OwnedBy             string                       `json:"owned_by"`
 			Task                string                       `json:"task"`
 			SupportFunctionCall *bool                        `json:"support_function_call,omitempty"`
+			AccessPolicy        string                       `json:"access_policy,omitempty"`
 			Endpoint            string                       `json:"endpoint"`
 			Upstreams           []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
 			RoutingPolicy       commontypes.RoutingPolicy    `json:"routing_policy,omitempty"`
@@ -125,6 +135,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Created:            m.Created,
 			OwnedBy:            m.OwnedBy,
 			Task:               m.Task,
+			AccessPolicy:       m.AccessPolicy,
 			Endpoint:           m.Endpoint,
 			Upstreams:          m.Upstreams,
 			RoutingPolicy:      m.RoutingPolicy,
@@ -190,6 +201,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Task                string                       `json:"task"`
 		DisplayName         string                       `json:"display_name"`
 		SupportFunctionCall bool                         `json:"support_function_call,omitempty"`
+		AccessPolicy        string                       `json:"access_policy,omitempty"`
 		Endpoint            string                       `json:"endpoint"`
 		Upstreams           []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
 		RoutingPolicy       commontypes.RoutingPolicy    `json:"routing_policy,omitempty"`
@@ -217,6 +229,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
 	m.SupportFunctionCall = aux.SupportFunctionCall
+	m.AccessPolicy = aux.AccessPolicy
 	m.Endpoint = aux.Endpoint
 	m.Upstreams = aux.Upstreams
 	m.RoutingPolicy = aux.RoutingPolicy
@@ -284,6 +297,29 @@ type ListModelsReq struct {
 	// caller's API key may access. The handler derives it from the API key's
 	// model scope, never from request input.
 	ModelScope []string `json:"-"`
+	// Caller identifies who is listing (visibility, pinned preferences,
+	// whitelist enforcement). The handler derives it from the auth context,
+	// never from request input.
+	Caller *commontypes.GatewayWhitelistCaller `json:"-"`
+}
+
+// GetAvailableModelsReq carries the parameters of
+// OpenAIComponent.GetAvailableModels. New query conditions are added as
+// fields here instead of changing the function signature.
+type GetAvailableModelsReq struct {
+	// Caller identifies who is listing (visibility, pinned preferences,
+	// whitelist enforcement).
+	Caller *commontypes.GatewayWhitelistCaller
+}
+
+// GetModelByIDReq carries the parameters of
+// OpenAIComponent.GetModelByID. New query conditions are added as fields
+// here instead of changing the function signature.
+type GetModelByIDReq struct {
+	// Caller identifies who is fetching (visibility, whitelist enforcement).
+	Caller *commontypes.GatewayWhitelistCaller
+	// ModelID is the public model id to resolve.
+	ModelID string
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method

@@ -16,6 +16,15 @@ type Tokenizer interface {
 	EmbeddingEncode(string) (int64, error)
 }
 
+// fallbackTokenizerFactory builds the last-resort tokenizer for models that
+// match no inference-engine imageID and no provider-specific implementation
+// (e.g. azure or gemini deployments). It approximates usage with the shared
+// cl100k_base BPE so token counting and billing keep working instead of
+// returning nil and silently disabling them. Package-level variable so tests
+// can inject an offline implementation; the real one downloads the cl100k_base
+// BPE file on first use.
+var fallbackTokenizerFactory = newTiktokenTokenizerImpl
+
 func NewTokenizerImpl(endpoint, host, model, imageID, provider string) Tokenizer {
 	// Internal models: use imageID to determine the inference engine
 	switch {
@@ -31,19 +40,16 @@ func NewTokenizerImpl(endpoint, host, model, imageID, provider string) Tokenizer
 		return newTEITokenizerImpl(endpoint, host, model)
 	}
 
-	// External models: when stream is interrupted (sensitive content), use provider-specific tokenizer to count tokens:
+	// External models: when stream is interrupted (sensitive content), use a
+	// local tokenizer to count tokens:
 	// 1. Usage chunk never arrives
 	// 2. Accumulate content from all chunks
-	// 3. Use provider-specific tokenizer to count
-	if provider != "" {
-		switch {
-		case strings.Contains(model, "gpt"), strings.Contains(model, "deepseek"): // PBE based tokenizer
-			return newTiktokenTokenizerImpl()
-		}
-		// TODO: add gemini tokenizer later, SentencePiece based tokenizer is not supported yet
-	}
-
-	return nil
+	// 3. Use the tokenizer to count
+	//
+	// No remaining provider has a dedicated tokenizer (azure, gemini, ...),
+	// so approximate with cl100k_base rather than returning nil.
+	// TODO: add gemini tokenizer later, SentencePiece based tokenizer is not supported yet
+	return fallbackTokenizerFactory()
 }
 
 var _ Tokenizer = (*DumyTokenizer)(nil)

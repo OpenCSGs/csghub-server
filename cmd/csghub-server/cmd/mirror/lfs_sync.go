@@ -12,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
+	sharedcomponent "opencsg.com/csghub-server/component"
 	mirrorcomponent "opencsg.com/csghub-server/mirror/component"
 	"opencsg.com/csghub-server/mirror/lfssyncer"
 	"opencsg.com/csghub-server/mirror/router"
@@ -59,10 +60,18 @@ var lfsSyncCmd = &cobra.Command{
 			return err
 		}
 
+		reporter := sharedcomponent.NewMirrorMetricsReporter(cfg, "lfs")
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			reporter.Stop(ctx)
+		}()
+
 		lfsWorkClient, err := mirrorcomponent.NewLFSWorkClient(context.Background(), cfg.Database.DSN, mirrorcomponent.LFSWorkDeps{
 			MirrorTaskStore: database.NewMirrorTaskJobStore(),
 			Syncer:          lfsSyncer,
 			MaxWorkers:      cfg.Mirror.WorkerNumber,
+			Reporter:        reporter,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create LFS workhub client: %w", err)
@@ -70,7 +79,9 @@ var lfsSyncCmd = &cobra.Command{
 		if err := lfsWorkClient.Start(context.Background()); err != nil {
 			return fmt.Errorf("failed to start LFS workhub client: %w", err)
 		}
+		reporter.SetState("ready")
 		defer func() {
+			reporter.SetState("stopping")
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := lfsWorkClient.Stop(ctx); err != nil {

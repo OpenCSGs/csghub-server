@@ -37,6 +37,16 @@ unsafe_rules = [
     { level = "Controversial", category = "Politically Sensitive Topics" }
 ]
 
+# EE/SaaS automatic model selection (unavailable in CE).
+# Leave server_url empty to disable: the
+# virtual model is then not published and every request must name a
+# concrete model.
+[aigateway.semantic_router]
+server_url = ""
+model_id = "auto"
+timeout_seconds = 5
+health_ttl_seconds = 300
+
 [agent]
 orchestrator_readiness_timeout_seconds = 1800
 orchestrator_gateway_wait_timeout_seconds = 30
@@ -104,11 +114,24 @@ password = "password123"
 [frontend]
 url = "https://opencsg.com"
 
+# Explicit browser origins allowed to read responses cross-origin. Setting at
+# least one valid entry makes this list the whole whitelist and disables
+# derivation. When left empty the middleware falls back to the deployment's own
+# addresses: the frontend URL above, the API public domain, and a per-label
+# wildcard over the space public root domain. Add any other legitimate
+# frontend origins (e.g. AgenticHub) here.
+[cors]
+allowed_origins = []
+
 [s3]
 access_key_id = "H0xkbJj7e86gv2tJYucv"
 access_key_secret = "KNmbQNkgxUYwKarIPHeKXAWWgrjTp4fPt0PykXsG"
 region = ""
 endpoint = "localhost:9000"
+# AWS S3 only: use dual-stack (IPv4+IPv6) endpoints. When true, an amazonaws.com
+# endpoint is normalized to its s3.dualstack form so presigned URLs stay valid
+# when proxied through the storage gateway.
+enable_dualstack = true
 bucket = "opencsg-test"
 enable_ssl = false
 public_bucket = "opencsg-public-resource"
@@ -135,7 +158,7 @@ media_moderation_poll_interval = "30s"
 # How long the poll workflow runs before it finalizes (and deletes the comment
 # if media is still non-terminal).
 media_moderation_workflow_timeout = "30m"
-# "ac_automaton", "mutable_ac_automaton", "aliyun_green", "guard_llm"]
+# "ac_automaton", "mutable_ac_automaton", "aliyun_green"]
 check_chain = ["ac_automaton", "mutable_ac_automaton", "aliyun_green"]
 stream_check_mode = "async"
 async_buffer_max_chars = 50
@@ -147,35 +170,7 @@ max_content_length = 7000
 # Zero keeps the legacy all-synchronous behavior.
 prompt_max_chunks = 3
 
-[sensitive_check.llm]
-enable = false
-timeout_ms = 1200
-max_tokens = 50
-temperature = 0.0
-response_mode = "json_or_text"
 
-# Model configurations - each model must have a type: "guard" or "guard_stream"
-# Type "guard" is used for non-streaming content checks
-# Type "guard_stream" is used for streaming content checks
-[[sensitive_check.llm.model_configs]]
-model = "Qwen/Qwen3Guard-Gen-0.6B"
-type = "guard"
-# Optional: override default endpoint for this model
-endpoint = "https://aigateway.prod.com/v1/chat/completions"
-# Optional: override default headers for this model
-[sensitive_check.llm.model_configs.headers]
-Authorization = "Bearer custom-token-1"
-Host = "custom-host1.example.com"
-
-[[sensitive_check.llm.model_configs]]
-model = "Qwen/Qwen3Guard-Stream-0.6B"
-type = "guard_stream"
-# Optional: override default endpoint for this model
-endpoint = "https://aigateway.stream.com/v1/chat/completions"
-# Optional: override default headers for this model
-[sensitive_check.llm.model_configs.headers]
-Authorization = "Bearer custom-token-2"
-Host = "custom-host2.example.com"
 
 [jwt]
 signing_key = "signing-key"

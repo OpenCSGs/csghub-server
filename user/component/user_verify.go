@@ -14,7 +14,9 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// UserVerifyComponent coordinates manual verification and edition-specific identity operations.
 type UserVerifyComponent interface {
+	userVerifyEditionAPI
 	Create(ctx context.Context, req *types.UserVerifyReq) (*database.UserVerify, error)
 	Update(ctx context.Context, id int64, status types.VerifyStatus, reason string) (*database.UserVerify, error)
 	Get(ctx context.Context, UUID string) (*database.UserVerify, error)
@@ -22,6 +24,7 @@ type UserVerifyComponent interface {
 }
 
 type UserVerifyComponentImpl struct {
+	userVerifyEdition
 	userVerifyStore       database.UserVerifyStore
 	userStore             database.UserStore
 	notificationSvcClient rpc.NotificationSvcClient
@@ -35,12 +38,20 @@ func NewUserVerifyComponent(config *config.Config) (UserVerifyComponent, error) 
 	c.config = config
 	c.notificationSvcClient = rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
 		rpc.AuthWithApiKey(config.APIToken))
+	if err := c.initVerifyEdition(config); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
+// Create applies edition-specific owner resolution before storing manual verification material.
 func (uv *UserVerifyComponentImpl) Create(ctx context.Context, req *types.UserVerifyReq) (*database.UserVerify, error) {
+	userUUID, err := uv.manualVerificationUUID(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	userVerify, err := uv.userVerifyStore.CreateUserVerify(ctx, &database.UserVerify{
-		UUID:        req.UUID,
+		UUID:        userUUID,
 		RealName:    req.RealName,
 		Username:    req.Username,
 		IDCardFront: req.IDCardFront,
@@ -58,31 +69,40 @@ func (uv *UserVerifyComponentImpl) Create(ctx context.Context, req *types.UserVe
 	return userVerify, nil
 }
 
+// Update completes a pending manual review atomically and dispatches effects only for the winning transition.
 func (uv *UserVerifyComponentImpl) Update(ctx context.Context, id int64, status types.VerifyStatus, reason string) (*database.UserVerify, error) {
 	userVerify, err := uv.userVerifyStore.UpdateUserVerify(ctx, id, status, reason)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user verify, error: %w", err)
 	}
-	err = uv.userStore.UpdateVerifyStatus(ctx, userVerify.UUID, status)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update user verify status, error: %w", err)
-	}
-
-	go func() {
-		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		err = uv.sendNotification(notificationCtx, status, userVerify.UUID)
-		if err != nil {
-			slog.ErrorContext(notificationCtx, "failed to send user verify notification", slog.Any("error", err))
-		}
-	}()
+	uv.afterVerificationCompleted(status, userVerify.UUID)
 	return userVerify, nil
 }
 
+// afterVerificationCompleted dispatches rewards and notifications after a committed terminal transition.
+// Callers must invoke it only after winning the database transition; retries and stale results must not reach it.
+func (uv *UserVerifyComponentImpl) afterVerificationCompleted(status types.VerifyStatus, userUUID string) {
+	uv.afterVerifyUpdated(status, userUUID)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := uv.sendNotification(ctx, status, userUUID); err != nil {
+			slog.ErrorContext(ctx, "failed to send user verify notification", slog.Any("error", err))
+		}
+	}()
+}
+
+// Get applies edition-specific ownership checks before reading and enriching verification data.
 func (uv *UserVerifyComponentImpl) Get(ctx context.Context, uuid string) (*database.UserVerify, error) {
+	if err := uv.authorizeVerificationQuery(ctx, uuid); err != nil {
+		return nil, err
+	}
 	userVerify, err := uv.userVerifyStore.GetUserVerify(ctx, uuid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user verify, error: %w", err)
+	}
+	if err := uv.enrichVerification(userVerify); err != nil {
+		return nil, err
 	}
 	return userVerify, nil
 }

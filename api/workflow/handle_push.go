@@ -97,6 +97,10 @@ func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) e
 		logger.Error("[git_callback] failed to calculate repo size", slog.Any("error", err), slog.Any("req", req))
 		return err
 	}
+	if err := submitSecurityScanFromPush(actCtx, req); err != nil {
+		logger.Error("[git_callback] failed to submit security scan", slog.Any("error", err))
+		return err
+	}
 
 	logger.Info("[git_callback] handle push workflow ended", slog.Any("req.Repository.FullName", req.Repository.FullName))
 

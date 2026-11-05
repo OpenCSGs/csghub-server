@@ -359,7 +359,7 @@ func (c *promptComponentImpl) checkPromptRepoPermission(ctx context.Context, req
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
@@ -600,7 +600,7 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}

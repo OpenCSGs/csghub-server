@@ -15,11 +15,12 @@ func TestUserLikeStore_Add(t *testing.T) {
 	ctx := context.TODO()
 
 	ulikeStore := database.NewUserLikesStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	r, err := repoStore.CreateRepo(ctx, database.Repository{
-		ID: 2,
-	})
+	r, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path: "fixtures/repo",
+		ID:   2,
+	}))
 	require.Nil(t, err)
 	require.Equal(t, r.ID, int64(2))
 
@@ -104,12 +105,13 @@ func TestUserLikeStore_Delete(t *testing.T) {
 	ctx := context.TODO()
 
 	ulikeStore := database.NewUserLikesStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	r, err := repoStore.CreateRepo(ctx, database.Repository{
+	r, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path:  "fixtures/repo",
 		ID:    2,
 		Likes: 1,
-	})
+	}))
 	require.Nil(t, err)
 	require.Equal(t, r.ID, int64(2))
 
@@ -137,12 +139,13 @@ func TestUserLikeStore_IsExist(t *testing.T) {
 	ctx := context.TODO()
 
 	ulikeStore := database.NewUserLikesStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
-	r, err := repoStore.CreateRepo(ctx, database.Repository{
-		ID: 2,
-	})
+	r, err := repoStore.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
+		Path: "fixtures/repo",
+		ID:   2,
+	}))
 	require.Nil(t, err)
 	require.Equal(t, r.ID, int64(2))
 
@@ -168,7 +171,7 @@ func TestUserLikeStore_IsExistCollection(t *testing.T) {
 	ctx := context.TODO()
 
 	ulikeStore := database.NewUserLikesStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	colStore := database.NewCollectionStoreWithDB(db)
 
 	err := userStore.Create(ctx, &database.User{

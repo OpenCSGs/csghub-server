@@ -65,6 +65,14 @@ type AccountTokenPlanInstance struct {
 	ExpiredAt          int64                    `bun:",nullzero" json:"expired_at"`
 	CreatedBy          string                   `bun:",notnull" json:"created_by"` // user
 	times
+	// NamespacePath is not persisted. It is resolved for admin listings so the
+	// console can show which namespace owns an instance without a second lookup.
+	NamespacePath string `bun:"-" json:"namespace_path"`
+	// TotalAmount and TotalCost are not persisted. They are the summed amount
+	// paid and the summed metered cost of every billing period of this instance,
+	// in cents as stored; converting them to yuan is the caller's job.
+	TotalAmount       float64                         `bun:"-" json:"total_amount"`
+	TotalCost         float64                         `bun:"-" json:"total_cost"`
 	LatestPeriod      *AccountTokenPlanInstancePeriod `bun:"-" json:"latest_period,omitempty"`
 	LatestPlanVersion *AccountTokenPlanVersion        `bun:"-" json:"latest_plan_version,omitempty"`
 }
@@ -86,8 +94,28 @@ type AccountTokenPlanInstancePeriod struct {
 	RetryCount    int64                `bun:",notnull,default:0" json:"retry_count"`
 	RetryAt       int64                `bun:",notnull,default:0" json:"retry_at"`
 	times
+	CostAmount   float64                            `bun:",notnull,default:0" json:"cost_amount"` // cent
 	ModelsUsage  []AccountTokenPlanPeriodModelQuota `bun:"-" json:"models_usage,omitempty"`
 	APIKeysUsage []AccountTokenPlanPeriodKeyQuota   `bun:"-" json:"api_keys_usage,omitempty"`
+}
+
+// TokenPlanPeriodWithPlanVersion pairs a billing period with the immutable
+// plan version snapshot that governs it.
+type TokenPlanPeriodWithPlanVersion struct {
+	AccountTokenPlanInstancePeriod
+	PlanVersion *AccountTokenPlanVersion
+}
+
+// TokenPlanPeriodListResult is one page of billing periods together with the
+// total count and summed amounts of every period matching the same filter.
+// TotalAmount is in cents. TotalCost is populated only for the admin instance
+// listing; namespace listings leave it zero because they do not expose
+// metered cost.
+type TokenPlanPeriodListResult struct {
+	Periods     []TokenPlanPeriodWithPlanVersion
+	Total       int
+	TotalAmount int64
+	TotalCost   float64
 }
 
 // AccountTokenPlanPeriodModelQuota holds the runtime per-model quota balance for

@@ -51,7 +51,7 @@ func TestWorkerForRegistryUsesKindTimeout(t *testing.T) {
 
 // TestWorkClientRescueStuckJobsAfter verifies work clients use the shared rescue threshold.
 func TestWorkClientRescueStuckJobsAfter(t *testing.T) {
-	require.Equal(t, MirrorLFSJobTimeout+5*time.Minute, workClientRescueStuckJobsAfter)
+	require.Equal(t, 10*time.Minute, workClientRescueStuckJobsAfter)
 }
 
 // TestMaintenanceWorkerRejectsExecution verifies a fallback cannot silently complete business work.
@@ -71,6 +71,7 @@ func TestMaintenanceWorkerRejectsExecution(t *testing.T) {
 func TestNewWorkerRegistryBuildsAllKnownKinds(t *testing.T) {
 	require.NotNil(t, NewWorkerRegistry(WorkerOverrides{}))
 	require.NotNil(t, NewWorkerRegistry(WorkerOverrides{
+		RebacTuple:           &registryTestWorker[RebacTupleArgs]{},
 		MirrorRepo:           &registryTestWorker[RepoArgs]{},
 		MirrorLFS:            &registryTestWorker[LFSArgs]{},
 		RepositoryDeletion:   &registryTestWorker[RepositoryDeletionArgs]{},

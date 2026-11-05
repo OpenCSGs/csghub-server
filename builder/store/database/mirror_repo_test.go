@@ -45,9 +45,10 @@ func assertQueuedMirrorTask(t *testing.T, ctx context.Context, db *database.DB, 
 func TestMirrorRepoStore_CreateMirrorRepoRecordsForExistingRepo(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	seedTupleNamespace(t, db, "ns")
 	ctx := context.TODO()
 
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, database.Repository{
 		UserID:         1,
 		Path:           "ns/name",
 		GitPath:        "models_ns/name",
@@ -60,7 +61,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForExistingRepo(t *testing.T) {
 	require.NoError(t, err)
 
 	jobClient := &fakeMirrorJobClient{}
-	store := database.NewMirrorRepoStoreWithDB(db, jobClient)
+	store := database.NewMirrorRepoStoreWithJobClients(db, jobClient, tests.NewFixtureRebacTupleJobClient(db))
 	mirror, err := store.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository: repo,
 		Urgent:     true,
@@ -84,7 +85,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForExistingRepo(t *testing.T) {
 	require.True(t, jobClient.inputs[0].Urgent)
 	assertQueuedMirrorTask(t, ctx, db, mirror, true)
 
-	reloadedRepo, err := database.NewRepoStoreWithDB(db).FindByPath(ctx, types.ModelRepo, "ns", "name")
+	reloadedRepo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).FindByPath(ctx, types.ModelRepo, "ns", "name")
 	require.NoError(t, err)
 	require.Equal(t, types.SyncStatusPending, reloadedRepo.SyncStatus)
 
@@ -103,9 +104,10 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForExistingRepo(t *testing.T) {
 func TestMirrorRepoStore_CreateMirrorRepoRecordsUpdatesExistingRepoSourceFields(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	seedTupleNamespace(t, db, "ns")
 	ctx := context.TODO()
 
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, database.Repository{
 		UserID:         1,
 		Path:           "ns/source",
 		GitPath:        "models_ns/source",
@@ -118,7 +120,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsUpdatesExistingRepoSourceFields(
 	require.NoError(t, err)
 
 	repo.GithubPath = "upstream/source"
-	store := database.NewMirrorRepoStoreWithDB(db, &fakeMirrorJobClient{})
+	store := database.NewMirrorRepoStoreWithJobClients(db, &fakeMirrorJobClient{}, tests.NewFixtureRebacTupleJobClient(db))
 	_, err = store.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository: repo,
 		Mirror: database.Mirror{
@@ -129,7 +131,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsUpdatesExistingRepoSourceFields(
 	})
 	require.NoError(t, err)
 
-	reloadedRepo, err := database.NewRepoStoreWithDB(db).FindByPath(ctx, types.ModelRepo, "ns", "source")
+	reloadedRepo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).FindByPath(ctx, types.ModelRepo, "ns", "source")
 	require.NoError(t, err)
 	require.Equal(t, "upstream/source", reloadedRepo.GithubPath)
 }
@@ -138,10 +140,11 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsUpdatesExistingRepoSourceFields(
 func TestMirrorRepoStore_CreateMirrorRepoRecordsForNewRepo(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	seedTupleNamespace(t, db, "ns")
 	ctx := context.TODO()
 
 	jobClient := &fakeMirrorJobClient{}
-	store := database.NewMirrorRepoStoreWithDB(db, jobClient)
+	store := database.NewMirrorRepoStoreWithJobClients(db, jobClient, tests.NewFixtureRebacTupleJobClient(db))
 	mirror, err := store.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		CreateRepository: true,
 		Repository: &database.Repository{
@@ -173,7 +176,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForNewRepo(t *testing.T) {
 	require.Equal(t, "ns/new", jobClient.inputs[0].RepoPath)
 	assertQueuedMirrorTask(t, ctx, db, mirror, false)
 
-	repo, err := database.NewRepoStoreWithDB(db).FindByPath(ctx, types.ModelRepo, "ns", "new")
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).FindByPath(ctx, types.ModelRepo, "ns", "new")
 	require.NoError(t, err)
 	require.Equal(t, mirror.RepositoryID, repo.ID)
 	require.Equal(t, "models_ns/new", repo.GitPath)
@@ -185,10 +188,11 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForNewRepo(t *testing.T) {
 func TestMirrorRepoStore_CreateMirrorRepoRecordsForNewCodeRepoSetsLastUpdatedAt(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	seedTupleNamespace(t, db, "ns")
 	ctx := context.TODO()
 
 	jobClient := &fakeMirrorJobClient{}
-	store := database.NewMirrorRepoStoreWithDB(db, jobClient)
+	store := database.NewMirrorRepoStoreWithJobClients(db, jobClient, tests.NewFixtureRebacTupleJobClient(db))
 	mirror, err := store.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		CreateRepository: true,
 		Repository: &database.Repository{
@@ -218,9 +222,10 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForNewCodeRepoSetsLastUpdatedAt(
 func TestMirrorRepoStore_CreateMirrorRepoRecordsForMCPServerRows(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	seedTupleNamespace(t, db, "ns")
 	ctx := context.TODO()
 
-	store := database.NewMirrorRepoStoreWithDB(db, &fakeMirrorJobClient{})
+	store := database.NewMirrorRepoStoreWithJobClients(db, &fakeMirrorJobClient{}, tests.NewFixtureRebacTupleJobClient(db))
 	mirror, err := store.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		CreateRepository: true,
 		Repository: &database.Repository{
@@ -255,7 +260,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForMCPServerRows(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	mcpServer, err := database.NewMCPServerStoreWithDB(db).ByRepoID(ctx, mirror.RepositoryID)
+	mcpServer, err := database.NewMCPServerStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db)).ByRepoID(ctx, mirror.RepositoryID)
 	require.NoError(t, err)
 	require.Equal(t, 1, mcpServer.ToolsNum)
 	require.Equal(t, `{"mode":"stdio"}`, mcpServer.Configuration)
@@ -279,9 +284,10 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForMCPServerRows(t *testing.T) {
 func TestMirrorRepoStore_CreateMirrorRepoRecordsRollsBackWhenJobInsertFails(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	seedTupleNamespace(t, db, "ns")
 	ctx := context.TODO()
 
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, database.Repository{
 		UserID:         1,
 		Path:           "ns/rollback",
 		GitPath:        "models_ns/rollback",
@@ -294,7 +300,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsRollsBackWhenJobInsertFails(t *t
 	require.NoError(t, err)
 
 	jobClient := &fakeMirrorJobClient{err: errors.New("insert job failed")}
-	store := database.NewMirrorRepoStoreWithDB(db, jobClient)
+	store := database.NewMirrorRepoStoreWithJobClients(db, jobClient, tests.NewFixtureRebacTupleJobClient(db))
 	_, err = store.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository: repo,
 		Mirror: database.Mirror{
@@ -322,12 +328,13 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsRollsBackWhenJobInsertFails(t *t
 func TestMirrorRepoStore_CreateMirrorRepoRecordsRollsBackNewRepoWhenJobInsertFails(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	seedTupleNamespace(t, db, "ns")
 	ctx := context.TODO()
 
 	sourceURL := "https://github.com/upstream/new-rollback.git"
 	repoPath := "ns/new-rollback"
 	jobClient := &fakeMirrorJobClient{err: errors.New("insert job failed")}
-	store := database.NewMirrorRepoStoreWithDB(db, jobClient)
+	store := database.NewMirrorRepoStoreWithJobClients(db, jobClient, tests.NewFixtureRebacTupleJobClient(db))
 
 	_, err := store.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		CreateRepository: true,

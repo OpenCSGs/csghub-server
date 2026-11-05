@@ -20,42 +20,39 @@ import (
 // includes a recharge URL.  When frontendURL is empty the recharge link
 // will be relative ("/settings/recharge-payment").
 func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan, err error, frontendURL string) {
+	if handleRoutingInputPlanError(c, p, err) {
+		return
+	}
 	if p != nil {
 		switch p.ErrorCode {
 		case types.PlanErrModelNotFound:
 			c.JSON(http.StatusNotFound, gin.H{"error": types.Error{
-				Code: "model_not_found", Message: err.Error(), Type: "not_found_error",
+				Code: types.ErrCodeModelNotFound, Message: err.Error(), Type: types.ErrTypeInvalidRequest,
 			}})
 			return
 		case types.PlanErrModelUnavailable:
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": types.Error{
-				Code: "model_unavailable", Message: err.Error(), Type: "server_error",
+				Code: types.ErrCodeModelUnavailable, Message: err.Error(), Type: types.ErrTypeServer,
 			}})
 			return
 		case types.PlanErrInsufficientBalance:
-			c.JSON(http.StatusPaymentRequired, gin.H{"error": gin.H{
-				"code":    "insufficient_balance",
-				"message": insufficientBalanceMessage(frontendURL),
-				"type":    "insufficient_balance",
+			c.JSON(http.StatusPaymentRequired, gin.H{"error": types.Error{
+				Code: types.ErrCodeInsufficientBalance, Message: insufficientBalanceMessage(frontendURL), Type: types.ErrTypeInsufficientBalance,
 			}})
 			return
 		case types.PlanErrQuotaExceeded:
 			// The tenant's own token plan allowance for this model is spent:
 			// a client-facing 429, not an outage (which stays PlanErrInternal).
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": gin.H{
-				"code":    "token_plan_quota_exceeded",
-				"message": err.Error(),
-				"type":    "rate_limit_error",
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": types.Error{
+				Code: types.ErrCodeTokenPlanQuotaExceeded, Message: err.Error(), Type: types.ErrTypeRateLimit,
 			}})
 			return
 		case types.PlanErrQueueTimeout:
 			// The client's queue-wait tolerance expired, not the capacity
 			// gate: 408, no Retry-After (the retry decision is the
 			// client's; the queue position is already released).
-			c.JSON(http.StatusRequestTimeout, gin.H{"error": gin.H{
-				"code":    "queue_timeout",
-				"message": "queued request exceeded its queue wait time for model capacity",
-				"type":    "timeout_error",
+			c.JSON(http.StatusRequestTimeout, gin.H{"error": types.Error{
+				Code: types.AdmissionReasonQueueTimeout, Message: types.MsgQueueTimeout, Type: types.ErrTypeTimeout,
 			}})
 			return
 		case types.PlanErrQueueCancelled:
@@ -64,22 +61,20 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 			// admission_lease rendering for consistency. In practice the
 			// response rarely reaches the client; this covers the race
 			// where the disconnect is observed only after the plan phase.
-			c.JSON(http.StatusRequestTimeout, gin.H{"error": gin.H{
-				"code":    "queue_cancelled",
-				"message": "request left the admission queue before being served",
-				"type":    "timeout_error",
+			c.JSON(http.StatusRequestTimeout, gin.H{"error": types.Error{
+				Code: types.AdmissionReasonQueueCancelled, Message: types.MsgQueueCancelled, Type: types.ErrTypeTimeout,
 			}})
 			return
 		case types.PlanErrCapacityExceeded:
-			message := "model capacity exceeded, please retry later"
+			message := types.MsgCapacityExceeded
 			retryAfter := int64(1)
-			code := "capacity_exceeded"
+			code := types.AdmissionReasonCapacityExceeded
 			if p.Admission != nil {
 				if p.Admission.Reason != "" {
 					message = "model capacity exceeded: " + p.Admission.Reason
 				}
 				if p.Admission.Reason == types.AdmissionReasonQueueFull {
-					code = "queue_full"
+					code = types.AdmissionReasonQueueFull
 				}
 				if p.Admission.RetryAfterSeconds > 0 {
 					retryAfter = p.Admission.RetryAfterSeconds
@@ -87,33 +82,36 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 			}
 			// Retry-After is a retry hint, not a capacity guarantee.
 			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": gin.H{
-				"code":    code,
-				"message": message,
-				"type":    "rate_limit_error",
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": types.Error{
+				Code: code, Message: message, Type: types.ErrTypeRateLimit,
 			}})
 			return
 		case types.PlanErrDisabled:
 			c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-				Code: "unsupported_feature", Message: fmt.Sprintf("this endpoint is not available for this model: %v", err), Type: "invalid_request_error",
+				Code: types.ErrCodeUnsupportedFeature, Message: fmt.Sprintf("this endpoint is not available for this model: %v", err), Type: types.ErrTypeInvalidRequest,
 			}})
 			return
 		case types.PlanErrSensitive:
-			message := "content blocked due to safety policy"
+			message := types.MsgContentBlocked
 			if p.Safety != nil && p.Safety.Message != "" {
 				message = p.Safety.Message
 			}
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{
-				"code":    "content_policy_violation",
-				"message": message,
-				"type":    "invalid_request_error",
+			c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+				Code: types.ErrCodeContentPolicyViolation, Message: message, Type: types.ErrTypeInvalidRequest,
+			}})
+			return
+		case types.PlanErrUpstreamPriorityDenied:
+			// The caller's user-tag priority admits no available upstream of
+			// this model: a client-facing 403, not an outage.
+			c.JSON(http.StatusForbidden, gin.H{"error": types.Error{
+				Code: types.ErrCodeUpstreamPriorityDenied, Message: err.Error(), Type: types.ErrTypePermission,
 			}})
 			return
 		case types.PlanErrInternal:
 			slog.ErrorContext(c.Request.Context(), "plan internal error",
 				slog.String("model", meta.Model), slog.Any("error", err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-				Code: "internal_error", Message: "an internal error occurred while processing the request", Type: "internal_error",
+				Code: types.ErrCodeInternal, Message: types.MsgInternalError, Type: types.ErrTypeServer,
 			}})
 			return
 		}
@@ -125,6 +123,6 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 	slog.ErrorContext(c.Request.Context(), "plan error",
 		slog.String("model", meta.Model), slog.Any("error", err))
 	c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-		Code: "internal_error", Message: "an internal error occurred while processing the request", Type: "internal_error",
+		Code: types.ErrCodeInternal, Message: types.MsgInternalError, Type: types.ErrTypeServer,
 	}})
 }

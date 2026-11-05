@@ -36,11 +36,14 @@ type MirrorStore interface {
 	ToSyncLfs(ctx context.Context) ([]Mirror, error)
 	IndexWithPagination(ctx context.Context, per, page int, filter types.MirrorFilter, hasRepo bool) (mirrors []Mirror, count int, err error)
 	StatusCount(ctx context.Context) ([]MirrorStatusCount, error)
+	// QueueCounts counts distinct waiting repositories for the Repo and LFS stages.
+	QueueCounts(ctx context.Context) (types.MirrorMetricsQueues, error)
 	UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error
 	FindBySourceURLs(ctx context.Context, sourceURLs []string) ([]Mirror, error)
 	BatchUpdate(ctx context.Context, mirrors []Mirror) error
 	BatchCreate(ctx context.Context, mirrors []Mirror) error
 	ToBeScheduled(ctx context.Context) ([]Mirror, error)
+	DeferScheduledMirror(ctx context.Context, mirrorID int64, until time.Time) error
 	Delete(ctx context.Context, mirror *Mirror) error
 	DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient MirrorJobCancelClient) error
 }
@@ -80,6 +83,8 @@ type Mirror struct {
 	PushUsername           string                 `bun:",nullzero" json:"-"`
 	PushAccessToken        string                 `bun:",nullzero" json:"-"`
 	RepositoryID           int64                  `bun:",notnull" json:"repository_id"`
+	RepositoryType         types.RepositoryType   `bun:"repository_type,nullzero" json:"repository_type"`
+	RepositoryCreatorID    int64                  `bun:"repository_creator_id,nullzero" json:"-"`
 	Repository             *Repository            `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	LastUpdatedAt          time.Time              `bun:",nullzero" json:"last_updated_at"`
 	SourceRepoPath         string                 `bun:",nullzero" json:"source_repo_path"`
@@ -292,9 +297,20 @@ func (s *mirrorStoreImpl) PushedMirror(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
+// Update changes mirror configuration without overwriting task-owned state from
+// a stale snapshot. Taskless legacy mirrors may still record scheduling failures.
+// A zero repository ID from a pre-binding snapshot must not detach a bound mirror.
 func (s *mirrorStoreImpl) Update(ctx context.Context, mirror *Mirror) (err error) {
 	err = assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
 		Model(mirror).
+		Column("interval", "source_url", "mirror_source_id", "username", "access_token",
+			"push_url", "push_username", "push_access_token", "repository_id",
+			"repository_type", "repository_creator_id", "last_updated_at",
+			"source_repo_path", "local_repo_path", "push_mirror_created",
+			"mirror_priority", "remote_updated_at", "updated_at", "status", "last_message").
+		Value("repository_id", "COALESCE(NULLIF(?, 0), mirror.repository_id)", mirror.RepositoryID).
+		Value("status", "CASE WHEN COALESCE(mirror.current_task_id, 0) = 0 THEN ? ELSE mirror.status END", mirror.Status).
+		Value("last_message", "CASE WHEN COALESCE(mirror.current_task_id, 0) = 0 THEN ? ELSE mirror.last_message END", mirror.LastMessage).
 		WherePK().
 		Exec(ctx),
 	)
@@ -534,21 +550,40 @@ func (s *mirrorStoreImpl) UpdateMirrorAndRepository(ctx context.Context, mirror 
 }
 
 func (s *mirrorStoreImpl) FindBySourceURLs(ctx context.Context, sourceURLs []string) ([]Mirror, error) {
+	// Preserve exact host/path matching while recognizing historical URLs without .git.
+	candidates := make([]string, 0, len(sourceURLs)*2)
+	for _, sourceURL := range sourceURLs {
+		base := strings.TrimSuffix(sourceURL, ".git")
+		candidates = append(candidates, base, base+".git")
+	}
 	var mirrors []Mirror
 	_, err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
-		Where("source_url in (?)", bun.In(sourceURLs)).
+		Relation("Repository").
+		Where("mirror.source_url in (?)", bun.In(candidates)).
 		Exec(ctx, &mirrors)
 	return mirrors, err
 }
 
 func (s *mirrorStoreImpl) BatchUpdate(ctx context.Context, mirrors []Mirror) error {
-	_, err := s.db.Operator.Core.NewUpdate().
-		Model(&mirrors).
-		Column("remote_updated_at", "mirror_priority", "username", "access_token").
-		Bulk().
-		Exec(ctx)
-	return err
+	return s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		for i := range mirrors {
+			mirror := &mirrors[i]
+			_, err := tx.NewUpdate().Model(mirror).
+				Set("remote_updated_at = ?", mirror.RemoteUpdatedAt).
+				Set("mirror_priority = ?", mirror.Priority).
+				Set("username = ?", mirror.Username).
+				Set("access_token = ?", mirror.AccessToken).
+				Set("status = CASE WHEN mirror.repository_id = 0 THEN ? ELSE mirror.status END", mirror.Status).
+				Set("repository_type = CASE WHEN mirror.repository_id = 0 THEN ? ELSE mirror.repository_type END", mirror.RepositoryType).
+				Set("repository_creator_id = CASE WHEN mirror.repository_id = 0 THEN ? ELSE mirror.repository_creator_id END", mirror.RepositoryCreatorID).
+				WherePK().Exec(ctx)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *mirrorStoreImpl) BatchCreate(ctx context.Context, mirrors []Mirror) error {
@@ -567,9 +602,57 @@ func (s *mirrorStoreImpl) ToBeScheduled(ctx context.Context) ([]Mirror, error) {
 			"mirror.remote_updated_at > mirror.updated_at or (mirror.repository_id = 0 and mirror.status = ?)",
 			types.MirrorQueued,
 		).
-		Distinct().
+		Where("mirror.repository_id != 0 OR mirror.next_execution_timestamp IS NULL OR mirror.next_execution_timestamp <= ?", time.Now()).
+		// Bound mirrors with active work wait outside the limited scheduling batch.
+		Where("mirror.repository_id = 0 OR NOT EXISTS (SELECT 1 FROM mirror_tasks AS active_task WHERE active_task.id = mirror.current_task_id AND active_task.status IN (?))", bun.In(activeMirrorTaskStatuses)).
+		// Fresh work precedes retries even when the cron interval exceeds the backoff.
+		OrderExpr("CASE WHEN mirror.repository_id = 0 AND mirror.next_execution_timestamp IS NOT NULL THEN 1 ELSE 0 END ASC").
+		OrderExpr("CASE WHEN mirror.repository_id = 0 THEN mirror.next_execution_timestamp END ASC NULLS FIRST").
 		Order("mirror_priority asc").
+		Order("mirror.id asc").
 		Limit(100).
 		Scan(ctx)
 	return mirrors, err
+}
+
+// DeferScheduledMirror releases a legacy scheduling slot without overwriting source
+// metadata that a concurrent crawler may have refreshed.
+func (s *mirrorStoreImpl) DeferScheduledMirror(ctx context.Context, mirrorID int64, until time.Time) error {
+	_, err := s.db.Operator.Core.NewUpdate().Model((*Mirror)(nil)).
+		Set("next_execution_timestamp = ?", until).
+		Where("id = ?", mirrorID).Where("repository_id = 0").Exec(ctx)
+	return err
+}
+
+// QueueCounts aggregates current tasks whose recorded River job is waiting.
+// It trusts the recorded job ID and returns at most two rows. Repository deduplication
+// happens after filtering so any waiting mirror of a repository contributes once per stage.
+func (s *mirrorStoreImpl) QueueCounts(ctx context.Context) (types.MirrorMetricsQueues, error) {
+	const query = `SELECT
+  CASE WHEN t.status IN ('repo_synced', 'lfs_start', 'failed') THEN 'lfs' ELSE 'repo' END AS stage,
+  COUNT(DISTINCT m.repository_id) AS waiting
+ FROM mirrors AS m
+ JOIN mirror_tasks AS t ON t.id = m.current_task_id AND t.mirror_id = m.id
+ JOIN river_job AS j ON j.id = CASE
+  WHEN t.status IN ('repo_synced', 'lfs_start', 'failed') THEN t.lfs_job_id ELSE t.repo_job_id END
+ WHERE t.status IN ('queued', 'running', 'repo_failed', 'repo_synced', 'lfs_start', 'failed')
+  AND j.state IN ('available', 'scheduled', 'retryable')
+ GROUP BY stage`
+	var rows []struct {
+		Stage string
+		types.MirrorMetricsQueue
+	}
+	var result types.MirrorMetricsQueues
+	if err := s.db.Operator.Core.NewRaw(query).Scan(ctx, &rows); err != nil {
+		return result, err
+	}
+	// Only the two stage aggregates cross the database boundary.
+	for _, row := range rows {
+		if row.Stage == "repo" {
+			result.Repo = row.MirrorMetricsQueue
+		} else if row.Stage == "lfs" {
+			result.LFS = row.MirrorMetricsQueue
+		}
+	}
+	return result, nil
 }

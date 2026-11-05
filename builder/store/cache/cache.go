@@ -9,6 +9,8 @@ import (
 )
 
 type RedisClient interface {
+	// Scan iterates matching keys without blocking Redis with KEYS.
+	Scan(ctx context.Context, cursor uint64, match string, count int64) ([]string, uint64, error)
 	FlushAll(ctx context.Context) error
 	ZAdd(ctx context.Context, key string, z ...redis.Z) error
 	BZPopMax(ctx context.Context, key string) (*redis.ZWithKey, error)
@@ -268,4 +270,9 @@ func (c *Cache) PSubscribe(ctx context.Context, patterns ...string) (*redis.PubS
 		return nil, err
 	}
 	return sub, nil
+}
+
+// Scan returns one cursor page of matching keys.
+func (c *Cache) Scan(ctx context.Context, cursor uint64, match string, count int64) ([]string, uint64, error) {
+	return c.core.Scan(ctx, cursor, match, count).Result()
 }

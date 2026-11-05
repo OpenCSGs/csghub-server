@@ -9,19 +9,22 @@ import (
 
 // AIGatewayMetricMinute stores per-minute aggregated business metrics
 // collected by the Metrics Collector from Prometheus.  Each row represents
-// one model+provider combination's aggregated metrics for a single minute
-// bucket.
+// one requested-model + resolved-model + provider combination's aggregated
+// metrics for a single minute bucket.
 //
 // This is a TimescaleDB hypertable (Apache 2-licensed features only).  The
-// composite primary key (bucket_time, model, provider) enables idempotent
-// upserts so the collector can safely re-process a minute after a crash or
-// restart.
+// composite primary key (bucket_time, request_model, model, provider) enables
+// idempotent upserts so the collector can safely re-process a minute after a
+// crash or restart.
 type AIGatewayMetricMinute struct {
 	bun.BaseModel `bun:"table:aigateway_metrics_minute,alias:amm"`
 
 	BucketTime time.Time `bun:"bucket_time,pk,notnull" json:"bucket_time"`
-	Model      string    `bun:"model,pk,notnull" json:"model"`
-	Provider   string    `bun:"provider,pk,notnull,default:''" json:"provider"`
+	// RequestModel is the model ID the client asked for; Model is the
+	// upstream model that actually served the request.
+	RequestModel string `bun:"request_model,pk,notnull,default:''" json:"request_model"`
+	Model        string `bun:"model,pk,notnull" json:"model"`
+	Provider     string `bun:"provider,pk,notnull,default:''" json:"provider"`
 
 	// Request counts
 	RequestTotal   int64 `bun:"request_total,notnull,default:0" json:"request_total"`
@@ -30,11 +33,11 @@ type AIGatewayMetricMinute struct {
 	RateLimited    int64 `bun:"rate_limited,notnull,default:0" json:"rate_limited"`
 
 	// Token consumption
-	PromptTokens          int64 `bun:"prompt_tokens,notnull,default:0" json:"prompt_tokens"`
-	CompletionTokens      int64 `bun:"completion_tokens,notnull,default:0" json:"completion_tokens"`
-	TotalTokens           int64 `bun:"total_tokens,notnull,default:0" json:"total_tokens"`
-	CachedTokens          int64 `bun:"cached_tokens,notnull,default:0" json:"cached_tokens"`
-	CacheCreationTokens   int64 `bun:"cache_creation_tokens,notnull,default:0" json:"cache_creation_tokens"`
+	PromptTokens        int64 `bun:"prompt_tokens,notnull,default:0" json:"prompt_tokens"`
+	CompletionTokens    int64 `bun:"completion_tokens,notnull,default:0" json:"completion_tokens"`
+	TotalTokens         int64 `bun:"total_tokens,notnull,default:0" json:"total_tokens"`
+	CachedTokens        int64 `bun:"cached_tokens,notnull,default:0" json:"cached_tokens"`
+	CacheCreationTokens int64 `bun:"cache_creation_tokens,notnull,default:0" json:"cache_creation_tokens"`
 
 	// Latency percentiles (estimated from Prometheus histograms)
 	TTFTP50Ms    float64 `bun:"ttft_p50_ms,nullzero" json:"ttft_p50_ms"`
@@ -42,7 +45,16 @@ type AIGatewayMetricMinute struct {
 	LatencyP50Ms float64 `bun:"latency_p50_ms,nullzero" json:"latency_p50_ms"`
 	LatencyP90Ms float64 `bun:"latency_p90_ms,nullzero" json:"latency_p90_ms"`
 
-	// Real-time concurrency (last sample within the minute)
+	// Admission queue wait percentiles.
+	QueueWaitP50Ms float64 `bun:"queue_wait_p50_ms,nullzero" json:"queue_wait_p50_ms"`
+	QueueWaitP90Ms float64 `bun:"queue_wait_p90_ms,nullzero" json:"queue_wait_p90_ms"`
+
+	// QueueDepth is the peak admission queue depth observed in the minute;
+	// NULL when nothing queued in that minute.
+	QueueDepth int64 `bun:"queue_depth,nullzero" json:"queue_depth"`
+
+	// Peak concurrency observed in the minute (max_over_time of the
+	// active-requests gauge, summed across gateway replicas).
 	ActiveRequests int64 `bun:"active_requests,notnull,default:0" json:"active_requests"`
 
 	times
@@ -52,9 +64,9 @@ type AIGatewayMetricMinute struct {
 // aigateway_metrics_minute table.
 type AIGatewayMetricMinuteStore interface {
 	// UpsertBatch idempotently inserts or updates a batch of per-minute
-	// metric rows.  ON CONFLICT (bucket_time, model, provider) DO UPDATE
-	// ensures the collector can safely re-process a minute after a crash
-	// or restart.
+	// metric rows.  ON CONFLICT (bucket_time, request_model, model, provider)
+	// DO UPDATE ensures the collector can safely re-process a minute after a
+	// crash or restart.
 	UpsertBatch(ctx context.Context, rows []AIGatewayMetricMinute) error
 
 	// QueryByTimeRange returns metric rows within [start, end), optionally
@@ -80,7 +92,7 @@ func (s *aigatewayMetricMinuteStoreImpl) UpsertBatch(ctx context.Context, rows [
 	}
 	_, err := s.db.Core.NewInsert().
 		Model(&rows).
-		On("CONFLICT (bucket_time, model, provider) DO UPDATE").
+		On("CONFLICT (bucket_time, request_model, model, provider) DO UPDATE").
 		Set("request_total = EXCLUDED.request_total").
 		Set("request_success = EXCLUDED.request_success").
 		Set("request_failed = EXCLUDED.request_failed").
@@ -94,6 +106,9 @@ func (s *aigatewayMetricMinuteStoreImpl) UpsertBatch(ctx context.Context, rows [
 		Set("ttft_p90_ms = EXCLUDED.ttft_p90_ms").
 		Set("latency_p50_ms = EXCLUDED.latency_p50_ms").
 		Set("latency_p90_ms = EXCLUDED.latency_p90_ms").
+		Set("queue_wait_p50_ms = EXCLUDED.queue_wait_p50_ms").
+		Set("queue_wait_p90_ms = EXCLUDED.queue_wait_p90_ms").
+		Set("queue_depth = EXCLUDED.queue_depth").
 		Set("active_requests = EXCLUDED.active_requests").
 		Set("updated_at = current_timestamp").
 		Exec(ctx)

@@ -46,5 +46,8 @@
     },
     "error.AUTH-ERR-9": {
         "other": "需要提供API密钥进行身份验证"
+    },
+    "error.AUTH-ERR-16": {
+        "other": "邮箱地址未设置"
     }
 }

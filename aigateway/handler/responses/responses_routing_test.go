@@ -57,6 +57,8 @@ func TestResolveResponsesRoutingCSGHubHostedVLLMNative(t *testing.T) {
 	}{
 		{name: "default vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.24.0"},
 		{name: "amd vllm image", runtimeFramework: "amd-vllm", imageID: "opencsghq/amd-vllm:rocm7.2.1_vllm_0.24.0"},
+		{name: "upgraded vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.31.0"},
+		{name: "upgraded amd vllm image", runtimeFramework: "amd-vllm", imageID: "opencsghq/amd-vllm:rocm7.2.3_vllm_0.31.0"},
 		{name: "future vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.25.1"},
 		{name: "future upstream major vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v1.0.0"},
 		{name: "multiple version tokens", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.8.5_vllm_0.24.0"},
@@ -163,6 +165,7 @@ func TestResolveResponsesRoutingCSGHubHostedSGLangNative(t *testing.T) {
 		imageID          string
 	}{
 		{name: "default sglang image", runtimeFramework: "sglang", imageID: "opencsghq/sglang:v0.5.14-cu130"},
+		{name: "upgraded sglang image", runtimeFramework: "sglang", imageID: "opencsghq/sglang:v0.5.21-cu130"},
 		{name: "guard stream sglang image", runtimeFramework: "sglang-qwen3-guard-stream", imageID: "opencsghq/sglang:0.5.3rc0-qwen3-guard-stream"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -203,6 +206,72 @@ func TestResolveResponsesRoutingCSGHubHostedSGLangNonNative(t *testing.T) {
 			require.Equal(t, "csghub_hosted_sglang_chat_adapter", decision.Reason)
 		})
 	}
+}
+
+func TestResolveResponsesRoutingCSGHubHostedLlamaCppNative(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		target           string
+		runtimeFramework string
+		imageID          string
+		wantURL          string
+	}{
+		{
+			name:             "cuda runtime",
+			target:           "https://model.internal",
+			runtimeFramework: "llama.cpp",
+			imageID:          "opencsghq/llama.cpp:b11684",
+			wantURL:          "https://model.internal/v1/responses",
+		},
+		{
+			name:             "cpu runtime with normalized name and trailing slash",
+			target:           "https://model.internal/",
+			runtimeFramework: " LLAMA.CPP ",
+			imageID:          "opencsghq/llama.cpp:b9787-cpu",
+			wantURL:          "https://model.internal/v1/responses",
+		},
+		{
+			name:             "amd runtime with base path",
+			target:           "https://model.internal/base",
+			runtimeFramework: "amd-llama.cpp",
+			imageID:          "opencsghq/llama.cpp-rocm:rocm7.2.2-b9787",
+			wantURL:          "https://model.internal/base/v1/responses",
+		},
+		{
+			name:             "image fallback for nonstandard runtime",
+			target:           "https://model.internal",
+			runtimeFramework: "custom",
+			imageID:          "opencsghq/llama.cpp:b11684",
+			wantURL:          "https://model.internal/v1/responses",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			decision, err := ResolveRouting(RoutingTarget{
+				ModelID:          "hosted-llama-cpp",
+				Target:           tc.target,
+				CSGHubHosted:     true,
+				RuntimeFramework: tc.runtimeFramework,
+				ImageID:          tc.imageID,
+			})
+			require.NoError(t, err)
+			require.Equal(t, ResponsesModeNative, decision.Mode)
+			require.Equal(t, tc.wantURL, decision.BackendURL)
+			require.Equal(t, "csghub_hosted_llama_cpp_native", decision.Reason)
+		})
+	}
+}
+
+func TestResolveResponsesRoutingCSGHubHostedLlamaArchitectureIsUnsupported(t *testing.T) {
+	decision, err := ResolveRouting(RoutingTarget{
+		ModelID:          "hosted-llama",
+		Target:           "https://model.internal",
+		CSGHubHosted:     true,
+		RuntimeFramework: "llama",
+		ImageID:          "opencsghq/inference:latest",
+	})
+	require.NoError(t, err)
+	require.Equal(t, ResponsesModeDisabled, decision.Mode)
+	require.Equal(t, "unsupported_csghub_hosted_runtime", decision.Reason)
 }
 
 func TestResolveResponsesRoutingCSGHubHostedUnknownRuntime(t *testing.T) {

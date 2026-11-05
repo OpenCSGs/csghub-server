@@ -115,7 +115,7 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 	if isEdit {
 		if err := c.Request.ParseMultipartForm(maxImageEditMultipartMemory); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-				Code: "invalid_request_error", Message: err.Error(), Type: "invalid_request_error",
+				Code: types.ErrCodeInvalidRequest, Message: err.Error(), Type: types.ErrTypeInvalidRequest,
 			}})
 			return nil, err
 		}
@@ -123,13 +123,13 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 		prompt := c.PostForm("prompt")
 		if modelID == "" || prompt == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-				Code: "invalid_request_error", Message: "Model and prompt cannot be empty", Type: "invalid_request_error",
+				Code: types.ErrCodeInvalidRequest, Message: "Model and prompt cannot be empty", Type: types.ErrTypeInvalidRequest,
 			}})
 			return nil, fmt.Errorf("model and prompt cannot be empty")
 		}
 		if !hasMultipartFile(c.Request.MultipartForm, "image") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-				Code: "invalid_request_error", Message: "Image is required", Type: "invalid_request_error",
+				Code: types.ErrCodeInvalidRequest, Message: "Image is required", Type: types.ErrTypeInvalidRequest,
 			}})
 			return nil, fmt.Errorf("image is required")
 		}
@@ -140,7 +140,6 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 			Model:         modelID,
 			TenantID:      nsUUID,
 			UserID:        username,
-			APIKeyID:      httpbase.GetAccessToken(c),
 			PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 			Streaming:     false,
 			Headers:       c.Request.Header,
@@ -151,13 +150,13 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 	var req types.ImageGenerationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: err.Error(), Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: err.Error(), Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, err
 	}
 	if req.Prompt == "" || req.Model == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Model and prompt cannot be empty", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "Model and prompt cannot be empty", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("model and prompt cannot be empty")
 	}
@@ -168,7 +167,6 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 		Model:         req.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -181,7 +179,6 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 func (h *imagePipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	requestID := commontrace.GetTraceIDInGinContext(c)
 
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -247,30 +244,30 @@ func (h *imagePipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "moderation_error", Message: "failed to check image prompts: " + err.Error(), Type: "internal_error",
+			Code: types.ErrCodeModeration, Message: "failed to check image prompts: " + err.Error(), Type: types.ErrTypeServer,
 		}})
 		return nil
 	}
 	if result != nil && result.IsSensitive {
 		finishModalGenerationTraceWithError(generationRecorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "content_policy_violation", Message: "Input data may contain inappropriate content.", Type: "invalid_request_error",
+			Code: types.ErrCodeContentPolicyViolation, Message: types.MsgSensitiveContent, Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil
 	}
 
 	if parsed.IsEdit {
-		return h.executeEditImage(c, ctx, nsUUID, meta.Model, meta.UserID, mt, parsed, generationRecorder, apikey)
+		return h.executeEditImage(c, ctx, nsUUID, meta.Model, meta.UserID, mt, parsed, generationRecorder)
 	}
-	return h.executeGenerateImage(c, ctx, nsUUID, meta.Model, meta.UserID, mt, parsed.GenerateReq, generationRecorder, apikey)
+	return h.executeGenerateImage(c, ctx, nsUUID, meta.Model, meta.UserID, mt, parsed.GenerateReq, generationRecorder)
 }
 
-func (h *imagePipelineHandler) executeGenerateImage(c *gin.Context, ctx context.Context, nsUUID, modelID, userID string, mt *types.ModelTarget, req *types.ImageGenerationRequest, generationRecorder llmtrace.GenerationRecorder, apikey string) error {
+func (h *imagePipelineHandler) executeGenerateImage(c *gin.Context, ctx context.Context, nsUUID, modelID, userID string, mt *types.ModelTarget, req *types.ImageGenerationRequest, generationRecorder llmtrace.GenerationRecorder) error {
 	adapter := h.handler.t2iRegistry.GetAdapter(mt.Model)
 	if adapter == nil {
 		finishModalGenerationTraceWithError(generationRecorder, fmt.Errorf("no adapter for model '%s'", modelID), types.TraceErrUpstreamUnavailable)
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "unsupported_model", Message: fmt.Sprintf("no adapter for model '%s'", modelID), Type: "invalid_request_error",
+			Code: types.ErrCodeUnsupportedModel, Message: fmt.Sprintf("no adapter for model '%s'", modelID), Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil
 	}
@@ -285,7 +282,7 @@ func (h *imagePipelineHandler) executeGenerateImage(c *gin.Context, ctx context.
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to transform image request", slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "internal_error", Message: err.Error(), Type: "internal_error",
+			Code: types.ErrCodeInternal, Message: err.Error(), Type: types.ErrTypeServer,
 		}})
 		return nil
 	}
@@ -333,17 +330,17 @@ func (h *imagePipelineHandler) executeGenerateImage(c *gin.Context, ctx context.
 	}
 
 	rp.ServeHTTP(w, c.Request, proxyToApi, mt.Host)
-	h.finishImageTrace(c, ctx, nsUUID, apikey, mt, imageWrapper, imageCounter, generationRecorder)
+	h.finishImageTrace(c, ctx, nsUUID, mt, imageWrapper, imageCounter, generationRecorder)
 	return nil
 }
 
-func (h *imagePipelineHandler) executeEditImage(c *gin.Context, ctx context.Context, nsUUID, modelID, userID string, mt *types.ModelTarget, parsed *imageParsedBody, generationRecorder llmtrace.GenerationRecorder, apikey string) error {
+func (h *imagePipelineHandler) executeEditImage(c *gin.Context, ctx context.Context, nsUUID, modelID, userID string, mt *types.ModelTarget, parsed *imageParsedBody, generationRecorder llmtrace.GenerationRecorder) error {
 	body, contentType, err := rebuildImageEditMultipartBody(parsed.Form, mt.ModelName)
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to rebuild image edit multipart request", slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "internal_error", Message: err.Error(), Type: "internal_error",
+			Code: types.ErrCodeInternal, Message: err.Error(), Type: types.ErrTypeServer,
 		}})
 		return nil
 	}
@@ -378,13 +375,13 @@ func (h *imagePipelineHandler) executeEditImage(c *gin.Context, ctx context.Cont
 	}
 
 	rp.ServeHTTP(w, c.Request, proxyToApi, mt.Host)
-	h.finishImageTrace(c, ctx, nsUUID, apikey, mt, imageWrapper, imageCounter, generationRecorder)
+	h.finishImageTrace(c, ctx, nsUUID, mt, imageWrapper, imageCounter, generationRecorder)
 	return nil
 }
 
 // finishImageTrace handles Finalize + async usage recording shared by both
 // generate and edit image.
-func (h *imagePipelineHandler) finishImageTrace(c *gin.Context, ctx context.Context, nsUUID, apikey string, mt *types.ModelTarget, imageWrapper *wrapper.ImageGeneration, imageCounter *token.ImageUsageCounter, generationRecorder llmtrace.GenerationRecorder) {
+func (h *imagePipelineHandler) finishImageTrace(c *gin.Context, ctx context.Context, nsUUID string, mt *types.ModelTarget, imageWrapper *wrapper.ImageGeneration, imageCounter *token.ImageUsageCounter, generationRecorder llmtrace.GenerationRecorder) {
 	if err := imageWrapper.Finalize(); err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
 		slog.ErrorContext(ctx, "failed to finalize image response", slog.Any("error", err))
@@ -424,7 +421,7 @@ func (h *imagePipelineHandler) finishImageTrace(c *gin.Context, ctx context.Cont
 		}
 		if isSuccessfulStatus(imageWrapper.StatusCode()) && usage != nil {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 			}
 		}

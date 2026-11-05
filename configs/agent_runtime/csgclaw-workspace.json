@@ -1,7 +1,7 @@
 {
   "agent_type": "csgclaw-workspace",
-  "version": "v0.8.0-beta.3",
-  "image": "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csgclaw-server-sandbox:2026100902",
+  "version": "v0.9.0",
+  "image": "opencsghq/csgclaw-server-sandbox:2026102302",
   "port": 18080,
   "command": [
     "/sbin/tini",

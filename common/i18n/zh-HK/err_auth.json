@@ -46,5 +46,8 @@
     },
     "error.AUTH-ERR-9": {
         "other": "需要API密鑰"
+    },
+    "error.AUTH-ERR-16": {
+        "other": "郵箱地址未設置"
     }
 }

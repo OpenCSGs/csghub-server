@@ -48,6 +48,46 @@ func TestGatewayMCPServerCapabilityStore_CreateOrUpdate_FindByServerAndConfig(t 
 	require.Equal(t, "connected", found2.Status)
 }
 
+func TestGatewayMCPServerCapabilityStore_UpsertErrorPreservesCatalog(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewGatewayMCPServerCapabilityStoreWithDB(db)
+	original := &database.GatewayMCPServerCapability{
+		MCPServerID: 91, MCPServerName: "modern", ConfigHash: "config",
+		Capabilities: map[string]any{"tools": []any{"read"}}, ProtocolVersion: "2026-07-28",
+		Status: "connected", RefreshedAt: time.Now(), ExpiresAt: time.Now().Add(time.Hour),
+	}
+	require.NoError(t, store.CreateOrUpdate(ctx, original))
+	failure := &database.GatewayMCPServerCapability{
+		MCPServerID: 91, MCPServerName: "modern", ConfigHash: "config", Error: "unreachable",
+		RefreshedAt: time.Now(), ExpiresAt: time.Now().Add(time.Hour),
+	}
+	require.NoError(t, store.UpsertError(ctx, failure))
+	found, err := store.FindByServerAndConfig(ctx, 91, "config")
+	require.NoError(t, err)
+	require.Equal(t, original.Capabilities, found.Capabilities)
+	require.Equal(t, "2026-07-28", found.ProtocolVersion)
+	require.Equal(t, "error", found.Status)
+	require.Equal(t, "unreachable", found.Error)
+	// A different configuration must not inherit another configuration's catalog.
+	failure.ID = 0
+	failure.ConfigHash = "other"
+	require.NoError(t, store.UpsertError(ctx, failure))
+	other, err := store.FindByServerAndConfig(ctx, 91, "other")
+	require.NoError(t, err)
+	require.Empty(t, other.Capabilities)
+	require.Empty(t, other.ProtocolVersion)
+	original.ProtocolVersion = "2025-11-25"
+	original.Capabilities = map[string]any{"tools": []any{"write"}}
+	require.NoError(t, store.CreateOrUpdate(ctx, original))
+	found, err = store.FindByServerAndConfig(ctx, 91, "config")
+	require.NoError(t, err)
+	require.Equal(t, original.Capabilities, found.Capabilities)
+	require.Equal(t, original.ProtocolVersion, found.ProtocolVersion)
+	require.Equal(t, "connected", found.Status)
+}
+
 func TestGatewayMCPServerCapabilityStore_DeleteByServer(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

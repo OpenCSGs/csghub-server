@@ -1,0 +1,11 @@
+{
+    "error.LLM-ERR-0": {
+        "other": "LLM configuration not found"
+    },
+    "error.LLM-ERR-1": {
+        "other": "Grant user or organization not found"
+    },
+    "error.LLM-ERR-2": {
+        "other": "The user or organization is already granted access to this model"
+    }
+}

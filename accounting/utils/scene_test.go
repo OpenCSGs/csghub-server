@@ -82,18 +82,56 @@ func TestScene_GetSKUTypeByScene(t *testing.T) {
 }
 
 func TestAccountUsersStore_IsNeedCheckUserSubscription(t *testing.T) {
+	// The subscription check covers hardware compute resource scenes only;
+	// serverless / GuiAgent / Starship usage is not subscription-gated.
 	scenes := map[types.SceneType]bool{
 		types.SceneModelInference:  true,
 		types.SceneSpace:           true,
 		types.SceneModelFinetune:   true,
 		types.SceneEvaluation:      true,
-		types.SceneModelServerless: true,
+		types.SceneModelServerless: false,
 		types.SceneGuiAgent:        false,
-		types.SceneStarship:        true,
+		types.SceneStarship:        false,
 	}
 
 	for scene, skuType := range scenes {
 		res := IsNeedCheckUserSubscription(scene)
 		require.Equal(t, skuType, res)
+	}
+}
+
+func TestScene_APIConsumptionSceneValues(t *testing.T) {
+	require.Equal(t, []int{int(types.SceneModelServerless), int(types.SceneMultiModalServerless)}, APIConsumptionSceneValues())
+}
+
+func TestScene_IsUseVoucher(t *testing.T) {
+	scenes := []types.SceneType{
+		types.SceneModelInference,
+		types.SceneSpace,
+		types.SceneModelFinetune,
+		types.SceneEvaluation,
+		types.SceneModelServerless,
+		types.SceneMultiModalServerless,
+	}
+
+	for _, scene := range scenes {
+		res := IsUseVoucher(scene)
+		require.True(t, res)
+	}
+
+	scenes = []types.SceneType{
+		types.SceneReserve,
+		types.ScenePayOrder,
+		types.SceneMultiSync,
+		types.SceneStarship,
+		types.SceneGuiAgent,
+		types.SceneUnknow,
+		types.ScenePortalCharge,
+		types.SceneCashCharge,
+	}
+
+	for _, scene := range scenes {
+		res := IsUseVoucher(scene)
+		require.False(t, res)
 	}
 }

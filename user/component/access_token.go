@@ -498,33 +498,7 @@ func (c *accessTokenComponentImpl) createUserToken(ctx context.Context, newToken
 		return fmt.Errorf("failed to create user %s new %s token, error: %w", user.Username, newToken.Application, err)
 	}
 
-	if newToken.Application == types.AccessTokenAppStarship {
-		// charge 100 credit for create starship token by call accounting service
-		err := c.presentForNewAccessToken(user)
-		if err != nil {
-			slog.ErrorContext(ctx, "fail to charge for new starship user with retry 3 times", slog.Any("user.uuid", user.UUID), slog.Any("err", err))
-		}
-	}
-
 	return nil
-}
-
-func (c *accessTokenComponentImpl) presentForNewAccessToken(user database.User) error {
-	var err error
-	req := types.ActivityReq{
-		ID:     types.StarShipNewUser.ID,
-		Value:  types.StarShipNewUser.Value,
-		OpUID:  user.Username,
-		OpDesc: types.StarShipNewUser.OpDesc,
-	}
-	// retry 3 time
-	for i := 0; i < 3; i++ {
-		_, err = c.acctClient.PresentAccountingUser(user.UUID, req)
-		if err == nil {
-			return nil
-		}
-	}
-	return err
 }
 
 func (c *accessTokenComponentImpl) validateNamespacePermission(ctx context.Context, req *types.CreateUserTokenRequest) (database.User, error) {
@@ -534,7 +508,7 @@ func (c *accessTokenComponentImpl) validateNamespacePermission(ctx context.Conte
 		return database.User{}, fmt.Errorf("failed to find namespace by uuid, uuid: %s, error: %w", req.NSUUID, err)
 	}
 
-	user, err := c.us.FindByUsername(ctx, req.Username)
+	user, err := c.us.FindByUsername(ctx, req.Username, types.UserWithAdminPermissions)
 	if err != nil {
 		return database.User{}, fmt.Errorf("failed to find user by username: %s error: %w", req.Username, err)
 	}

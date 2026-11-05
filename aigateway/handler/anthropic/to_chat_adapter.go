@@ -102,9 +102,11 @@ func messagesToChatRequest(req *types.AnthropicMessagesRequest, modelName string
 	}
 	// top_k is not a standard OpenAI Chat Completions parameter; it is
 	// intentionally dropped (the Responses adapter does the same).
-	if req.Metadata != nil && req.Metadata.UserID != "" {
-		chatReq["user"] = req.Metadata.UserID
-	}
+	//
+	// metadata is Anthropic-specific client metadata and is intentionally
+	// not translated into the OpenAI `user` field: strict upstream decoders
+	// (e.g. DeepSeek) reject the unknown field with HTTP 400, and the
+	// gateway already knows the authenticated caller.
 	if req.Stream {
 		chatReq["stream_options"] = map[string]any{"include_usage": true}
 	}

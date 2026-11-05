@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -64,15 +65,16 @@ func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMet
 		}
 
 		if utils.IsGetTokenID(input.Scene) && len(extra.APIKey) > 0 {
-			token, err := findByTokenValue(ctx, tx, extra.APIKey)
+			// parse token ID string to int64
+			tokenIntID, err := strconv.ParseInt(extra.APIKey, 10, 64)
 			if err != nil {
-				slog.ErrorContext(ctx, "find token by value failed, error", slog.Any("error", err), slog.Any("input", input))
-			}
-			if token != nil {
-				extra.TokenID = token.ID
+				slog.ErrorContext(ctx, "parse api key ID str to int64 fail in metering",
+					slog.Any("error", err),
+					slog.Any("event_uuid", input.EventUUID),
+					slog.Any("user_uuid", input.UserUUID),
+					slog.Any("token_id_str", extra.APIKey))
 			} else {
-				// token not found, set token_id to 0
-				slog.WarnContext(ctx, "token object not found, set token_id to 0", slog.Any("input", input))
+				extra.TokenID = tokenIntID
 			}
 		}
 
@@ -105,7 +107,7 @@ func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMet
 			Set("updated_at = current_timestamp").
 			Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("update account statistics for user %s, error: %w", input.UserUUID, err)
+			return fmt.Errorf("update account metering statistics for user %s, error: %w", input.UserUUID, err)
 		}
 
 		return nil

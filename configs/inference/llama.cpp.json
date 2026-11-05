@@ -6,14 +6,14 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/llama.cpp:b9787",
+      "image": "opencsghq/llama.cpp:b11785",
       "driver_version": "12.4",
-      "engine_version": "b9787"
+      "engine_version": "b11785"
     },
     {
       "compute_type": "cpu",
-      "image": "opencsghq/llama.cpp:b9787-cpu",
-      "engine_version": "b9787"
+      "image": "opencsghq/llama.cpp:b11785-cpu",
+      "engine_version": "b11785"
     }
   ],
   "engine_args": [
@@ -156,6 +156,35 @@
     "maincoder",
     "kimi-linear",
     "talkie",
-    "mellum"
+    "mellum",
+    "clef",
+    "vllm-decision2",
+    "qwen4exp",
+    "gemma-embedding2",
+    "maple",
+    "muse-glimmer",
+    "muse-spark",
+    "deepseek4",
+    "graniteswitch",
+    "granite_swa",
+    "bailingmoe3",
+    "dots3note",
+    "laguna",
+    "hy_v3",
+    "hy_v4",
+    "minimax-01",
+    "hrm_text",
+    "minimax-m3",
+    "dflash",
+    "spark2_5",
+    "maion-coder",
+    "kimi-k3",
+    "glm5-next",
+    "nanbeige",
+    "qwen3tts",
+    "pockettts",
+    "k2-horizon",
+    "beam",
+    "kolibri1"
   ]
 }

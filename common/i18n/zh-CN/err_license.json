@@ -13,5 +13,11 @@
     },
     "error.LICENSE-ERR-4": {
         "other": "许可证扩展数据无效。"
+    },
+    "error.LICENSE-ERR-5": {
+        "other": "未找到当前用户所请求产品的有效许可证"
+    },
+    "error.LICENSE-ERR-6": {
+        "other": "许可证产品 {{.actual}} 与预期产品 {{.expected}} 不匹配"
     }
 }

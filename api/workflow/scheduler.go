@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	CronJobQueueName      = types.AgentAllocationDispatchTaskQueue
-	BatchMigrateQueueName = "workflow_batch_migrate_queue"
+	CronJobQueueName       = types.AgentAllocationDispatchTaskQueue
+	BatchMigrateQueueName  = "workflow_batch_migrate_queue"
+	BatchMigrateWorkflowID = "batch-migrate-to-xnet"
 )
 
 // createSchedule creates a Temporal cron schedule with SKIP overlap policy.

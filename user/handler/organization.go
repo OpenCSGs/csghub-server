@@ -75,7 +75,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	}
 
 	req.Username = currentUser
-	org, err := h.c.Create(ctx, &req)
+	org, err := h.c.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create organization", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrNamespaceAlreadyExists) || errors.Is(err, errorx.ErrTagIDsNotExist) {
@@ -90,7 +90,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	httpbase.OK(ctx, org)
 }
 
-// GetOrganization godoc
+// Get reads organization details with the original request context and any locally authorized administrator marker.
 // @Security     ApiKey
 // @Summary      Get organization info
 // @Tags         Organization
@@ -108,7 +108,7 @@ func (h *OrganizationHandler) Get(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("organization name is empty"), nil))
 		return
 	}
-	org, err := h.c.Get(ctx, orgName)
+	org, err := h.c.Get(ctx.Request.Context(), orgName)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get organization", slog.Any("error", err), slog.String("org_path", orgName))
 		if errors.Is(err, errorx.ErrDatabaseNoRows) {
@@ -164,7 +164,7 @@ func (h *OrganizationHandler) GetByUUID(ctx *gin.Context) {
 	httpbase.OK(ctx, org)
 }
 
-// GetOrganizations godoc
+// Index lists organizations with the original request context and existing public query filters.
 // @Summary      Get all organizations
 // @Description  get all organizations, no authentication required
 // @Tags         Organization
@@ -190,7 +190,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	orgs, total, err := h.c.Index(ctx, search, per, page, orgType, verifyStatus, tag)
+	orgs, total, err := h.c.Index(ctx.Request.Context(), search, per, page, orgType, verifyStatus, tag)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -207,6 +207,46 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 
 	slog.InfoContext(ctx.Request.Context(), "Get all organizations succeed", slog.String("search", search), slog.Int("per", per), slog.Int("page", page))
 	httpbase.OK(ctx, respData)
+}
+
+// OrganizationChoices serves minimal organization candidates through submodule-specific route handlers.
+func (h *OrganizationHandler) OrganizationChoices(ctx *gin.Context) {
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	req := types.OrganizationChoiceListRequest{Search: ctx.Query("search"), Per: per, Page: page,
+		OrgType: ctx.Query("org_type"), VerifyStatus: ctx.Query("verify_status"), Tag: ctx.Query("tag")}
+	organizations, total, err := h.c.OrganizationChoices(ctx.Request.Context(), req)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, types.OrganizationChoiceList{Data: organizations, Total: total})
+}
+
+// OrganizationChoice resolves a recipient while preserving the existing edition-mode validation.
+func (h *OrganizationHandler) OrganizationChoice(ctx *gin.Context) {
+	name := ctx.Param("namespace")
+	if name == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("organization name is empty"), nil))
+		return
+	}
+	organization, err := h.c.OrganizationChoice(ctx.Request.Context(), name)
+	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
+		return
+	}
+	if organization.IsHierarchical != h.isHierarchical {
+		httpbase.BadRequestWithExt(ctx, errorx.ErrOrganizationModeIncompatible)
+		return
+	}
+	httpbase.OK(ctx, organization)
 }
 
 // ListUserOrganizations godoc
@@ -418,7 +458,7 @@ func (h *OrganizationHandler) CreateVerify(ctx *gin.Context) {
 	httpbase.OK(ctx, orgVerify)
 }
 
-// UpdateVerify godoc
+// UpdateVerify updates verification while preserving request authorization and cancellation in the component.
 // @Security     ApiKey
 // @Summary      Update organization verification
 // @Description  update organization verification status (approved or rejected)
@@ -454,7 +494,7 @@ func (h *OrganizationHandler) UpdateVerify(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("rejected need reason"), nil))
 	}
 
-	orgVerify, err := h.ov.Update(ctx, vID, req.Status, req.Reason)
+	orgVerify, err := h.ov.Update(ctx.Request.Context(), vID, req.Status, req.Reason)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -465,7 +505,7 @@ func (h *OrganizationHandler) UpdateVerify(ctx *gin.Context) {
 	httpbase.OK(ctx, orgVerify)
 }
 
-// GetVerify godoc
+// GetVerify reads verification while preserving request authorization and cancellation in the component.
 // @Security     ApiKey
 // @Summary      Get organization verification
 // @Description  get organization verification info by organization ID
@@ -479,7 +519,7 @@ func (h *OrganizationHandler) UpdateVerify(ctx *gin.Context) {
 // @Router       /organization/verify/{namespace} [get]
 func (h *OrganizationHandler) GetVerify(ctx *gin.Context) {
 	path := ctx.Param("namespace")
-	orgVerify, err := h.ov.Get(ctx, path)
+	orgVerify, err := h.ov.Get(ctx.Request.Context(), path)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

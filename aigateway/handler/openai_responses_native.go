@@ -16,7 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 )
 
-func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
+func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, owner, nsUUID, publicModelID, publicPreviousResponseID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
 	backendURL := decision.BackendURL
 	// Capacity admission: the plan-phase lease covers the pinned primary
 	// upstream; rotate when this execution resolves a different upstream.
@@ -30,7 +30,7 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 	mapper, err := h.getResponsesIDMapper()
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
-		writeResponsesError(c, http.StatusInternalServerError, "internal_error", "internal_error", err.Error())
+		writeResponsesError(c, http.StatusInternalServerError, types.ErrCodeInternal, types.ErrTypeServer, err.Error())
 		return
 	}
 	reqCopy := *req
@@ -38,14 +38,16 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 	body, err := json.Marshal(&reqCopy)
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
-		writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request_error", err.Error())
+		writeResponsesError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, types.ErrTypeInvalidRequest, err.Error())
 		return
 	}
 	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
 		slog.WarnContext(c.Request.Context(), "invalid auth header", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
-	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding())
+	observation := component.ObserveRouteCall(c.Request.Context(), types.RouteCallTarget{Model: modelTarget.Model.ID, UpstreamID: modelTarget.Upstream.ID, Protocol: "responses"}, body)
+	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding(), proxy.WithResponseModifier(observation.Modify))
 	if err != nil {
+		observation.Finish(err)
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, req.Stream, err)
 		return
@@ -80,10 +82,11 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 	}
 	writer := newResponsesNativeResponseWriter(c.Writer, req.Stream, transformer, moderation, sessionID)
 	proxyStartTime := time.Now()
-	rp.ServeHTTP(writer, c.Request, proxyPath, modelTarget.Host)
+	proxyErr := rp.(proxy.ErrorReportingReverseProxy).ServeHTTPWithError(writer, c.Request, proxyPath, modelTarget.Host)
+	observation.Finish(proxyErr)
 	if err := writer.Finalize(); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
-		writeResponsesError(c, http.StatusBadGateway, "upstream_response_invalid", "api_error", err.Error())
+		writeResponsesError(c, http.StatusBadGateway, types.ErrCodeUpstreamResponseInvalid, types.ErrTypeAPI, err.Error())
 		return
 	}
 
@@ -101,5 +104,5 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 		Usage:          responsesUsage,
 	})
 	traceInput := newResponsesTracePostProcessInput(generationRecorder, req, writer.StatusCode(), writer.FirstWriteAt())
-	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput, admissionLeaseFromPlan(p))
+	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, logCapture, traceInput, admissionLeaseFromPlan(p))
 }

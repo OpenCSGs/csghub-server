@@ -30,11 +30,15 @@ type accountingComponentImpl struct {
 type AccountingComponent interface {
 	QueryAllUsersBalance(ctx context.Context, per, page int) (interface{}, error)
 	QueryBalanceByUserID(ctx context.Context, currentUser, UUID string) (interface{}, error)
+	// QueryUserBalanceForAdmin confines an authorized account/user request to an active personal user.
+	QueryUserBalanceForAdmin(ctx context.Context, currentUser, UUID string) (interface{}, error)
 	QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*types.UserBalanceResp, error)
 	ListStatementByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error)
 	ListBillsByUserIDAndDate(ctx context.Context, req types.ActStatementsReq) (interface{}, error)
 	ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (interface{}, error)
 	RechargeAccountingUser(ctx context.Context, UUID string, req types.RechargeReq) (interface{}, error)
+	// RechargeUserForAdmin confines an authorized account/user recharge to an active personal user.
+	RechargeUserForAdmin(ctx context.Context, UUID string, req types.RechargeReq) (interface{}, error)
 	CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (interface{}, error)
 	GetQuotaByID(currentUser string) (interface{}, error)
 	CreateQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (interface{}, error)
@@ -81,12 +85,46 @@ func NewAccountingComponent(config *config.Config) (AccountingComponent, error) 
 		memberStore:      database.NewMemberStore(),
 		deployTaskStore:  database.NewDeployTaskStore(),
 		userSvcClient:    userRpcClient,
-		notificationSvcClient: rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
-			rpc.AuthWithApiKey(config.APIToken)),
+		notificationSvcClient: rpc.NewNotificationSvcHttpClient(
+			fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
+			rpc.AuthWithApiKey(config.APIToken),
+		),
 		config:         config,
 		namespaceStore: database.NewNamespaceStore(),
 		rebac:          authorizer,
 	}, nil
+}
+
+// QueryUserBalanceForAdmin validates the user-only administration boundary before reusing balance retrieval.
+func (ac *accountingComponentImpl) QueryUserBalanceForAdmin(ctx context.Context, currentUser, UUID string) (interface{}, error) {
+	if err := ac.requireAdminUserTarget(ctx, UUID); err != nil {
+		return nil, err
+	}
+	return ac.QueryBalanceByUserID(ctx, currentUser, UUID)
+}
+
+// RechargeUserForAdmin validates the user-only administration boundary before resolving the real recharge operator.
+func (ac *accountingComponentImpl) RechargeUserForAdmin(ctx context.Context, UUID string, req types.RechargeReq) (interface{}, error) {
+	if err := ac.requireAdminUserTarget(ctx, UUID); err != nil {
+		return nil, err
+	}
+	return ac.RechargeAccountingUser(ctx, UUID, req)
+}
+
+// requireAdminUserTarget accepts only active personal user records for an already authorized administrator request.
+// Global administrator permission does not expand this entry point to organization billing accounts.
+func (ac *accountingComponentImpl) requireAdminUserTarget(ctx context.Context, targetNSUUID string) error {
+	if !types.IsAdminAuthorized(ctx) || targetNSUUID == "" {
+		return errorx.ErrForbidden
+	}
+	ns, err := ac.userSvcClient.GetNameSpaceInfoByUUID(ctx, targetNSUUID)
+	if err != nil {
+		return fmt.Errorf("target namespace not found: %w", err)
+	}
+	if ns == nil || (ns.NSType != string(database.OrgNamespace) && ns.NSType != string(database.UserNamespace)) {
+		return errorx.ErrForbidden
+	}
+	return nil
 }
 
 func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
@@ -98,10 +136,10 @@ func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Cont
 	return ac.accountingClient.ListMeteringsByUserIDAndTime(req)
 }
 
-// CanQueryUserData checks if the current user has permission to query the target user's data.
+// checkOwnerOrOrgMemberPermission checks permission to query the target user's data.
 // Permission is granted if:
 // 1. Current user is the same as the target user (querying own data)
-// 2. Current user is an admin
+// 2. The request has administrator authorization or the user has global super administrator permission
 // 3. Current user can read the organization namespace that owns the target user's namespace
 func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.UserSvcClient, authorizer rebac.Authorizer, currentUser, targetUUID string) (*rpc.Namespace, error) {
 	user, err := userSvcClient.GetUserByName(ctx, currentUser)
@@ -114,7 +152,7 @@ func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.User
 		return ns, fmt.Errorf("target namespace not found: %w", err)
 	}
 
-	if user.IsAdmin() || user.UUID == targetUUID {
+	if types.IsAdminAuthorized(ctx) || user.IsSuperAdmin() || user.UUID == targetUUID {
 		return ns, nil
 	}
 

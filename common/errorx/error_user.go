@@ -27,6 +27,16 @@ const (
 	uuidConflict
 	namespaceAlreadyExists
 	tagIDsNotExist
+	// Identity codes are appended to preserve the existing user error codes.
+	identityInput
+	identityNotFound
+	identityConflict
+	identityThrottled
+	identityUnavailable
+	identityRejected
+	identityInitializationTimeout
+	identityResultPending
+	identityExpired
 )
 
 var (
@@ -297,6 +307,24 @@ var (
 	//
 	// zh-HK: 部分標籤ID不存在
 	ErrTagIDsNotExist error = CustomError{prefix: errUserPrefix, code: tagIDsNotExist}
+	// ErrIdentityInput identifies invalid name or identity card input.
+	ErrIdentityInput error = CustomError{prefix: errUserPrefix, code: identityInput}
+	// ErrIdentityNotFound hides identity records not owned by the authenticated user.
+	ErrIdentityNotFound error = CustomError{prefix: errUserPrefix, code: identityNotFound}
+	// ErrIdentityConflict identifies an approved identity or a stale generation update.
+	ErrIdentityConflict error = CustomError{prefix: errUserPrefix, code: identityConflict}
+	// ErrIdentityThrottled asks the client to wait before another identity request.
+	ErrIdentityThrottled error = CustomError{prefix: errUserPrefix, code: identityThrottled}
+	// ErrIdentityUnavailable safely represents internal identity service failures.
+	ErrIdentityUnavailable = CustomError{prefix: errUserPrefix, code: identityUnavailable}
+	// ErrIdentityRejected identifies rejected initialization data or an invalid initialization flow.
+	ErrIdentityRejected = CustomError{prefix: errUserPrefix, code: identityRejected}
+	// ErrIdentityInitializationTimeout identifies an initialization retry window that has elapsed.
+	ErrIdentityInitializationTimeout = CustomError{prefix: errUserPrefix, code: identityInitializationTimeout}
+	// ErrIdentityResultPending supplies a localization code for an unconfirmed, nonterminal result.
+	ErrIdentityResultPending = CustomError{prefix: errUserPrefix, code: identityResultPending}
+	// ErrIdentityExpired identifies an authenticated provider expiry result.
+	ErrIdentityExpired = CustomError{prefix: errUserPrefix, code: identityExpired}
 )
 
 // UsernameExists creates a specific error for username conflicts with the conflicting username

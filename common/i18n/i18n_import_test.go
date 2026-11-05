@@ -1,10 +1,29 @@
 package i18n
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// TestUserErrorTranslationKeys requires numeric user error codes in every supported language resource.
+func TestUserErrorTranslationKeys(t *testing.T) {
+	for _, lang := range []string{"en-US", "zh-CN", "zh-HK"} {
+		t.Run(lang, func(t *testing.T) {
+			data, err := i18nConfigFiles.ReadFile(lang + "/err_user.json")
+			require.NoError(t, err)
+			var messages map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(data, &messages))
+			for key := range messages {
+				require.Regexp(t, `^error\.USER-ERR-[0-9]+$`, key)
+			}
+			for _, code := range []string{"26", "27", "28", "29", "30"} {
+				require.Contains(t, messages, "error.USER-ERR-"+code)
+			}
+		})
+	}
+}
 
 func TestInitLocalizersFromEmbedFile_ImportErrors(t *testing.T) {
 	InitLocalizersFromEmbedFile()

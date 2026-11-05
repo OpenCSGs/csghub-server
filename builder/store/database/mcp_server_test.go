@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
@@ -18,11 +19,11 @@ func TestMCPServerStore_CURD(t *testing.T) {
 
 	store := database.NewMCPServerStoreWithDB(db)
 
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:  int64(1),
 		Path:    "foo/bar",
 		Private: false,
-	})
+	}))
 	require.Nil(t, err)
 
 	server := database.MCPServer{
@@ -114,13 +115,13 @@ func TestMCPServerStore_ListPropertiesUsesRepositoryAccessIDs(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 	store := database.NewMCPServerStoreWithDB(db)
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           "private/tools",
 		GitPath:        "private/tools",
 		Private:        true,
 		RepositoryType: types.MCPServerRepo,
-	})
+	}))
 	require.NoError(t, err)
 	server, err := store.Create(ctx, database.MCPServer{RepositoryID: repo.ID})
 	require.NoError(t, err)
@@ -155,14 +156,14 @@ func TestMCPServerStore_ByUsername(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	us := database.NewUserStoreWithDB(db)
-	err := us.Create(ctx, &database.User{Username: "foo"}, &database.Namespace{})
+	us := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	err := us.Create(ctx, &database.User{Username: "foo"}, &database.Namespace{Path: "foo"})
 	require.Nil(t, err)
 
 	user, err := us.FindByUsername(ctx, "foo")
 	require.Nil(t, err)
 
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	repo, err := repoStore.CreateRepo(ctx, database.Repository{
 		UserID:  user.ID,
 		Path:    "foo/bar",
@@ -194,7 +195,15 @@ func TestMCPServerStore_ByOrgPath(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	repoStore := database.NewRepoStoreWithDB(db)
+	// Use an organization owner so creation produces the organization tuple.
+	namespace := &database.Namespace{Path: "foo", UUID: uuid.NewString(), NamespaceType: database.OrgNamespace}
+	_, err := db.Core.NewInsert().Model(namespace).Exec(ctx)
+	require.NoError(t, err)
+	organization := &database.Organization{Name: namespace.Path, UUID: uuid.New(), NamespaceID: namespace.ID}
+	_, err = db.Core.NewInsert().Model(organization).Exec(ctx)
+	require.NoError(t, err)
+
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	repo, err := repoStore.CreateRepo(ctx, database.Repository{
 		Path:    "foo/bar",
@@ -279,23 +288,24 @@ func TestMCPServerStore_UserLikes(t *testing.T) {
 func TestMCPServerStore_CreateAndDeleteSpaceAndRepoForDeploy(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	seedTupleNamespace(t, db, "mcp-owner")
 	ctx := context.TODO()
 
-	store := database.NewMCPServerStoreWithDB(db)
+	store := database.NewMCPServerStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	repo := &database.Repository{
 		Name: "repo1",
-		Path: "p1",
+		Path: "mcp-owner/repo1",
 	}
 
 	space := &database.Space{
 		Sdk: "mcp_server",
 	}
 
-	err := store.CreateSpaceAndRepoForDeploy(ctx, repo, space)
+	owner, err := store.CreateSpaceAndRepoForDeploy(ctx, repo, space)
 	require.Nil(t, err)
 
-	err = store.DeleteSpaceAndRepoForDeploy(ctx, space.ID, repo.ID)
+	err = store.DeleteSpaceAndRepoForDeploy(ctx, space.ID, repo.ID, owner)
 	require.Nil(t, err)
 }
 
