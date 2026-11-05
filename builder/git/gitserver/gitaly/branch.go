@@ -45,7 +45,7 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 		if resp != nil {
 			for _, branch := range resp.Branches {
 				branches = append(branches, types.Branch{
-					Name:    filepath.Base(string(branch.Name)),
+					Name:    string(branch.Name),
 					Message: string(branch.Target.Subject),
 					Commit: types.RepoBranchCommit{
 						ID: branch.Target.Id,
@@ -88,7 +88,7 @@ func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranc
 		return nil, nil
 	}
 
-	branch.Name = filepath.Base(string(resp.Branch.Name))
+	branch.Name = string(resp.Branch.Name)
 	branch.Message = string(resp.Branch.TargetCommit.Subject)
 	branch.Commit = types.RepoBranchCommit{
 		ID: resp.Branch.TargetCommit.Id,
