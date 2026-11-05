@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -111,6 +112,68 @@ func TestGetUserInfo_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, user)
 	assert.Equal(t, "test-user", user.Username)
+}
+
+// TestUserRoleAuthorizationResponse verifies the super-administrator JSON contract and trusted RPC grants.
+func TestUserRoleAuthorizationResponse(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		roles      []string
+		admin      bool
+		superAdmin bool
+	}{
+		{name: "ordinary role", roles: []string{"personal_user"}},
+		{name: "legacy names without verified grants", roles: []string{"admin", "super_user"}},
+		{name: "super administrator name without a grant", roles: []string{"super_admin"}, admin: true},
+		{name: "module administrator", roles: []string{"asset_admin", "personal_user"}, admin: true},
+		{name: "custom global administrator", roles: []string{"owner"}, admin: true, superAdmin: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			payload, err := json.Marshal(httpbase.R{Data: &types.User{
+				Username: "test-user", UUID: "test-user-uuid", Roles: tc.roles,
+				Admin: tc.admin, SuperAdmin: tc.superAdmin,
+			}})
+			require.NoError(t, err)
+			var response struct {
+				Data map[string]json.RawMessage `json:"data"`
+			}
+			require.NoError(t, json.Unmarshal(payload, &response))
+			require.NotContains(t, response.Data, "is_global_admin")
+			if tc.superAdmin {
+				require.JSONEq(t, "true", string(response.Data["is_super_admin"]))
+			} else {
+				require.NotContains(t, response.Data, "is_super_admin", "false grants must remain omitted")
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodGet, r.Method)
+				w.Header().Set("Content-Type", "application/json")
+				_, err := w.Write(payload)
+				assert.NoError(t, err)
+			}))
+			defer server.Close()
+			client := setupTestClient(server)
+			ctx := context.Background()
+
+			user, err := client.GetUserInfo(ctx, "test-user", "test-user")
+			require.NoError(t, err)
+			require.Equal(t, tc.roles, user.Roles)
+			require.Equal(t, tc.admin, user.Admin)
+			require.Equal(t, tc.superAdmin, user.SuperAdmin)
+			require.Equal(t, tc.superAdmin, user.IsSuperAdmin())
+
+			byName, err := client.GetUserByName(ctx, "test-user")
+			require.NoError(t, err)
+			require.Equal(t, tc.roles, byName.Roles)
+			require.Equal(t, tc.admin, byName.Admin)
+			require.Equal(t, tc.superAdmin, byName.IsSuperAdmin())
+
+			byUUID, err := client.GetUserByUUID(ctx, "test-user-uuid")
+			require.NoError(t, err)
+			require.Equal(t, tc.roles, byUUID.Roles)
+			require.Equal(t, tc.admin, byUUID.Admin)
+			require.Equal(t, tc.superAdmin, byUUID.IsSuperAdmin())
+		})
+	}
 }
 
 func TestGetOrCreateFirstAvaiTokens_Success(t *testing.T) {

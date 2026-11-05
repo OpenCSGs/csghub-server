@@ -146,7 +146,7 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	isLastAdmin, err = store.IsLastOrganizationAdmin(ctx, "u1")
 	require.NoError(t, err)
 	require.True(t, isLastAdmin)
-	require.NoError(t, database.NewMemberStoreWithDB(db).Delete(ctx, org.ID, owner.ID))
+	require.NoError(t, database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db)).Delete(ctx, org.ID, owner.ID))
 	isLastAdmin, err = store.IsLastOrganizationAdmin(ctx, "u1")
 	require.NoError(t, err)
 	require.False(t, isLastAdmin)
@@ -304,7 +304,7 @@ func TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots(t *test
 	ctx := context.Background()
 
 	root := createRootOrganization(t, ctx, db, "user-root-orgs")
-	unitStore := database.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	unitStore := database.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
 	research := createChild(t, ctx, unitStore, root, "user-root-orgs-research", nil, 1)
 	it := createChild(t, ctx, unitStore, root, "user-root-orgs-it", &research.UUID, 1)
 
@@ -326,7 +326,7 @@ func TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots(t *test
 		Path: legacyOrganization.Name,
 		UUID: legacyOrganization.UUID.String(),
 	}))
-	memberStore := database.NewMemberStoreWithDB(db)
+	memberStore := database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 	require.NoError(t, memberStore.Add(ctx, legacyOrganization.ID, users[0].ID, string(types.UserRead)))
 	researchOrganizationID := organizationIDForUnit(t, ctx, unitStore, research.UUID)
 	itOrganizationID := organizationIDForUnit(t, ctx, unitStore, it.UUID)
@@ -383,8 +383,8 @@ func TestOrganizationStore_IsLastOrganizationAdmin(t *testing.T) {
 	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
-	legacyStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
-	hierarchyStore := database.NewOrgStore(true, nil)
+	legacyStore := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB()))
+	hierarchyStore := database.NewOrgStoreWithJobClients(true, nil, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB()))
 	organizations := map[string]*database.Organization{}
 	createOrganization := func(store database.OrgStore, name string) {
 		organization := &database.Organization{Name: name, Nickname: name, UUID: uuid.New()}
@@ -440,7 +440,7 @@ func TestOrganizationStore_CreateWithRelations(t *testing.T) {
 	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
-	userStore := database.NewUserStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	require.NoError(t, userStore.Create(ctx, &database.User{
 		GitID:    90001,
 		UUID:     uuid.NewString(),
@@ -450,7 +450,7 @@ func TestOrganizationStore_CreateWithRelations(t *testing.T) {
 	owner, err := userStore.FindByUsername(ctx, "atomic-owner")
 	require.NoError(t, err)
 
-	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB()))
 
 	org := &database.Organization{
 		Name:     "atomic-org",
@@ -464,7 +464,7 @@ func TestOrganizationStore_CreateWithRelations(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, org.ID, storedOrg.ID)
 
-	member, err := database.NewMemberStoreWithDB(db).Find(ctx, org.ID, owner.ID)
+	member, err := database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db)).Find(ctx, org.ID, owner.ID)
 	require.NoError(t, err)
 	require.Equal(t, string(types.UserAdmin), member.Role)
 
@@ -483,7 +483,7 @@ func TestOrganizationStore_CreateWithRelationsRollback(t *testing.T) {
 	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
-	userStore := database.NewUserStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	require.NoError(t, userStore.Create(ctx, &database.User{
 		GitID:    90002,
 		UUID:     uuid.NewString(),
@@ -493,7 +493,7 @@ func TestOrganizationStore_CreateWithRelationsRollback(t *testing.T) {
 	owner, err := userStore.FindByUsername(ctx, "rollback-owner")
 	require.NoError(t, err)
 
-	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB()))
 
 	org := &database.Organization{
 		Name:     "rollback-org",
@@ -541,12 +541,13 @@ func TestOrganization_CreateWithForceDelete(t *testing.T) {
 	require.Equal(t, true, errors.Is(err, sql.ErrNoRows))
 }
 
+// TestOrganization_DeleteLocksAssociatedTombstoneWhenPathWasRecreated preserves a newer namespace identity during deletion.
 func TestOrganization_DeleteLocksAssociatedTombstoneWhenPathWasRecreated(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
-	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
+	orgStore := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
 	org := &database.Organization{Name: "recreated-delete", Nickname: "recreated-delete", UUID: uuid.New()}
 	associated := &database.Namespace{Path: org.Name, UUID: uuid.NewString(), DeletedAt: time.Now()}
 	require.NoError(t, orgStore.Create(ctx, org, associated))
@@ -723,7 +724,7 @@ func TestOrganizationStore_SearchOrder(t *testing.T) {
 	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
 
-	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB()))
 	orgsToCreate := []database.Organization{
 		{
 			Name:     "sss",
@@ -913,7 +914,7 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	defer db.Close()
 	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
-	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB()))
 
 	// Create users
 	user1 := &database.User{Username: "belong_user1", UUID: uuid.New().String()}
@@ -1002,7 +1003,7 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	// Both Store constructors must preserve roles, owner compatibility, and pagination.
 	stores := map[string]database.OrgStore{
 		"legacy":    store,
-		"hierarchy": database.NewOrgStore(true, nil),
+		"hierarchy": database.NewOrgStoreWithJobClients(true, nil, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB())),
 	}
 	for name, candidate := range stores {
 		t.Run(name, func(t *testing.T) {
@@ -1034,7 +1035,7 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	}
 
 	// Removed memberships must not appear in either the result or its total count.
-	require.NoError(t, database.NewMemberStoreWithDB(db).Delete(ctx, org2.ID, user1.ID))
+	require.NoError(t, database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db)).Delete(ctx, org2.ID, user1.ID))
 	for _, candidate := range stores {
 		organizations, count, err := candidate.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "", "")
 		require.NoError(t, err)
@@ -1145,14 +1146,15 @@ func TestOrganizationStore_Delete_CleansUpTags(t *testing.T) {
 	require.Len(t, tags, 0)
 }
 
+// TestOrgStore_DeleteOwnedRepositories limits repository cleanup to the deleted organization.
 func TestOrgStore_DeleteOwnedRepositories(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 	jobClient := &testRepositoryDeletionJobClient{}
-	store := database.NewOrgStore(false, jobClient)
-	repoStore := database.NewRepoStoreWithDB(db)
+	store := database.NewOrgStoreWithJobClients(false, jobClient, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	for _, path := range []string{"delete-repos", "delete-repos-similar"} {
 		err := store.Create(ctx, &database.Organization{Name: path, Nickname: path, UUID: uuid.New()}, &database.Namespace{Path: path})
@@ -1208,6 +1210,7 @@ func TestOrgStore_DeleteSerializesWithRepositoryUpsert(t *testing.T) {
 	})
 }
 
+// testOrgStoreDeleteSerializesWithRepositoryWrite verifies deletion snapshots wait for concurrent repository writes.
 func testOrgStoreDeleteSerializesWithRepositoryWrite(
 	t *testing.T,
 	writeRepository func(context.Context, database.RepoStore, database.Repository) error,
@@ -1216,8 +1219,8 @@ func testOrgStoreDeleteSerializesWithRepositoryWrite(
 	defer db.Close()
 	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
-	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
-	repoStore := database.NewRepoStoreWithDB(db)
+	orgStore := database.NewOrgStoreWithJobClients(false, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	err := orgStore.Create(ctx, &database.Organization{
 		Name: "concurrent-org", Nickname: "Concurrent Org", UUID: uuid.New(),
@@ -1296,7 +1299,7 @@ func TestOrgStore_RecreatedNamespaceAllowsRepositoryCreation(t *testing.T) {
 	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
-	repoStore := database.NewRepoStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	createOrganization := func() {
 		err := orgStore.Create(ctx, &database.Organization{
@@ -1334,7 +1337,7 @@ func TestOrgStore_DeleteRetainsRecords(t *testing.T) {
 	org := &database.Organization{Name: "retained-org", UUID: uuid.New(), UserID: admin.ID}
 	ns := &database.Namespace{Path: org.Name, UUID: uuid.NewString()}
 	jobClient := &testRepositoryDeletionJobClient{}
-	store := database.NewOrgStoreWithDeletionJobClients(false, jobClient, jobClient)
+	store := database.NewOrgStoreWithJobClients(false, jobClient, jobClient, tests.NewFixtureRebacTupleJobClient(database.GetDB()))
 	require.NoError(t, store.CreateWithRelations(ctx, org, ns, nil))
 	// A revoked administrator must not regain deletion permission through a historical membership.
 	revoked := &database.Member{OrganizationID: org.ID, UserID: admin.ID + 100, Role: string(types.UserAdmin), DeletedAt: time.Now().Add(-time.Hour)}
@@ -1407,7 +1410,7 @@ func TestOrganizationUnitStore_DeleteSubtreeRetry(t *testing.T) {
 	ctx := context.Background()
 	root := createRootOrganization(t, ctx, db, "retained-subtree")
 	jobClient := &testRepositoryDeletionJobClient{}
-	store := database.NewOrganizationUnitStoreWithDBAndDeletionJobClients(db, jobClient, jobClient)
+	store := database.NewOrganizationUnitStoreWithDBAndJobClients(db, jobClient, jobClient, tests.NewFixtureRebacTupleJobClient(db))
 	child := createChild(t, ctx, store, root, "child", nil, 1)
 	grandchild := createChild(t, ctx, store, root, "grandchild", &child.UUID, 1)
 	sibling := createChild(t, ctx, store, root, "sibling", nil, 2)

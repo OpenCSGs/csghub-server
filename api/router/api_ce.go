@@ -14,6 +14,8 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
+func addBatchMirrorRoutes(_ *gin.RouterGroup, _ *handler.MirrorHandler) {}
+
 func useAdvancedMiddleware(r *gin.Engine, config *config.Config) {}
 
 // addOrgRoutes registers edition-specific hierarchy organization routes.
@@ -43,7 +45,8 @@ func createXnetRoutes(_ *gin.Engine, _ middleware.MiddlewareCollection, _ *confi
 	return nil
 }
 
-func createComputingRoutes(_ *gin.RouterGroup, _ *handler.ClusterHandler) error {
+// createComputingRoutes leaves advanced compute administration disabled in CE.
+func createComputingRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *handler.ClusterHandler) error {
 	return nil
 }
 

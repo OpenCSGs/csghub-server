@@ -14,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// TestDatasetCompnent_Create checks the expected user query options.
 func TestDatasetCompnent_Create(t *testing.T) {
 	ctx := context.TODO()
 	dc := initializeTestDatasetComponent(ctx, t)
@@ -29,7 +30,7 @@ func TestDatasetCompnent_Create(t *testing.T) {
 		database.Namespace{}, nil,
 	)
 
-	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(database.User{
 		RoleMask: "user",
 		Username: "user",
 	}, nil)

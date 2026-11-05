@@ -2,24 +2,81 @@ package component
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
+// TestRecomComponent_SetOpWeight checks asset-type boundaries and preserves store failures without unintended writes.
 func TestRecomComponent_SetOpWeight(t *testing.T) {
-	ctx := context.TODO()
-	rc := initializeTestRecomComponent(ctx, t)
-
-	rc.mocks.stores.RepoMock().EXPECT().FindById(ctx, int64(1)).Return(&database.Repository{}, nil)
-	rc.mocks.stores.RecomMock().EXPECT().UpsetOpWeights(ctx, int64(1), int64(100)).Return(nil)
-
-	err := rc.SetOpWeight(ctx, 1, 100)
-	require.Nil(t, err)
+	supported := []types.RepositoryType{types.ModelRepo, types.DatasetRepo, types.CodeRepo, types.SpaceRepo, types.MCPServerRepo, types.SkillRepo}
+	unsupported := []types.RepositoryType{types.UnknownRepo, types.PromptRepo, types.TemplateRepo, "invalid"}
+	lookupErr, writeErr := errors.New("repository lookup failed"), errors.New("recommendation write failed")
+	// weightCase records the authorization result and permitted store side effects together.
+	type weightCase struct {
+		name         string
+		expectedType types.RepositoryType
+		repository   *database.Repository
+		lookupErr    error
+		writeErr     error
+		wantErr      error
+		lookup       bool
+		write        bool
+	}
+	cases := []weightCase{
+		{name: "nil repository", expectedType: types.ModelRepo, lookup: true, wantErr: errorx.ErrForbidden},
+		{name: "repository lookup failure", expectedType: types.ModelRepo, lookupErr: lookupErr, lookup: true, wantErr: lookupErr},
+		{name: "weight update failure", expectedType: types.ModelRepo, repository: &database.Repository{ID: 1, RepositoryType: types.ModelRepo}, writeErr: writeErr, lookup: true, write: true, wantErr: writeErr},
+	}
+	actualTypes := append(append([]types.RepositoryType{}, supported...), unsupported...)
+	for _, expected := range supported {
+		for _, actual := range actualTypes {
+			tc := weightCase{
+				name: fmt.Sprintf("expected=%q/actual=%q", expected, actual), expectedType: expected,
+				repository: &database.Repository{ID: 1, RepositoryType: actual}, lookup: true, write: expected == actual,
+			}
+			if !tc.write {
+				tc.wantErr = errorx.ErrForbidden
+			}
+			cases = append(cases, tc)
+		}
+	}
+	for _, expected := range unsupported {
+		cases = append(cases, weightCase{name: fmt.Sprintf("invalid expected=%q", expected), expectedType: expected, wantErr: errorx.ErrForbidden})
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			repos, weights := mockdb.NewMockRepoStore(t), mockdb.NewMockRecomStore(t)
+			rc := &recomComponentImpl{repoStore: repos, recomStore: weights}
+			if tc.lookup {
+				repos.EXPECT().FindById(ctx, int64(1)).Return(tc.repository, tc.lookupErr).Once()
+			}
+			if tc.write {
+				weights.EXPECT().UpsetOpWeights(ctx, int64(1), int64(100)).Return(tc.writeErr).Once()
+			}
+			err := rc.SetOpWeight(ctx, tc.expectedType, 1, 100)
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+			}
+			if !tc.lookup {
+				repos.AssertNotCalled(t, "FindById", mock.Anything, mock.Anything)
+			}
+			if !tc.write {
+				weights.AssertNotCalled(t, "UpsetOpWeights", mock.Anything, mock.Anything, mock.Anything)
+			}
+		})
+	}
 }
 
 func TestRecomComponent_CalculateRecomScore(t *testing.T) {

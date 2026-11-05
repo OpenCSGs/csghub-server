@@ -1,6 +1,9 @@
 package types
 
-import "net/url"
+import (
+	"net/url"
+	"time"
+)
 
 type XnetTokenReq struct {
 	Permission string         `json:"permission"`
@@ -52,4 +55,31 @@ type MigrationStatsResp struct {
 	StorageEfficiencyRatio float64 `json:"storage_efficiency_ratio"`
 	LfsStorageSize         int64   `json:"lfs_storage_size"`
 	LfsObjectCount         int64   `json:"lfs_object_count"`
+}
+
+type XnetDispatchBatchResult struct {
+	Claimed     int  `json:"claimed"`
+	Published   int  `json:"published"`
+	Failed      int  `json:"failed"`
+	Active      int  `json:"active"`
+	Retryable   int  `json:"retryable"`
+	Exhausted   int  `json:"exhausted"`
+	Completed   int  `json:"completed"`
+	PollSeconds int  `json:"poll_seconds"`
+	Done        bool `json:"done"`
+}
+
+// XnetDispatchStateQuery scopes task-state checks to one repository.
+type XnetDispatchStateQuery struct {
+	RepositoryID  int64
+	LeaseDuration time.Duration
+	MaxAttempts   int
+}
+
+// XnetDispatchState records existence, not counts. Higher-priority work short
+// circuits lower-priority checks: active, then retryable, then exhausted.
+type XnetDispatchState struct {
+	Active    bool
+	Retryable bool
+	Exhausted bool
 }

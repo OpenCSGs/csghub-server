@@ -158,7 +158,7 @@ func TestAgentInstanceTaskStore_ListTasks(t *testing.T) {
 	sessionStore := database.NewAgentInstanceSessionStoreWithDB(db)
 	argoStore := database.NewArgoWorkFlowStoreWithDB(db)
 	deployStore := database.NewDeployTaskStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	store := database.NewAgentInstanceTaskStoreWithDB(db)
 
 	userUUID1 := uuid.New().String()
@@ -554,7 +554,7 @@ func TestAgentInstanceTaskStore_GetTaskByID(t *testing.T) {
 	sessionStore := database.NewAgentInstanceSessionStoreWithDB(db)
 	argoStore := database.NewArgoWorkFlowStoreWithDB(db)
 	deployStore := database.NewDeployTaskStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	store := database.NewAgentInstanceTaskStoreWithDB(db)
 
 	userUUID := uuid.New().String()

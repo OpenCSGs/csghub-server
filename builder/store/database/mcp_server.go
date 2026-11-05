@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -52,25 +53,34 @@ type MCPServerStore interface {
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) ([]MCPServer, int, error)
 	UserLikes(ctx context.Context, userID int64, per, page int) ([]MCPServer, int, error)
 	CreateIfNotExist(ctx context.Context, input MCPServer) (*MCPServer, error)
-	CreateSpaceAndRepoForDeploy(ctx context.Context, inputRepo *Repository, inputSpace *Space) error
-	DeleteSpaceAndRepoForDeploy(ctx context.Context, spaceID int64, repoID int64) error
+	// CreateSpaceAndRepoForDeploy returns the committed owner tuple for failure cleanup.
+	CreateSpaceAndRepoForDeploy(ctx context.Context, inputRepo *Repository, inputSpace *Space) (rebac.Relationship, error)
+	// DeleteSpaceAndRepoForDeploy reuses the creation tuple without resolving its namespace again.
+	DeleteSpaceAndRepoForDeploy(ctx context.Context, spaceID int64, repoID int64, owner rebac.Relationship) error
 	CreateAndUpdateRepoPath(ctx context.Context, input MCPServer, path string) (*MCPServer, error)
 }
 
 type mcpServerStoreImpl struct {
-	db *DB
+	// rebacTupleJobClient records permission changes on this Store's business transaction.
+	rebacTupleJobClient RebacTupleJobClient
+	db                  *DB
 }
 
+// NewMCPServerStore creates a Store for operations that do not require permission events.
+// Use the explicit job-client constructor for tuple-changing operations.
 func NewMCPServerStore() MCPServerStore {
-	return &mcpServerStoreImpl{
-		db: defaultDB,
-	}
+	return NewMCPServerStoreWithRebacTupleJobClient(defaultDB, nil)
 }
 
+// NewMCPServerStoreWithDB creates a Store for operations that do not require permission events.
+// Use the explicit job-client constructor for tuple-changing operations.
 func NewMCPServerStoreWithDB(db *DB) MCPServerStore {
-	return &mcpServerStoreImpl{
-		db: db,
-	}
+	return NewMCPServerStoreWithRebacTupleJobClient(db, nil)
+}
+
+// NewMCPServerStoreWithRebacTupleJobClient injects the transactional permission job producer.
+func NewMCPServerStoreWithRebacTupleJobClient(db *DB, tupleJobs RebacTupleJobClient) MCPServerStore {
+	return &mcpServerStoreImpl{db: db, rebacTupleJobClient: tupleJobs}
 }
 
 func (m *mcpServerStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) ([]MCPServer, error) {
@@ -105,10 +115,10 @@ func (m *mcpServerStoreImpl) ByPath(ctx context.Context, namespace string, name 
 		Relation("Repository.Mirror").
 		Relation("Repository.Mirror.CurrentTask").
 		Relation("Repository.Statistics").
-		Where("repository.path = ?", fmt.Sprintf("%s/%s", namespace, name)).
+		Where("LOWER(repository.path) = LOWER(?)", fmt.Sprintf("%s/%s", namespace, name)).
 		Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("select mcp server %s/%s error: %w", namespace, name, err)
+		return nil, fmt.Errorf("select mcp server %s/%s error: %w", namespace, name, resourceLookupError(err, namespace, name))
 	}
 	err = m.db.Operator.Core.NewSelect().
 		Model(mcpServer.Repository).
@@ -314,8 +324,18 @@ func (m *mcpServerStoreImpl) CreateIfNotExist(ctx context.Context, input MCPServ
 	return &input, nil
 }
 
-func (m *mcpServerStoreImpl) CreateSpaceAndRepoForDeploy(ctx context.Context, inputRepo *Repository, inputSpace *Space) error {
+// CreateSpaceAndRepoForDeploy commits deployment records and their owner event together.
+// The returned tuple is the exact snapshot enqueued by the creation transaction.
+// Namespace locking makes concurrent deletion include this repository or reject creation.
+func (m *mcpServerStoreImpl) CreateSpaceAndRepoForDeploy(ctx context.Context, inputRepo *Repository, inputSpace *Space) (rebac.Relationship, error) {
+	if inputRepo == nil {
+		return rebac.Relationship{}, fmt.Errorf("repository is required")
+	}
+	var owner rebac.Relationship
 	err := m.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := lockRepositoryNamespaceForWrite(ctx, tx, *inputRepo); err != nil {
+			return err
+		}
 		if err := assertAffectedOneRow(tx.NewInsert().Model(inputRepo).Exec(ctx)); err != nil {
 			return errorx.HandleDBError(err, errorx.Ctx().Set("insert_repo_path", inputRepo.Path).Set("type", inputRepo.RepositoryType))
 		}
@@ -326,15 +346,29 @@ func (m *mcpServerStoreImpl) CreateSpaceAndRepoForDeploy(ctx context.Context, in
 			return errorx.HandleDBError(err, errorx.Ctx().Set("insert_mcp_space", ""))
 		}
 
-		return nil
+		var err error
+		owner, err = repositoryOwnerTx(ctx, tx, *inputRepo)
+		if err != nil {
+			return err
+		}
+		return enqueueRebacTuple(ctx, tx, m.rebacTupleJobClient, types.NewRebacTuple("repository.namespace",
+			types.TupleOperation{Relationships: []rebac.Relationship{owner}}))
 	})
 
-	return err
+	if err != nil {
+		return rebac.Relationship{}, err
+	}
+	return owner, nil
 }
 
-func (m *mcpServerStoreImpl) DeleteSpaceAndRepoForDeploy(ctx context.Context, spaceID int64, repoID int64) error {
+// DeleteSpaceAndRepoForDeploy removes deployment records and persists the owner removal together.
+// Cleanup uses the creation snapshot even if the namespace, subject or repository is soft-deleted.
+// Both organization inheritance variants are removed to cover changes made during deployment.
+func (m *mcpServerStoreImpl) DeleteSpaceAndRepoForDeploy(ctx context.Context, spaceID int64, repoID int64, owner rebac.Relationship) error {
+	if owner.Object != rebac.RepositoryObject(repoID) {
+		return fmt.Errorf("MCP cleanup tuple does not match repository %d", repoID)
+	}
 	err := m.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-
 		if err := assertAffectedOneRow(tx.NewDelete().Model(&Space{}).Where("id = ?", spaceID).ForceDelete().Exec(ctx)); err != nil {
 			return errorx.HandleDBError(err, errorx.Ctx().Set("delete_mcp_space_id", spaceID))
 		}
@@ -343,7 +377,8 @@ func (m *mcpServerStoreImpl) DeleteSpaceAndRepoForDeploy(ctx context.Context, sp
 			return errorx.HandleDBError(err, errorx.Ctx().Set("delete_repo_id", repoID))
 		}
 
-		return nil
+		return enqueueRebacTuple(ctx, tx, m.rebacTupleJobClient, types.NewRebacTuple("repository.namespace",
+			types.TupleOperation{Delete: true, Relationships: repositoryOwnerDeletes(owner)}))
 	})
 
 	return err

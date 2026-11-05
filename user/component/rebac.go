@@ -6,11 +6,32 @@ import (
 	"sort"
 
 	"github.com/google/uuid"
+	"github.com/riverqueue/river"
 	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+// NewRebacTupleWorkClient consumes ordered permission jobs with execution leases.
+func NewRebacTupleWorkClient(ctx context.Context, dsn string, worker *RebacTupleWorker) (workhub.WorkClient, error) {
+	if worker == nil {
+		return nil, fmt.Errorf("ReBAC tuple worker is required")
+	}
+	return workhub.NewWorkClient(ctx, dsn, newRebacTupleRiverConfig(worker))
+}
+
+// newRebacTupleRiverConfig gives ordered tuple work its own leased client.
+func newRebacTupleRiverConfig(worker *RebacTupleWorker) *river.Config {
+	return &river.Config{
+		JobLease: &river.JobLeaseConfig{},
+		Queues: map[string]river.QueueConfig{
+			workhub.RebacTupleQueue: {MaxWorkers: 4},
+		},
+		Workers: workhub.NewWorkerRegistry(workhub.WorkerOverrides{RebacTuple: worker}),
+	}
+}
 
 var organizationMemberRelations = []rebac.Relation{
 	rebac.RelationReader,
@@ -138,25 +159,6 @@ func deleteUserObjectOwnerRelationship(ctx context.Context, authorizer rebac.Aut
 	return nil
 }
 
-// loadUserNamespaceRelationship loads the owner tuple for a user's namespace, including a soft-deleted namespace.
-func loadUserNamespaceRelationship(
-	ctx context.Context,
-	namespaceStore database.NamespaceStore,
-	user database.User,
-) (rebac.Relationship, error) {
-	if namespaceStore == nil {
-		return rebac.Relationship{}, fmt.Errorf("namespace store is required")
-	}
-	namespace, err := namespaceStore.FindByPathWithDeleted(ctx, user.Username)
-	if err != nil {
-		return rebac.Relationship{}, fmt.Errorf("find user namespace %q including deleted records: %w", user.Username, err)
-	}
-	if namespace.NamespaceType != database.UserNamespace {
-		return rebac.Relationship{}, fmt.Errorf("namespace %q is not a user namespace", namespace.Path)
-	}
-	return namespaceRelationship(namespace, user.UUID)
-}
-
 // deleteNamespaceRelationship removes an existing direct namespace tuple.
 func deleteNamespaceRelationship(ctx context.Context, authorizer rebac.Authorizer, relationship rebac.Relationship) error {
 	return deleteNamespaceRelationships(ctx, authorizer, []rebac.Relationship{relationship})
@@ -249,68 +251,6 @@ func deleteOrganizationReBACRelationships(
 		return fmt.Errorf("delete organization namespace relationships: %w", err)
 	}
 	return nil
-}
-
-// loadUserOrganizationReBACCleanups loads the organizations whose direct member tuples belong to a user.
-func loadUserOrganizationReBACCleanups(
-	ctx context.Context,
-	orgStore database.OrgStore,
-	user database.User,
-) ([]types.OrganizationReBACCleanup, error) {
-	if orgStore == nil {
-		return nil, fmt.Errorf("organization store is required")
-	}
-	if user.UUID == "" {
-		return nil, fmt.Errorf("user UUID is required for ReBAC cleanup")
-	}
-
-	organizations, err := orgStore.GetUserBelongOrgs(ctx, user.ID)
-	if err != nil {
-		return nil, fmt.Errorf("load organizations for user %q: %w", user.UUID, err)
-	}
-
-	cleanups := make([]types.OrganizationReBACCleanup, 0, len(organizations))
-	seen := make(map[string]struct{}, len(organizations))
-	for _, organization := range organizations {
-		if organization.UUID == uuid.Nil {
-			return nil, fmt.Errorf("organization %d has no UUID for ReBAC cleanup", organization.ID)
-		}
-		organizationUUID := organization.UUID.String()
-		if _, exists := seen[organizationUUID]; exists {
-			continue
-		}
-		seen[organizationUUID] = struct{}{}
-		cleanups = append(cleanups, types.OrganizationReBACCleanup{
-			OrganizationUUID: organizationUUID,
-			UserUUIDs:        []string{user.UUID},
-		})
-	}
-	return cleanups, nil
-}
-
-// deleteUserOrganizationReBACRelationships removes a user's direct roles from every organization.
-func deleteUserOrganizationReBACRelationships(
-	ctx context.Context,
-	authorizer rebac.Authorizer,
-	cleanups []types.OrganizationReBACCleanup,
-) error {
-	for _, cleanup := range cleanups {
-		if err := reconcileOrganizationMemberRelationships(
-			ctx, authorizer, cleanup.OrganizationUUID, cleanup.UserUUIDs, nil,
-		); err != nil {
-			return fmt.Errorf("delete user relationships from organization %s: %w", cleanup.OrganizationUUID, err)
-		}
-	}
-	return nil
-}
-
-// desiredOrganizationMemberRoles assigns one desired role to every user UUID.
-func desiredOrganizationMemberRoles(userUUIDs []string, role types.UserRole) map[string]types.UserRole {
-	roles := make(map[string]types.UserRole, len(userUUIDs))
-	for _, userUUID := range userUUIDs {
-		roles[userUUID] = role
-	}
-	return roles
 }
 
 // reconcileOrganizationMemberRelationships makes direct role tuples match the database state.

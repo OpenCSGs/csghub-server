@@ -1,4 +1,4 @@
-"""Patch vLLM v0.28.0 to expose the decoded input audio duration.
+"""Patch vLLM v0.31.0 to expose the decoded input audio duration.
 
 The patch is intentionally version-locked. It must fail during the image build
 when vLLM changes, rather than silently producing an image without the header.
@@ -12,7 +12,7 @@ import vllm
 def replace_once(path: Path, old: str, new: str) -> None:
     content = path.read_text()
     if content.count(old) != 1:
-        raise RuntimeError(f"unexpected vLLM v0.28.0 source in {path}")
+        raise RuntimeError(f"unexpected vLLM v0.31.0 source in {path}")
     path.write_text(content.replace(old, new))
 
 

@@ -17,6 +17,7 @@ type AgentTemplate struct {
 	Type        string         `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
 	UserUUID    string         `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
 	Name        string         `bun:",notnull" json:"name"`         // Agent template name
+	Nickname    string         `bun:",nullzero" json:"nickname"`    // Agent template display name
 	Description string         `bun:",nullzero" json:"description"` // Agent template description
 	Content     string         `bun:",type:text" json:"content"`    // Used to store the complete content of the template
 	Public      bool           `bun:",notnull" json:"public"`       // Whether the template is public
@@ -505,11 +506,13 @@ func (s *agentInstanceStoreImpl) Delete(ctx context.Context, id int64) error {
 	})
 }
 
-// CountByUserAndType returns the count of agent instances for a specific user and type
+// CountByUserAndType returns the count of agent instances for a specific user
+// and type. Platform built-in instances are excluded so they do not consume the
+// user's per-type quota.
 func (s *agentInstanceStoreImpl) CountByUserAndType(ctx context.Context, userUUID string, instanceType string) (int, error) {
 	count, err := s.db.Core.NewSelect().
 		Model((*AgentInstance)(nil)).
-		Where("user_uuid = ? AND type = ? AND kind = ?", userUUID, instanceType, AgentInstanceKindRuntime).
+		Where("user_uuid = ? AND type = ? AND kind = ? AND built_in = ?", userUUID, instanceType, AgentInstanceKindRuntime, false).
 		Count(ctx)
 	if err != nil {
 		return 0, errorx.HandleDBError(err, map[string]any{
@@ -521,9 +524,12 @@ func (s *agentInstanceStoreImpl) CountByUserAndType(ctx context.Context, userUUI
 }
 
 func (s *agentInstanceStoreImpl) IsInstanceNameExists(ctx context.Context, userUUID string, instanceName string) (bool, error) {
+	// Best-effort per-user name check across runtime and logical instances. The
+	// unique index stays per-kind, so cross-kind duplicates can still arise from
+	// a concurrent creation race or exist in pre-existing data.
 	exists, err := s.db.Core.NewSelect().
 		Model((*AgentInstance)(nil)).
-		Where("user_uuid = ? AND name = ? AND kind = ?", userUUID, instanceName, AgentInstanceKindRuntime).
+		Where("user_uuid = ? AND name = ?", userUUID, instanceName).
 		Exists(ctx)
 	if err != nil {
 		return false, errorx.HandleDBError(err, map[string]any{

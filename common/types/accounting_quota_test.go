@@ -176,3 +176,24 @@ func TestCheckQuotaItems(t *testing.T) {
 		assert.NoError(t, CheckQuotaItems(items, false))
 	})
 }
+
+func TestIsTokenMetred(t *testing.T) {
+	tests := []struct {
+		taskType string
+		want     bool
+	}{
+		{taskType: string(TextGeneration), want: true},
+		{taskType: string(TextRanking), want: true},
+		{taskType: string(FeatureExtraction), want: true},
+		{taskType: string(TypedDecisions), want: true},
+		{taskType: string(ImageText2Text), want: false},
+		{taskType: "text-classification", want: false},
+		{taskType: "", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.taskType, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsTokenMetred(tt.taskType))
+		})
+	}
+}

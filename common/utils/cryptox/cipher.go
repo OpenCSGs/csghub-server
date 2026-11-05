@@ -1,4 +1,4 @@
-// Package cryptox provides shared encryption helpers for secrets at rest.
+// Package cryptox provides shared encryption and keyed lookup helpers for secrets at rest.
 //
 // The package expects high-entropy master keys. Do not pass user passwords
 // directly; derive password-based keys with a dedicated password KDF first.
@@ -8,9 +8,11 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hkdf"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -50,11 +52,11 @@ type Config struct {
 	InfoPrefix string
 }
 
-// Cipher encrypts and decrypts values with AES-256-GCM keys derived by HKDF-SHA256.
+// Cipher encrypts values with AES-256-GCM and computes keyed lookup hashes using HKDF-SHA256 keys.
 //
 // A Cipher is immutable after NewCipher returns, so it is safe for concurrent use by
-// multiple goroutines. Each call derives a fresh per-scope key and uses a freshly
-// allocated nonce and output buffer, sharing no mutable state across calls.
+// multiple goroutines. Calls derive scoped keys without sharing mutable state;
+// encryption also allocates a fresh nonce and output buffer for each operation.
 type Cipher struct {
 	prk        []byte
 	infoPrefix string
@@ -194,7 +196,7 @@ func buildScope(parts ...string) string {
 	return builder.String()
 }
 
-// deriveKey expands the initialized HKDF pseudorandom key into one AES-256 key for scope.
+// deriveKey expands the initialized HKDF pseudorandom key into one 256-bit key for scope.
 func (c *Cipher) deriveKey(scope []string) ([]byte, error) {
 	if c == nil || len(c.prk) == 0 {
 		return nil, fmt.Errorf("%w: cipher is not initialized", ErrInvalidConfig)
@@ -259,4 +261,18 @@ func zeroBytes(value []byte) {
 	for i := range value {
 		value[i] = 0
 	}
+}
+
+// LookupHash computes a stable HMAC-SHA256 index using a purpose-separated key.
+// RFC 5869 HKDF derivation separates it from encryption, including for equal scopes.
+// Do not include user identifiers in scope when cross-user equality is required.
+func (c *Cipher) LookupHash(plaintext string, scope ...string) (string, error) {
+	key, err := c.deriveKey(append([]string{"hmac-sha256-index/v1"}, scope...))
+	if err != nil {
+		return "", err
+	}
+	defer zeroBytes(key)
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write([]byte(plaintext))
+	return hex.EncodeToString(mac.Sum(nil)), nil
 }

@@ -8,14 +8,16 @@ import (
 	"strings"
 	"time"
 
-	"opencsg.com/csghub-server/common/errorx"
-	"opencsg.com/csghub-server/common/types"
-
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/builder/rebac"
+	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type orgStoreImpl struct {
+	// rebacTupleJobClient records permission changes on this Store's business transaction.
+	rebacTupleJobClient           RebacTupleJobClient
 	db                            *DB
 	isHierarchical                bool
 	repositoryDeletionJobClient   RepositoryDeletionJobClient
@@ -38,6 +40,8 @@ type OrganizationDeletionJobInput struct {
 }
 
 type OrgStore interface {
+	// ReconcileNamespaceTuples queues ownership and any current creator admin role.
+	ReconcileNamespaceTuples(ctx context.Context, orgID int64) error
 	Create(ctx context.Context, org *Organization, namepace *Namespace) (err error)
 	// CreateWithRelations atomically creates one legacy organization with its namespace, tags, and creator admin membership.
 	CreateWithRelations(ctx context.Context, org *Organization, namepace *Namespace, tagIDs []int64) error
@@ -72,16 +76,18 @@ type OrgStore interface {
 // NewOrgStore uses the initialized default database and the supplied organization mode.
 // A nil jobClient is allowed unless repository deletion jobs need to be enqueued.
 func NewOrgStore(isHierarchical bool, jobClient RepositoryDeletionJobClient) OrgStore {
-	return &orgStoreImpl{db: defaultDB, isHierarchical: isHierarchical, repositoryDeletionJobClient: jobClient}
+	return NewOrgStoreWithJobClients(isHierarchical, jobClient, nil, nil)
 }
 
 // NewOrgStoreWithDeletionJobClients creates an organization store with both
 // transactional repository and organization cleanup job clients.
 func NewOrgStoreWithDeletionJobClients(isHierarchical bool, repositoryJobClient RepositoryDeletionJobClient, organizationJobClient OrganizationDeletionJobClient) OrgStore {
-	return &orgStoreImpl{
-		db: defaultDB, isHierarchical: isHierarchical,
-		repositoryDeletionJobClient: repositoryJobClient, organizationDeletionJobClient: organizationJobClient,
-	}
+	return NewOrgStoreWithJobClients(isHierarchical, repositoryJobClient, organizationJobClient, nil)
+}
+
+// NewOrgStoreWithJobClients injects cleanup and permission job producers.
+func NewOrgStoreWithJobClients(isHierarchical bool, repositoryJobs RepositoryDeletionJobClient, organizationJobs OrganizationDeletionJobClient, tupleJobs RebacTupleJobClient) OrgStore {
+	return &orgStoreImpl{db: defaultDB, isHierarchical: isHierarchical, repositoryDeletionJobClient: repositoryJobs, organizationDeletionJobClient: organizationJobs, rebacTupleJobClient: tupleJobs}
 }
 
 type Organization struct {
@@ -144,6 +150,11 @@ func (s *orgStoreImpl) Create(ctx context.Context, org *Organization, namepace *
 // CreateWithRelations atomically creates an organization, its namespace, tags, and initial admin membership.
 func (s *orgStoreImpl) CreateWithRelations(ctx context.Context, org *Organization, namepace *Namespace, tagIDs []int64) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if org.UserID != 0 {
+			if err := lockUserRebacTx(ctx, tx, org.UserID); err != nil {
+				return err
+			}
+		}
 		org.IsRoot = true
 		org.IsHierarchical = s.isHierarchical
 		if err := s.createOrganizationTx(ctx, tx, org, namepace); err != nil {
@@ -157,7 +168,7 @@ func (s *orgStoreImpl) CreateWithRelations(ctx context.Context, org *Organizatio
 				return err
 			}
 		}
-		return nil
+		return enqueueOrganizationCreationTx(ctx, tx, s.rebacTupleJobClient, *org, *namepace, org.UserID)
 	})
 	return errorx.HandleDBError(err, nil)
 }
@@ -280,6 +291,7 @@ func (s *orgStoreImpl) Update(ctx context.Context, org *Organization) (err error
 // Delete soft-deletes the organization and namespace and returns retained cleanup data.
 func (s *orgStoreImpl) Delete(ctx context.Context, path string) (result OrganizationDeleteResult, err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var events []types.RebacTuple
 		var org Organization
 		org.Nickname = path
 		if err = tx.NewSelect().Model(&org).WhereAllWithDeleted().
@@ -304,7 +316,7 @@ func (s *orgStoreImpl) Delete(ctx context.Context, path string) (result Organiza
 			if err != nil {
 				return err
 			}
-			result.DeletedRepositories, err = deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient)
+			result.DeletedRepositories, err = deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient, &events)
 			if err != nil {
 				return err
 			}
@@ -349,7 +361,14 @@ func (s *orgStoreImpl) Delete(ctx context.Context, path string) (result Organiza
 				return fmt.Errorf("enqueue organization deletion: %w", err)
 			}
 		}
-		return nil
+		event, err := organizationDeletionTupleTx(ctx, tx, OrganizationDeletionJobInput{
+			OrganizationIDs: []int64{org.ID}, DeletedReBACRelationships: result.DeletedReBACRelationships,
+		})
+		if err != nil {
+			return err
+		}
+		events = append(events, event)
+		return enqueueRebacTuple(ctx, tx, s.rebacTupleJobClient, events...)
 	})
 	if err != nil {
 		return OrganizationDeleteResult{}, errorx.HandleDBError(err, nil)
@@ -768,4 +787,109 @@ func softDeleteOrganizationNamespaces(ctx context.Context, tx bun.Tx, ids []int6
 	_, err := tx.NewUpdate().Model((*Namespace)(nil)).Set("deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP").
 		Where("id IN (SELECT namespace_id FROM organizations WHERE id IN (?)) AND deleted_at IS NULL", bun.In(ids)).Exec(ctx)
 	return err
+}
+
+// namespaceTuple builds the owner relationship from committed identity fields.
+func namespaceTuple(namespace Namespace, subjectUUID string) rebac.Relationship {
+	relation := rebac.RelationOwner
+	subject := rebac.UserSubject(subjectUUID)
+	if namespace.NamespaceType == OrgNamespace {
+		relation = rebac.RelationOrganization
+		subject = rebac.NewSubject(rebac.ObjectTypeOrganization, subjectUUID)
+	}
+	return rebac.Relationship{Subject: subject, Relation: relation, Object: rebac.NamespaceObject(namespace.UUID)}
+}
+
+// enqueueOrganizationCreationTx snapshots namespace ownership and the real creator membership.
+func enqueueOrganizationCreationTx(ctx context.Context, tx bun.Tx, tupleJobs RebacTupleJobClient, org Organization, namespace Namespace, creatorID int64) error {
+	relationships := []rebac.Relationship{namespaceTuple(namespace, org.UUID.String())}
+	if creatorID != 0 {
+		var user User
+		if err := tx.NewSelect().Model(&user).Column("uuid").Where("id = ?", creatorID).Scan(ctx); err != nil {
+			return err
+		}
+		relationships = append(relationships, rebac.Relationship{Subject: rebac.UserSubject(user.UUID), Relation: rebac.RelationAdmin, Object: rebac.OrganizationObject(org.UUID.String())})
+	}
+	return enqueueRebacTuple(ctx, tx, tupleJobs, types.NewRebacTuple("organization.create", types.TupleOperation{Relationships: relationships}))
+}
+
+// ReconcileNamespaceTuples repairs only permissions supported by current DB rows.
+func (s *orgStoreImpl) ReconcileNamespaceTuples(ctx context.Context, orgID int64) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// Resolve the creator before locking the organization to preserve lock order.
+		var creatorID int64
+		if err := tx.NewSelect().Model((*Organization)(nil)).Column("user_id").Where("id = ?", orgID).Scan(ctx, &creatorID); err != nil {
+			return err
+		}
+		if creatorID != 0 {
+			if err := lockUserRebacTx(ctx, tx, creatorID); err != nil {
+				return err
+			}
+		}
+		if err := lockTupleOrganization(ctx, tx, orgID); err != nil {
+			return err
+		}
+		var org Organization
+		if err := tx.NewSelect().Model(&org).Where("id = ?", orgID).Scan(ctx); err != nil {
+			return err
+		}
+		if org.UserID != creatorID {
+			return fmt.Errorf("organization creator changed during tuple reconciliation")
+		}
+		var ns Namespace
+		if err := tx.NewSelect().Model(&ns).Where("id = ?", org.NamespaceID).Scan(ctx); err != nil {
+			return err
+		}
+		var role types.UserRole
+		err := tx.NewSelect().Model((*Member)(nil)).Column("role").Where("organization_id = ? AND user_id = ?", orgID, org.UserID).Scan(ctx, &role)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		creatorID = 0
+		if role == types.UserAdmin {
+			creatorID = org.UserID
+		}
+		return enqueueOrganizationCreationTx(ctx, tx, s.rebacTupleJobClient, org, ns, creatorID)
+	})
+}
+
+// organizationDeletionTupleTx snapshots all direct relations, including queued writes.
+// It reads grants without row locks; organization deletion already excludes new grants.
+func organizationDeletionTupleTx(ctx context.Context, tx bun.Tx, input OrganizationDeletionJobInput) (types.RebacTuple, error) {
+	var relationships []rebac.Relationship
+	for _, edge := range input.DeletedHierarchyRelationships {
+		relationships = append(relationships,
+			rebac.Relationship{Subject: rebac.NewSubject(rebac.ObjectTypeOrganization, edge.ParentOrganizationUUID), Relation: rebac.RelationParent, Object: rebac.OrganizationObject(edge.ChildOrganizationUUID)},
+			rebac.Relationship{Subject: rebac.NewSubject(rebac.ObjectTypeOrganization, edge.ChildOrganizationUUID), Relation: rebac.RelationChild, Object: rebac.OrganizationObject(edge.ParentOrganizationUUID)},
+		)
+	}
+	for _, cleanup := range input.DeletedReBACRelationships {
+		for _, userUUID := range cleanup.UserUUIDs {
+			operations, err := memberTupleOperations(cleanup.OrganizationUUID, userUUID, "")
+			if err != nil {
+				return types.RebacTuple{}, err
+			}
+			relationships = append(relationships, operations[0].Relationships...)
+		}
+		if cleanup.NamespaceUUID != "" {
+			relationships = append(relationships, namespaceTuple(Namespace{UUID: cleanup.NamespaceUUID, NamespaceType: OrgNamespace}, cleanup.OrganizationUUID))
+		}
+	}
+	if len(input.OrganizationIDs) > 0 {
+		var grants []RepositoryAuthorization
+		if err := tx.NewSelect().Model(&grants).Where("subject_type = ? AND subject_id IN (?)", types.RepoAuthSubjectOrganization, bun.In(input.OrganizationIDs)).Order("id ASC").Scan(ctx); err != nil {
+			return types.RebacTuple{}, err
+		}
+		for _, grant := range grants {
+			r, err := authorizationTuple(grant)
+			if err != nil {
+				return types.RebacTuple{}, err
+			}
+			relationships = append(relationships, r)
+		}
+	}
+	if len(relationships) == 0 {
+		return types.RebacTuple{}, nil
+	}
+	return types.NewRebacTuple("organization.delete", types.TupleOperation{Delete: true, Relationships: relationships}), nil
 }

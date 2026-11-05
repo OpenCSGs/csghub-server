@@ -426,6 +426,14 @@
 - **错误名:** `noTargetTransferPermission`
 - **描述:** 用户对目标命名空间没有写权限，无法将仓库转移到该命名空间。
 
+---
+
+### `AUTH-ERR-16`
+
+- **错误代码:** `AUTH-ERR-16`
+- **错误名:** `userEmailNotVerified`
+- **描述:** 邮箱地址未设置。请在进行此请求之前设置您的邮箱地址。
+
 ## Collection 错误
 
 ### `COLL-ERR-0`

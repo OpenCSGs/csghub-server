@@ -83,19 +83,27 @@ func (h *rerankPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata,
 
 	var req types.RerankRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Message: err.Error(), Type: types.ErrTypeInvalidRequest,
+		}})
 		return nil, err
 	}
 	if req.Model == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Model cannot be empty"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Message: types.MsgModelEmpty, Type: types.ErrTypeInvalidRequest,
+		}})
 		return nil, fmt.Errorf("model cannot be empty")
 	}
 	if req.Query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Query cannot be empty"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Message: types.MsgQueryEmpty, Type: types.ErrTypeInvalidRequest,
+		}})
 		return nil, fmt.Errorf("query cannot be empty")
 	}
 	if len(req.Documents) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Documents cannot be empty"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Message: types.MsgDocumentsEmpty, Type: types.ErrTypeInvalidRequest,
+		}})
 		return nil, fmt.Errorf("documents cannot be empty")
 	}
 
@@ -105,7 +113,6 @@ func (h *rerankPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata,
 		Model:         req.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -118,7 +125,6 @@ func (h *rerankPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata,
 func (h *rerankPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 
 	// End the preflight span that was started by the entry handler.
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -203,7 +209,7 @@ func (h *rerankPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetad
 
 		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record rerank token usage", "error", err)
 			}
 		}

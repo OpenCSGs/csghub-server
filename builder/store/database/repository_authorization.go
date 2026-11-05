@@ -2,9 +2,15 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"slices"
 	"time"
 
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -90,16 +96,31 @@ type RepositoryAuthorizationStore interface {
 	ListBySubject(ctx context.Context, subjectType types.RepoAuthSubjectType, subjectID int64) ([]RepositoryAuthorization, error)
 }
 
-type repositoryAuthorizationStoreImpl struct{ db *DB }
+// RebacTupleJobClient persists permission changes in the business transaction.
+// Implementations must not execute OpenFGA writes before this transaction commits.
+type RebacTupleJobClient interface {
+	InsertRebacTupleJobsTx(context.Context, *sql.Tx, []types.RebacTuple) error
+}
+
+type repositoryAuthorizationStoreImpl struct {
+	// rebacTupleJobClient records permission changes on this Store's business transaction.
+	rebacTupleJobClient RebacTupleJobClient
+	db                  *DB
+}
 
 // NewRepositoryAuthorizationStore creates a direct repository authorization store.
 func NewRepositoryAuthorizationStore() RepositoryAuthorizationStore {
-	return NewRepositoryAuthorizationStoreWithDB(defaultDB)
+	return NewRepositoryAuthorizationStoreWithRebacTupleJobClient(defaultDB, nil)
 }
 
 // NewRepositoryAuthorizationStoreWithDB creates a direct repository authorization store with the provided database.
 func NewRepositoryAuthorizationStoreWithDB(db *DB) RepositoryAuthorizationStore {
-	return &repositoryAuthorizationStoreImpl{db: db}
+	return NewRepositoryAuthorizationStoreWithRebacTupleJobClient(db, nil)
+}
+
+// NewRepositoryAuthorizationStoreWithRebacTupleJobClient injects the transactional permission job producer.
+func NewRepositoryAuthorizationStoreWithRebacTupleJobClient(db *DB, tupleJobs RebacTupleJobClient) RepositoryAuthorizationStore {
+	return &repositoryAuthorizationStoreImpl{db: db, rebacTupleJobClient: tupleJobs}
 }
 
 // roleValid reports whether a repository authorization role is supported.
@@ -117,12 +138,12 @@ func (s *repositoryAuthorizationStoreImpl) Create(ctx context.Context, authoriza
 	if !subjectTypeValid(authorization.SubjectType) || !s.roleValid(authorization.Role) {
 		return errorx.ErrReqParamInvalid
 	}
-	_, err := s.db.Operator.Core.NewInsert().Model(authorization).
-		On("CONFLICT (repository_id, subject_type, subject_id) DO UPDATE").
-		Set("subject_uuid = EXCLUDED.subject_uuid").
-		Set("role = EXCLUDED.role").
-		Set("updated_at = CURRENT_TIMESTAMP").Exec(ctx)
-	return errorx.HandleDBError(err, nil)
+	return s.mutateGrant(ctx, *authorization, func(ctx context.Context, tx bun.Tx, old *RepositoryAuthorization) (*RepositoryAuthorization, error) {
+		_, err := tx.NewInsert().Model(authorization).
+			On("CONFLICT (repository_id, subject_type, subject_id) DO UPDATE").
+			Set("subject_uuid = EXCLUDED.subject_uuid").Set("role = EXCLUDED.role").Set("updated_at = CURRENT_TIMESTAMP").Exec(ctx)
+		return authorization, errorx.HandleDBError(err, nil)
+	})
 }
 
 // Find retrieves a direct repository grant by repository and subject.
@@ -177,20 +198,24 @@ func (s *repositoryAuthorizationStoreImpl) ListByRepository(ctx context.Context,
 }
 
 // UpdateRole changes the role of an existing direct repository grant.
+// Repeating the locked role leaves the record and permission queue unchanged.
 func (s *repositoryAuthorizationStoreImpl) UpdateRole(ctx context.Context, repositoryID, subjectID int64, subjectType types.RepoAuthSubjectType, role types.UserRole) error {
 	if !subjectTypeValid(subjectType) || !s.roleValid(role) {
 		return errorx.ErrReqParamInvalid
 	}
-	result, err := s.db.Operator.Core.NewUpdate().Model((*RepositoryAuthorization)(nil)).
-		Set("role = ?", role).Set("updated_at = CURRENT_TIMESTAMP").
-		Where("repository_id = ? AND subject_id = ? AND subject_type = ?", repositoryID, subjectID, subjectType).Exec(ctx)
-	if err != nil {
-		return errorx.HandleDBError(err, nil)
-	}
-	if affected, _ := result.RowsAffected(); affected == 0 {
-		return errorx.ErrRepoAuthorizationNotFound
-	}
-	return nil
+	key := RepositoryAuthorization{RepositoryID: repositoryID, SubjectID: subjectID, SubjectType: subjectType}
+	return s.mutateGrant(ctx, key, func(ctx context.Context, tx bun.Tx, old *RepositoryAuthorization) (*RepositoryAuthorization, error) {
+		if old == nil {
+			return nil, errorx.ErrRepoAuthorizationNotFound
+		}
+		if old.Role == role {
+			return old, nil
+		}
+		next := *old
+		next.Role = role
+		err := assertAffectedOneRow(tx.NewUpdate().Model(&next).Set("role = ?", role).Set("updated_at = CURRENT_TIMESTAMP").WherePK().Exec(ctx))
+		return &next, errorx.HandleDBError(err, nil)
+	})
 }
 
 // Delete removes a direct repository grant for a repository subject.
@@ -198,9 +223,14 @@ func (s *repositoryAuthorizationStoreImpl) Delete(ctx context.Context, repositor
 	if !subjectTypeValid(subjectType) {
 		return errorx.ErrReqParamInvalid
 	}
-	_, err := s.db.Operator.Core.NewDelete().Model((*RepositoryAuthorization)(nil)).
-		Where("repository_id = ? AND subject_id = ? AND subject_type = ?", repositoryID, subjectID, subjectType).Exec(ctx)
-	return errorx.HandleDBError(err, nil)
+	key := RepositoryAuthorization{RepositoryID: repositoryID, SubjectID: subjectID, SubjectType: subjectType}
+	return s.mutateGrant(ctx, key, func(ctx context.Context, tx bun.Tx, old *RepositoryAuthorization) (*RepositoryAuthorization, error) {
+		if old == nil {
+			return nil, nil
+		}
+		_, err := tx.NewDelete().Model(old).WherePK().Exec(ctx)
+		return nil, errorx.HandleDBError(err, nil)
+	})
 }
 
 // DeleteBySubject removes all direct repository grants for a subject.
@@ -233,3 +263,170 @@ func (s *repositoryAuthorizationStoreImpl) ListBySubject(ctx context.Context, su
 }
 
 var _ RepositoryAuthorizationStore = (*repositoryAuthorizationStoreImpl)(nil)
+
+// authorizationTuple preserves the grant's stored subject UUID and userset.
+func authorizationTuple(grant RepositoryAuthorization) (rebac.Relationship, error) {
+	relation, ok := grant.Role.ReBACRelation()
+	if !ok {
+		return rebac.Relationship{}, fmt.Errorf("invalid repository grant role %q", grant.Role)
+	}
+	subject := rebac.UserSubject(grant.SubjectUUID)
+	switch grant.SubjectType {
+	case types.RepoAuthSubjectUser:
+	case types.RepoAuthSubjectOrganization:
+		subject = rebac.OrganizationMembers(grant.SubjectUUID)
+	default:
+		return rebac.Relationship{}, fmt.Errorf("invalid repository grant subject %q", grant.SubjectType)
+	}
+	return rebac.Relationship{Subject: subject, Relation: relation, Object: rebac.RepositoryObject(grant.RepositoryID)}, nil
+}
+
+// lockUserRebacTx serializes user grants and memberships with account deletion.
+// Acquire all subject locks in ascending user ID order before taking any row locks.
+// Keep the existing advisory key so repository grants use the same lock domain.
+func lockUserRebacTx(ctx context.Context, tx bun.Tx, userID int64) error {
+	if tx.Dialect().Name() != dialect.PG {
+		return nil
+	}
+	key := fmt.Sprintf("rebac:user_repository_grants:%d", userID)
+	_, err := tx.NewRaw("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", key).Exec(ctx)
+	return err
+}
+
+// lockOrganizationGrantSubjectTx locks the hierarchy root, then the subject,
+// before any repository rows. Hierarchy deletion locks the root before deleting
+// descendant repositories, so locking only a child would introduce a lock cycle.
+// Retained or missing subjects return inactive so revocations remain possible.
+func lockOrganizationGrantSubjectTx(ctx context.Context, tx bun.Tx, organizationID int64) (bool, error) {
+	var initial Organization
+	if err := tx.NewSelect().Model(&initial).WhereAllWithDeleted().Where("id = ?", organizationID).Scan(ctx); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	rootID := organizationID
+	if initial.IsHierarchical && !initial.IsRoot {
+		if err := tx.NewSelect().Model((*OrganizationUnit)(nil)).Column("root_organization_id").WhereAllWithDeleted().
+			Where("organization_id = ?", organizationID).Scan(ctx, &rootID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+	var root Organization
+	if err := tx.NewSelect().Model(&root).WhereAllWithDeleted().Where("id = ?", rootID).For("UPDATE").Scan(ctx); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	subject := root
+	if rootID != organizationID {
+		if err := tx.NewSelect().Model(&subject).WhereAllWithDeleted().Where("id = ?", organizationID).For("UPDATE").Scan(ctx); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+	if subject.IsHierarchical != initial.IsHierarchical || subject.IsRoot != initial.IsRoot {
+		return false, fmt.Errorf("organization hierarchy changed concurrently during grant mutation")
+	}
+	active := root.DeletedAt.IsZero() && subject.DeletedAt.IsZero()
+	if rootID != organizationID {
+		active = active && root.IsHierarchical && root.IsRoot
+	}
+	return active, nil
+}
+
+// mutateGrant atomically enqueues permission changes while coordinating subject deletion.
+// User grants take the subject advisory lock; organization grants lock root and subject
+// rows before the repository. The repository lock also serializes concurrent upserts.
+// A callback returning the original pointer reports a no-op and must not modify it.
+func (s *repositoryAuthorizationStoreImpl) mutateGrant(ctx context.Context, key RepositoryAuthorization, change func(context.Context, bun.Tx, *RepositoryAuthorization) (*RepositoryAuthorization, error)) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		organizationActive := false
+		if key.SubjectType == types.RepoAuthSubjectUser {
+			if err := lockUserRebacTx(ctx, tx, key.SubjectID); err != nil {
+				return err
+			}
+		} else if key.SubjectType == types.RepoAuthSubjectOrganization {
+			var err error
+			organizationActive, err = lockOrganizationGrantSubjectTx(ctx, tx, key.SubjectID)
+			if err != nil {
+				return err
+			}
+		}
+		var repoID int64
+		q := tx.NewSelect().Model((*Repository)(nil)).Column("id").Where("id = ?", key.RepositoryID)
+		if tx.Dialect().Name() == dialect.PG {
+			q.For("UPDATE")
+		}
+		if err := q.Scan(ctx, &repoID); err != nil {
+			return err
+		}
+		var previous RepositoryAuthorization
+		err := tx.NewSelect().Model(&previous).Where("repository_id = ? AND subject_type = ? AND subject_id = ?", key.RepositoryID, key.SubjectType, key.SubjectID).Scan(ctx)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		var old *RepositoryAuthorization
+		if err == nil {
+			old = &previous
+		}
+		next, err := change(ctx, tx, old)
+		if err != nil {
+			return err
+		}
+		if next == old {
+			return nil
+		}
+		if next != nil && key.SubjectType == types.RepoAuthSubjectOrganization && !organizationActive {
+			return errorx.ErrDatabaseNoRows
+		}
+		if next != nil && key.SubjectType == types.RepoAuthSubjectUser {
+			// A mutation waiting on deletion must not recreate a deleted user's grant.
+			// Keep deletion idempotent even when its subject no longer exists.
+			var userID int64
+			if err := tx.NewSelect().Model((*User)(nil)).Column("id").Where("id = ?", key.SubjectID).Scan(ctx, &userID); err != nil {
+				return errorx.HandleDBError(err, nil)
+			}
+		}
+		var operations []types.TupleOperation
+		if old != nil && (next == nil || old.Role != next.Role || old.SubjectUUID != next.SubjectUUID) {
+			r, err := authorizationTuple(*old)
+			if err != nil {
+				return err
+			}
+			operations = append(operations, types.TupleOperation{Delete: true, Relationships: []rebac.Relationship{r}})
+		}
+		if next != nil {
+			r, err := authorizationTuple(*next)
+			if err != nil {
+				return err
+			}
+			operations = append(operations, types.TupleOperation{Relationships: []rebac.Relationship{r}})
+		}
+		return enqueueRebacTuple(ctx, tx, s.rebacTupleJobClient, types.NewRebacTuple("repository.authorization", operations...))
+	})
+}
+
+// enqueueRebacTuple persists a permission delta using the Store's injected producer.
+// Missing wiring fails closed instead of committing an untracked permission change.
+func enqueueRebacTuple(ctx context.Context, tx bun.Tx, tupleJobs RebacTupleJobClient, inputs ...types.RebacTuple) error {
+	var events []types.RebacTuple
+	for _, input := range inputs {
+		if len(input.Operations) > 0 {
+			events = append(events, input)
+		}
+	}
+	if len(events) == 0 {
+		return nil
+	}
+	if tupleJobs == nil {
+		return fmt.Errorf("transactional tuple job client is required")
+	}
+	return tupleJobs.InsertRebacTupleJobsTx(ctx, tx.Tx, events)
+}

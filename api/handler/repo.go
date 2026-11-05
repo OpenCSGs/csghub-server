@@ -1542,7 +1542,9 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	mirror, err := h.mirror.CreateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
-		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
+		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) ||
+			errors.Is(err, errorx.ErrMirrorSourceURLInvalid) ||
+			errors.Is(err, errorx.ErrBadRequest) {
 			httpbase.BadRequestWithExt(ctx, err)
 			return
 		}
@@ -1639,7 +1641,9 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	mirror, err := h.mirror.UpdateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
-		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
+		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) ||
+			errors.Is(err, errorx.ErrMirrorSourceURLInvalid) ||
+			errors.Is(err, errorx.ErrBadRequest) {
 			httpbase.BadRequestWithExt(ctx, err)
 			return
 		}

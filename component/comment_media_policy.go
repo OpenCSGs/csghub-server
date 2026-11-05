@@ -31,6 +31,7 @@ type commentMediaPolicyImpl struct {
 	mediaEnabled   bool
 	publicBucket   string
 	publicEndpoint string
+	publicRegion   string
 	maxAVRefs      int
 	maxImageRefs   int
 	maxTotalRefs   int
@@ -46,17 +47,17 @@ const (
 
 func NewCommentMediaPolicy(
 	enabled bool,
-	publicBucket, publicEndpoint string,
+	publicBucket, publicEndpoint, publicRegion string,
 	maxRefs int,
 	images SensitiveComponent,
 	media MediaModerationComponent,
 ) CommentMediaPolicy {
-	return newCommentMediaPolicy(enabled, enabled, publicBucket, publicEndpoint, maxRefs, maxRefs, maxRefs, images, media)
+	return newCommentMediaPolicy(enabled, enabled, publicBucket, publicEndpoint, publicRegion, maxRefs, maxRefs, maxRefs, images, media)
 }
 
 func newCommentMediaPolicy(
 	imagesEnabled, mediaEnabled bool,
-	publicBucket, publicEndpoint string,
+	publicBucket, publicEndpoint, publicRegion string,
 	maxAVRefs, maxImageRefs, maxTotalRefs int,
 	images SensitiveComponent,
 	media MediaModerationComponent,
@@ -66,7 +67,7 @@ func newCommentMediaPolicy(
 	maxTotalRefs = positiveOrDefault(maxTotalRefs, defaultCommentMediaMaxTotalRefs)
 	return &commentMediaPolicyImpl{
 		imagesEnabled: imagesEnabled, mediaEnabled: mediaEnabled,
-		publicBucket: publicBucket, publicEndpoint: publicEndpoint,
+		publicBucket: publicBucket, publicEndpoint: publicEndpoint, publicRegion: publicRegion,
 		maxAVRefs: maxAVRefs, maxImageRefs: maxImageRefs, maxTotalRefs: maxTotalRefs,
 		images: images, media: media,
 	}
@@ -87,7 +88,7 @@ func NewCommentMediaPolicyFromConfig(cfg *config.Config, images SensitiveCompone
 	return newCommentMediaPolicy(
 		imagesEnabled,
 		mediaEnabled,
-		cfg.S3.PublicBucket, cfg.S3.Endpoint,
+		cfg.S3.PublicBucket, cfg.S3.Endpoint, cfg.S3.Region,
 		cfg.SensitiveCheck.MediaModerationMaxRefsPerComment,
 		cfg.SensitiveCheck.ImageCheckMaxRefsPerComment,
 		cfg.SensitiveCheck.CommentMediaMaxRefsPerComment,
@@ -146,7 +147,7 @@ func (p *commentMediaPolicyImpl) CheckUpdate(ctx context.Context, content string
 
 func (p *commentMediaPolicyImpl) parseAndValidate(content string) ([]types.MediaRef, []types.MediaRef, error) {
 	refs, err := utils.ExtractEnabledCommentMediaRefs(
-		content, p.publicBucket, p.publicEndpoint, p.maxTotalRefs, p.imagesEnabled, p.mediaEnabled,
+		content, p.publicBucket, p.publicEndpoint, p.publicRegion, p.maxTotalRefs, p.imagesEnabled, p.mediaEnabled,
 	)
 	if err != nil {
 		return nil, nil, err

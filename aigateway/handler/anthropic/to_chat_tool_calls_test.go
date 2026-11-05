@@ -136,7 +136,6 @@ func TestChatResponseToMessagesResponseStopReasonFromContent(t *testing.T) {
 		{"stop with tool calls", "stop", toolCall, "tool_use"},
 		{"tool_calls with tool calls", "tool_calls", toolCall, "tool_use"},
 		{"length wins over tool calls", "length", toolCall, "max_tokens"},
-		{"content_filter wins over tool calls", "content_filter", toolCall, "refusal"},
 		{"stop without tool calls", "stop", "", "end_turn"},
 		{"length without tool calls", "length", "", "max_tokens"},
 	}
@@ -175,14 +174,6 @@ func TestToChatStreamLengthWinsOverToolCalls(t *testing.T) {
 	)
 
 	assert.Equal(t, "max_tokens", stopReason)
-}
-
-func TestToChatStreamContentFilterWinsOverToolCalls(t *testing.T) {
-	_, stopReason := streamToolCalls(t,
-		chatChunk(toolCallDelta(wholeToolCall("call_paris", "Paris")), `"content_filter"`),
-	)
-
-	assert.Equal(t, "refusal", stopReason)
 }
 
 func TestToChatStreamStopWithoutToolCallsReportsEndTurn(t *testing.T) {

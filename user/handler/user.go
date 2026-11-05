@@ -7,13 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -30,13 +34,13 @@ type UserHandler struct {
 	c                              component.UserComponent
 	sc                             apicomponent.SensitiveComponent
 	publicDomain                   string
-	EnableHTTPS                    bool
 	signinSuccessRedirectURL       string
 	signinFailureRedirectURL       string
 	atc                            component.AccessTokenComponent
 	codeSoulerVScodeRedirectURL    string
 	codeSoulerJetbrainsRedirectURL string
 	liteRedirectURL                string
+	flowRedirects                  map[string]*url.URL
 	config                         *config.Config
 	uv                             component.UserVerifyComponent
 }
@@ -51,6 +55,16 @@ const (
 	JETBRAINS = "jetbrains"
 	CASDOOR   = "casdoor"
 	LITE      = "lite"
+
+	// porticoSigninCookieName binds a Portico sign-in transaction to the
+	// browser that initiated it, so the callback can reject a code redeemed
+	// from a different browser (login CSRF / account swapping).
+	//
+	// The __Host- prefix makes the browser reject any cookie that is not
+	// Secure, is not scoped to Path=/, or carries a Domain attribute. A
+	// same-site subdomain can therefore no longer forge this cookie with a
+	// Domain=<apex> attribute and replay a login into a victim's browser.
+	porticoSigninCookieName = "__Host-portico_signin_state"
 )
 
 func NewUserHandler(config *config.Config) (*UserHandler, error) {
@@ -74,12 +88,15 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 		return nil, fmt.Errorf("failed to create access token component: %w", err)
 	}
 	h.publicDomain = domainParsedUrl.Hostname()
-	h.EnableHTTPS = config.EnableHTTPS
 	h.signinSuccessRedirectURL = config.User.SigninSuccessRedirectURL
 	h.signinFailureRedirectURL = config.ServerFailureRedirectURL
 	h.codeSoulerVScodeRedirectURL = config.User.CodeSoulerVScodeRedirectURL
 	h.codeSoulerJetbrainsRedirectURL = config.User.CodeSoulerJetBrainsRedirectURL
 	h.liteRedirectURL = config.User.LiteRedirectURL
+	h.flowRedirects, err = parseFlowRedirects(config.User.FlowRedirects)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse user flow redirects: %w", err)
+	}
 	h.config = config
 	h.uv, err = component.NewUserVerifyComponent(config)
 	if err != nil {
@@ -123,7 +140,7 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 // UpdateUser godoc
 // @Security     ApiKey
 // @Summary      Update user. If change user name, should only send 'new_username' in the request body.
-// @Description  update user
+// @Description  Update user profile fields. Role assignments are managed through administrator role APIs.
 // @Tags         User
 // @Accept       json
 // @Produce      json
@@ -181,6 +198,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 // DeleteUser godoc
 // @Security     ApiKey
 // @Summary      Delete user
+// @Description  Active administrator roles must be revoked before deletion. This endpoint schedules an asynchronous workflow; administrator membership is checked again in the deletion transaction before related data is removed.
 // @Tags         User
 // @Accept       json
 // @Produce      json
@@ -196,7 +214,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 	userName := ctx.Param("username")
 
 	// Check if operator can delete user
-	isServerErr, err := h.c.CheckOperatorAndUser(ctx, operator, userName)
+	isServerErr, err := h.c.CheckOperatorAndUser(ctx.Request.Context(), operator, userName)
 
 	if err != nil {
 		if isServerErr {
@@ -210,7 +228,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 	}
 
 	// Prevent deleting the only administrator of any organization.
-	isLastOrganizationAdmin, err := h.c.CheckIfUserIsLastOrgAdmin(ctx, userName)
+	isLastOrganizationAdmin, err := h.c.CheckIfUserIsLastOrgAdmin(ctx.Request.Context(), userName)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Check last organization administrator failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check last organization administrator: %w", err))
@@ -226,7 +244,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 		return
 	}
 	// Check if user has running or building deployments
-	hasDeployments, err := h.c.CheckIfUserHasRunningOrBuildingDeployments(ctx, userName)
+	hasDeployments, err := h.c.CheckIfUserHasRunningOrBuildingDeployments(ctx.Request.Context(), userName)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Check if user has deployments failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has deployments, error: %w", err))
@@ -239,7 +257,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 	}
 
 	// Check if user has bills, Saas only
-	hasBills, err := h.c.CheckIfUserHasBills(ctx, userName)
+	hasBills, err := h.c.CheckIfUserHasBills(ctx.Request.Context(), userName)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Check if user has bills failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has bills, error: %w", err))
@@ -295,9 +313,9 @@ func (h *UserHandler) Get(ctx *gin.Context) {
 	var user *types.User
 	var err error
 	if authType == httpbase.AuthTypeSystemApiKey {
-		user, err = h.c.GetInternal(ctx, userNameOrUUID, useUUID)
+		user, err = h.c.GetInternal(ctx.Request.Context(), userNameOrUUID, useUUID)
 	} else {
-		user, err = h.c.Get(ctx, userNameOrUUID, visitorName, useUUID)
+		user, err = h.c.Get(ctx.Request.Context(), userNameOrUUID, visitorName, useUUID)
 	}
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user", slog.Any("error", err))
@@ -330,45 +348,12 @@ func (h *UserHandler) Get(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /users [get]
 func (h *UserHandler) Index(ctx *gin.Context) {
-	visitorName := httpbase.GetCurrentUser(ctx)
-	search := ctx.Query("search")
-	sortBy := ctx.Query("sort_by")
-	sortOrder := ctx.Query("sort_order")
-
-	per, page, err := common.GetPerAndPageFromContext(ctx)
+	req, err := parseUserListRequest(ctx)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get per and page", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	_labels := ctx.QueryArray("labels")
-	labels := types.ParseLabels(_labels)
-	verifyStatus := ctx.Query("verify_status")
-	exactMatchQuery := ctx.Query("exact_match")
-	exactMatch := false
-	if exactMatchQuery != "" {
-		var err error
-		exactMatch, err = strconv.ParseBool(exactMatchQuery)
-		if err != nil {
-			slog.ErrorContext(ctx.Request.Context(), "Failed to parse exact_match", slog.Any("error", err), slog.String("exact_match", exactMatchQuery))
-			ext := errorx.Ctx().Set("query", "exact_match")
-			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, ext))
-			return
-		}
-
-	}
-	req := types.UserListReq{
-		VisitorName:  visitorName,
-		Search:       search,
-		VerifyStatus: verifyStatus,
-		Labels:       labels,
-		Per:          per,
-		Page:         page,
-		SortBy:       sortBy,
-		SortOrder:    sortOrder,
-		ExactMatch:   exactMatch,
-	}
-	users, count, err := h.c.Index(ctx, req)
+	users, count, err := h.c.Index(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -383,14 +368,162 @@ func (h *UserHandler) Index(ctx *gin.Context) {
 	httpbase.OK(ctx, respData)
 }
 
+// UserChoices serves minimal candidates through independently documented submodule route handlers.
+// It shares search parsing with Index but never returns the full account-list projection.
+func (h *UserHandler) UserChoices(ctx *gin.Context) {
+	req, err := parseUserListRequest(ctx)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	users, total, err := h.c.UserChoices(ctx.Request.Context(), req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get user choices", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, types.UserChoiceList{Data: users, Total: total})
+}
+
+// UserChoice serves a voucher recipient projection through an independently documented submodule handler.
+func (h *UserHandler) UserChoice(ctx *gin.Context) {
+	username := ctx.Param("username")
+	if username == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("username is empty"), nil))
+		return
+	}
+	user, err := h.c.UserChoice(ctx.Request.Context(), username)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
+		return
+	}
+	httpbase.OK(ctx, user)
+}
+
+// parseUserListRequest preserves pagination, filtering, and validation for both list projections.
+func parseUserListRequest(ctx *gin.Context) (types.UserListReq, error) {
+	visitorName := httpbase.GetCurrentUser(ctx)
+	search := ctx.Query("search")
+	sortBy := ctx.Query("sort_by")
+	sortOrder := ctx.Query("sort_order")
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		return types.UserListReq{}, err
+	}
+	_labels := ctx.QueryArray("labels")
+	labels := types.ParseLabels(_labels)
+	verifyStatus := ctx.Query("verify_status")
+	exactMatchQuery := ctx.Query("exact_match")
+	exactMatch := false
+	if exactMatchQuery != "" {
+		var err error
+		exactMatch, err = strconv.ParseBool(exactMatchQuery)
+		if err != nil {
+			ext := errorx.Ctx().Set("query", "exact_match")
+			return types.UserListReq{}, errorx.ReqParamInvalid(err, ext)
+		}
+
+	}
+	return types.UserListReq{
+		VisitorName:  visitorName,
+		Search:       search,
+		VerifyStatus: verifyStatus,
+		Labels:       labels,
+		Per:          per,
+		Page:         page,
+		SortBy:       sortBy,
+		SortOrder:    sortOrder,
+		ExactMatch:   exactMatch,
+	}, nil
+}
+
 func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	code := ctx.Query("code")
 	state := ctx.Query("state")
 	slog.DebugContext(ctx.Request.Context(), "get casdoor callback", slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", state)))
 
-	jwtToken, signed, err := h.c.Signin(ctx.Request.Context(), code, state)
+	h.handleSigninCallback(ctx, code, state, state)
+}
+
+// PorticoSignin starts the backend-initiated Portico sign-in flow with PKCE
+// and redirects the browser to the Portico authorization page. The optional
+// state query param carries the same routing state as the casdoor callback.
+func (h *UserHandler) PorticoSignin(ctx *gin.Context) {
+	state := ctx.Query("state")
+	if state == "" {
+		state = CASDOOR
+	}
+	slog.DebugContext(ctx.Request.Context(), "start portico signin", slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", state)))
+
+	redirectURL, oauthState, err := h.c.BuildSigninRedirect(ctx.Request.Context(), state)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to signin", slog.Any("error", commonlog.SafeError(err)), slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", state)))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to start portico signin", slog.Any("error", commonlog.SafeError(err)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", state)))
+		h.redirectToSigninFailure(ctx, fmt.Sprintf("failed to signin: %v", err))
+		return
+	}
+
+	// Bind the sign-in transaction to the initiating browser. The callback
+	// refuses to redeem the authorization code unless this cookie matches the
+	// state in the callback URL, preventing cross-browser code redemption.
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     porticoSigninCookieName,
+		Value:    oauthState,
+		Path:     "/",
+		HttpOnly: true,
+		// Secure must stay true regardless of EnableHTTPS: the __Host- prefix
+		// is only valid on Secure cookies, and a non-Secure downgrade would let
+		// the browser reject the binding silently instead of failing closed.
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	slog.InfoContext(ctx.Request.Context(), "redirecting to portico authorization page", slog.String("url", redirectURL))
+	redirectWithoutBody(ctx, http.StatusFound, redirectURL)
+}
+
+// Portico handles the OAuth callback from Portico. The OAuth state is the
+// nonce prefix, which the sso client consumes during the token exchange,
+// followed by the original routing state.
+func (h *UserHandler) Portico(ctx *gin.Context) {
+	code := ctx.Query("code")
+	state := ctx.Query("state")
+	slog.DebugContext(ctx.Request.Context(), "get portico callback", slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", state)))
+
+	_, routingState, ok := rpc.SplitPorticoSigninState(state)
+	if !ok {
+		errMsg := fmt.Sprintf("invalid portico signin state: %s", state)
+		slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)))
+		h.redirectToSigninFailure(ctx, "failed to signin: "+errMsg)
+		return
+	}
+
+	// The callback must be completed by the same browser that initiated the
+	// sign-in. Without this binding, an attacker who retains their own
+	// un-consumed callback URL could hand it to a victim and log the victim
+	// into the attacker's account.
+	boundState, err := ctx.Cookie(porticoSigninCookieName)
+	if err != nil || boundState != state {
+		slog.ErrorContext(ctx.Request.Context(), "portico callback rejected: sign-in state is not bound to this browser", slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", state)))
+		h.redirectToSigninFailure(ctx, "failed to signin: portico sign-in state is not bound to this browser")
+		return
+	}
+
+	h.handleSigninCallback(ctx, code, state, routingState)
+}
+
+// handleSigninCallback exchanges the OAuth code for a local JWT and redirects
+// the browser according to the routing state, which selects the vscode,
+// jetbrains, lite or portal redirect targets, or treats the routing state as
+// a custom flow URL.
+func (h *UserHandler) handleSigninCallback(ctx *gin.Context, code, oauthState, routingState string) {
+	jwtToken, signed, err := h.c.Signin(ctx.Request.Context(), code, oauthState)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to signin", slog.Any("error", commonlog.SafeError(err)), slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", oauthState)))
 		var customErr errorx.CustomError
 		if errors.As(err, &customErr) {
 			if handleConflictCustomError(ctx, customErr, h.signinFailureRedirectURL) {
@@ -398,10 +531,7 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 			}
 		}
 
-		errorMsg := url.QueryEscape(fmt.Sprintf("failed to signin: %v", err))
-		errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
-		slog.InfoContext(ctx.Request.Context(), "redirecting to error page", slog.String("url", errorRedirectURL))
-		redirectWithoutBody(ctx, http.StatusFound, errorRedirectURL)
+		h.redirectToSigninFailure(ctx, fmt.Sprintf("failed to signin: %v", err))
 		return
 	}
 
@@ -410,60 +540,143 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 		starshipApiKey string
 	)
 
-	if state == VSCODE || state == JETBRAINS {
-		starshipApiKey, err = h.getStarshipApiKey(ctx, jwtToken.CurrentUser, "codesouler-"+state)
+	if routingState == VSCODE || routingState == JETBRAINS {
+		starshipApiKey, err = h.getStarshipApiKey(ctx, jwtToken.CurrentUser, "codesouler-"+routingState)
 		if err != nil {
-			errMsg := fmt.Sprintf("failed to get user %s starship apikey for login from %s", jwtToken.CurrentUser, state)
+			errMsg := fmt.Sprintf("failed to get user %s starship apikey for login from %s", jwtToken.CurrentUser, routingState)
 			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.Any("error", commonlog.SafeError(err)))
-			errorMsg := url.QueryEscape(errMsg)
-			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
-			slog.InfoContext(ctx.Request.Context(), "redirecting to error page", slog.String("url", errorRedirectURL))
-			redirectWithoutBody(ctx, http.StatusFound, errorRedirectURL)
+			h.redirectToSigninFailure(ctx, errMsg)
 			return
 		}
 		codeSoulerEndpoint := h.codeSoulerVScodeRedirectURL
-		if state == JETBRAINS {
+		if routingState == JETBRAINS {
 			codeSoulerEndpoint = h.codeSoulerJetbrainsRedirectURL
 		}
 		targetUrl = fmt.Sprintf("%s?apikey=%s&portal_url=%s&jwt=%s", codeSoulerEndpoint, starshipApiKey, h.signinSuccessRedirectURL, signed)
-	} else if state == LITE {
+	} else if routingState == LITE {
 		liteToken, err := h.atc.GetOrCreateFirstAvaiToken(ctx, jwtToken.CurrentUser, string(types.AccessTokenAppCSGHub), "csglite")
 		if err != nil {
-			errMsg := fmt.Sprintf("failed to get user %s csghub access token for login from %s", jwtToken.CurrentUser, state)
+			errMsg := fmt.Sprintf("failed to get user %s csghub access token for login from %s", jwtToken.CurrentUser, routingState)
 			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.Any("error", commonlog.SafeError(err)))
-			errorMsg := url.QueryEscape(errMsg)
-			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
-			slog.InfoContext(ctx.Request.Context(), "redirecting to error page", slog.String("url", errorRedirectURL))
-			redirectWithoutBody(ctx, http.StatusFound, errorRedirectURL)
+			h.redirectToSigninFailure(ctx, errMsg)
 			return
 		}
 		targetUrl = fmt.Sprintf("%s?token=%s&portal_url=%s&jwt=%s", h.liteRedirectURL, url.QueryEscape(liteToken), h.signinSuccessRedirectURL, signed)
-	} else if state == CASDOOR {
+	} else if routingState == CASDOOR {
 		targetUrl = fmt.Sprintf("%s?jwt=%s", h.signinSuccessRedirectURL, signed)
 	} else {
-		// parse state as url and get host
-		var flowURL *url.URL
-		var err error
-		flowURL, err = url.Parse(state)
-		if err != nil || flowURL.Host == "" {
-			errMsg := "invalid state format for 'flows', not a valid URL"
-			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.Any("error", commonlog.SafeError(err)))
-			errorMsg := url.QueryEscape(errMsg)
-			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s",
-				h.signinFailureRedirectURL, errorMsg)
-			slog.InfoContext(ctx.Request.Context(), "redirecting to error page", slog.String("url", errorRedirectURL))
-			redirectWithoutBody(ctx, http.StatusFound, errorRedirectURL)
+		flowTarget, ok := h.resolveFlowRedirectURL(routingState, signed)
+		if !ok {
+			errMsg := "untrusted signin callback target for 'flows'"
+			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", routingState)))
+			h.redirectToSigninFailure(ctx, errMsg)
 			return
 		}
-		// set jwt token in jwt query
-		query := flowURL.Query()
-		query.Set("jwt_token", signed)
-		flowURL.RawQuery = query.Encode()
-		targetUrl = flowURL.String()
+		targetUrl = flowTarget
 	}
 
 	slog.InfoContext(ctx.Request.Context(), "generate login redirect url", slog.String("target_url", commonlog.SafeURLString(targetUrl)))
 	redirectWithoutBody(ctx, http.StatusFound, targetUrl)
+}
+
+// redirectToSigninFailure sends the browser back to the configured signin
+// failure page instead of any client-provided URL.
+func (h *UserHandler) redirectToSigninFailure(ctx *gin.Context, errMsg string) {
+	errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, url.QueryEscape(errMsg))
+	slog.InfoContext(ctx.Request.Context(), "redirecting to error page", slog.String("url", errorRedirectURL))
+	redirectWithoutBody(ctx, http.StatusFound, errorRedirectURL)
+}
+
+// resolveFlowRedirectURL resolves the legacy "flows" signin state to a
+// redirect target built exclusively from configured flow callbacks. The state
+// is accepted only as a registered flow name, or as a URL whose parsed
+// scheme, host, port, and path exactly match a registered callback URL.
+// Client-provided userinfo, host, port, path, and fragment never reach the
+// redirect target, so host-confusion forms like "https://trusted@evil.com"
+// are rejected or discarded by construction.
+func (h *UserHandler) resolveFlowRedirectURL(state, signed string) (string, bool) {
+	if registered, ok := h.flowRedirects[state]; ok {
+		return flowCallbackWithJWT(registered, nil, signed), true
+	}
+	stateURL, err := url.Parse(state)
+	if err != nil || stateURL.User != nil || stateURL.Host == "" {
+		return "", false
+	}
+	for _, registered := range h.flowRedirects {
+		if sameCallbackTarget(stateURL, registered) {
+			return flowCallbackWithJWT(registered, stateURL.Query(), signed), true
+		}
+	}
+	return "", false
+}
+
+// sameCallbackTarget reports whether candidate points at the registered
+// callback origin and path. Host comparison is case-insensitive; scheme and
+// port must match exactly, so a registered "https://a.example.com/cb" does
+// not accept "https://a.example.com:443/cb" or an http downgrade.
+func sameCallbackTarget(candidate, registered *url.URL) bool {
+	if candidate.Scheme != registered.Scheme {
+		return false
+	}
+	if !strings.EqualFold(candidate.Hostname(), registered.Hostname()) {
+		return false
+	}
+	if candidate.Port() != registered.Port() {
+		return false
+	}
+	return candidate.EscapedPath() == registered.EscapedPath()
+}
+
+// flowCallbackWithJWT builds the redirect target from a registered callback
+// URL: the registered query is authoritative and wins over colliding state
+// query keys, state query params fill in the rest, and the freshly signed JWT
+// is appended last.
+func flowCallbackWithJWT(registered *url.URL, extra url.Values, signed string) string {
+	target := *registered
+	query := registered.Query()
+	for key, values := range extra {
+		if _, ok := query[key]; !ok {
+			query[key] = values
+		}
+	}
+	query.Set("jwt_token", signed)
+	target.RawQuery = query.Encode()
+	return target.String()
+}
+
+// parseFlowRedirects validates the configured flow callback targets. Entries
+// must be absolute URLs without userinfo; https is required except for
+// loopback http targets reserved for local development. A misconfigured entry
+// fails startup instead of silently weakening the signin redirect allowlist.
+func parseFlowRedirects(redirects config.FlowRedirects) (map[string]*url.URL, error) {
+	parsed := make(map[string]*url.URL, len(redirects))
+	for _, redirect := range redirects {
+		if redirect.Name == "" {
+			return nil, fmt.Errorf("flow redirect entry %q has an empty name", redirect.CallbackURL)
+		}
+		target, err := url.Parse(redirect.CallbackURL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid callback URL for flow redirect %q: %w", redirect.Name, err)
+		}
+		if target.Host == "" || target.User != nil {
+			return nil, fmt.Errorf("callback URL for flow redirect %q must be an absolute URL without userinfo", redirect.Name)
+		}
+		if target.Scheme != "https" && !(target.Scheme == "http" && isLoopbackHost(target.Hostname())) {
+			return nil, fmt.Errorf("callback URL for flow redirect %q must use https, or http on a loopback address for local development", redirect.Name)
+		}
+		parsed[redirect.Name] = target
+	}
+	return parsed, nil
+}
+
+// isLoopbackHost reports whether the host refers to the local machine: the
+// "localhost" name or an IP in the loopback ranges (127.0.0.0/8, ::1).
+func isLoopbackHost(hostname string) bool {
+	if strings.EqualFold(hostname, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(hostname)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (h *UserHandler) getStarshipApiKey(ctx *gin.Context, userName, tokenName string) (string, error) {
@@ -477,13 +690,15 @@ func (h *UserHandler) getStarshipApiKey(ctx *gin.Context, userName, tokenName st
 // CreateVerify godoc
 // @Security     ApiKey
 // @Summary      Create user verification
-// @Description  create a new user identity verification request
+// @Description  Create a user verification request; SaaS binds ownership to the authenticated user UUID.
 // @Tags         UserVerify
 // @Accept       json
 // @Produce      json
 // @Param        body body types.UserVerifyReq true "User verification request body"
 // @Success      200  {object}  types.Response{data=database.UserVerify} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Authenticated user UUID required"
+// @Failure      409  {object}  types.APIBadRequest "Verification record conflicts with the manual submission"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/verify [post]
 func (h *UserHandler) CreateVerify(ctx *gin.Context) {
@@ -495,8 +710,16 @@ func (h *UserHandler) CreateVerify(ctx *gin.Context) {
 		return
 	}
 	req.Username = currentUser
-	orgVerify, err := h.uv.Create(ctx, &req)
+	orgVerify, err := h.uv.Create(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		if errors.Is(err, database.ErrIdentityConflict) {
+			httpbase.ConflictError(ctx, errorx.ErrIdentityConflict)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -506,7 +729,7 @@ func (h *UserHandler) CreateVerify(ctx *gin.Context) {
 	httpbase.OK(ctx, orgVerify)
 }
 
-// UpdateVerify godoc
+// UpdateVerify updates verification while preserving request authorization and cancellation in the component.
 // @Security     ApiKey
 // @Summary      Update user verification
 // @Description  update user verification status (approved or rejected)
@@ -517,6 +740,7 @@ func (h *UserHandler) CreateVerify(ctx *gin.Context) {
 // @Param        body  body  types.UserVerifyStatusReq true "Update verification request body"
 // @Success      200  {object}  types.Response{data=database.UserVerify} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      409  {object}  types.APIBadRequest "Verification record conflicts with the manual review"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/verify/{id} [put]
 func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
@@ -535,16 +759,21 @@ func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
 	if req.Status != types.VerifyStatusRejected && req.Status != types.VerifyStatusApproved {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", "Not allowed status"))
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("not allowed status"), nil))
+		return
 	}
 
 	if req.Status == types.VerifyStatusRejected && req.Reason == "" {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", "rejected need reason"))
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("rejected need reason"), nil))
-
+		return
 	}
 
-	orgVerify, err := h.uv.Update(ctx, vID, req.Status, req.Reason)
+	orgVerify, err := h.uv.Update(ctx.Request.Context(), vID, req.Status, req.Reason)
 	if err != nil {
+		if errors.Is(err, database.ErrIdentityConflict) {
+			httpbase.ConflictError(ctx, errorx.ErrIdentityConflict)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -554,22 +783,32 @@ func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
 	httpbase.OK(ctx, orgVerify)
 }
 
-// GetVerify godoc
+// GetVerify reads verification while preserving request authorization and cancellation in the component.
 // @Security     ApiKey
 // @Summary      Get user verification
-// @Description  get user verification information by user ID
+// @Description  Get local verification information by user UUID; SaaS permits only the authenticated account's UUID and includes a masked identity number when available.
 // @Tags         UserVerify
 // @Accept       json
 // @Produce      json
 // @Param        id             path  string true  "user UUID"
 // @Success      200  {object}  types.Response{data=database.UserVerify} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Authentication required"
+// @Failure      403  {object}  types.APIForbidden "Another account's verification is forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/verify/{id} [get]
 func (h *UserHandler) GetVerify(ctx *gin.Context) {
 	id := ctx.Param("id")
-	orgVerify, err := h.uv.Get(ctx, id)
+	orgVerify, err := h.uv.Get(ctx.Request.Context(), id)
 	if err != nil {
+		if errors.Is(err, errorx.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -894,7 +1133,7 @@ func (h *UserHandler) GenerateVerificationCodeAndSendEmail(ctx *gin.Context) {
 	email := ctx.Param("email")
 	err := h.c.GenerateVerificationCodeAndSendEmail(ctx, uid, email)
 	if err != nil {
-		if errors.Is(err, errorx.ErrUserNotFound) {
+		if errors.Is(err, errorx.ErrUserNotFound) || errors.Is(err, errorx.ErrForbidden) || errors.Is(err, errorx.ErrContactBlocked) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
@@ -903,6 +1142,78 @@ func (h *UserHandler) GenerateVerificationCodeAndSendEmail(ctx *gin.Context) {
 		return
 	}
 
+	httpbase.OK(ctx, nil)
+}
+
+// AdminGetUserTags godoc
+// @Security     ApiKey
+// @Summary      List a user's tags as an administrator
+// @Description  Returns the user-scope tags of the user identified by the path parameter (a username or a uuid), routing tags (low_priority / priority:<n>) included. The public profile hides routing tags.
+// @Tags         User
+// @Produce      json
+// @Param        identifier path string true "username or uuid"
+// @Success      200  {object}  types.Response{data=[]types.RepoTag} "OK"
+// @Failure      401  {object}  types.APIUnauthorized
+// @Failure      403  {object}  types.APIForbidden
+// @Failure      404  {object}  types.APINotFound "User not found"
+// @Router       /admin/account/user/user/{identifier}/tags [get]
+func (h *UserHandler) AdminGetUserTags(ctx *gin.Context) {
+	identifier := ctx.Param("identifier")
+	tags, err := h.c.AdminGetUserTags(ctx, identifier)
+	if err != nil {
+		if errors.Is(err, errorx.ErrUserNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "AdminGetUserTags failed", slog.Any("err", err), slog.String("identifier", identifier))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, tags)
+}
+
+// AdminResetUserTags godoc
+// @Security     ApiKey
+// @Summary      Reset a user's tags as an administrator
+// @Description  Replaces the user-scope tags of the user identified by the path parameter (a username or a uuid). Routing tags (low_priority / priority:<n>) are writable here because they are operator-managed.
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        identifier path string true "username or uuid"
+// @Param        tagIDs body []int64 true "tagIDs"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request (unknown, duplicated or non user-scope tag ids)"
+// @Failure      401  {object}  types.APIUnauthorized
+// @Failure      403  {object}  types.APIForbidden
+// @Failure      404  {object}  types.APINotFound "User not found"
+// @Router       /admin/account/user/user/{identifier}/tags [put]
+func (h *UserHandler) AdminResetUserTags(ctx *gin.Context) {
+	identifier := ctx.Param("identifier")
+	var req []int64
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "AdminResetUserTags failed", slog.Any("err", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	// A JSON null binds to a nil slice with no error; it is a client bug, not
+	// a request to clear the set. Only an explicit [] means "clear".
+	if req == nil {
+		httpbase.BadRequest(ctx, "tag_ids is required")
+		return
+	}
+	if err := h.c.AdminResetUserTags(ctx, identifier, req,
+		httpbase.GetCurrentUserUUID(ctx), httpbase.GetCurrentUser(ctx)); err != nil {
+		switch {
+		case errors.Is(err, errorx.ErrUserNotFound):
+			httpbase.NotFoundError(ctx, err)
+		case errors.Is(err, component.ErrInvalidUserTagIDs):
+			httpbase.BadRequest(ctx, err.Error())
+		default:
+			slog.ErrorContext(ctx.Request.Context(), "AdminResetUserTags failed", slog.Any("err", err), slog.String("identifier", identifier))
+			httpbase.ServerError(ctx, err)
+		}
+		return
+	}
 	httpbase.OK(ctx, nil)
 }
 
@@ -1042,6 +1353,10 @@ func (h *UserHandler) ExportUserInfo(ctx *gin.Context) {
 }
 
 func redirectWithoutBody(ctx *gin.Context, code int, url string) {
+	// Signin redirects carry freshly issued tokens in the Location URL; keep
+	// them out of Referer headers, back/forward caches, and shared caches.
+	ctx.Header("Referrer-Policy", "no-referrer")
+	ctx.Header("Cache-Control", "no-store")
 	ctx.Header("Location", url)
 	ctx.AbortWithStatus(code)
 }

@@ -30,6 +30,11 @@ func (fakeManagerJobClient) InsertTx(ctx context.Context, tx *sql.Tx, args workh
 	return 0, nil
 }
 
+// InsertManyTx is unused by manager cancellation tests.
+func (fakeManagerJobClient) InsertManyTx(context.Context, *sql.Tx, []workhub.InsertManyParams) ([]int64, error) {
+	return nil, nil
+}
+
 // JobCancelTx is passed through to the task store and is not called directly by manager tests.
 func (fakeManagerJobClient) JobCancelTx(ctx context.Context, tx *sql.Tx, jobID int64) error {
 	return nil
@@ -46,7 +51,6 @@ func TestManagerComponentCancelUsesTaskJobStore(t *testing.T) {
 		mirrorTaskStore: store,
 		jobClient:       jobClient,
 		syncCache:       syncCache,
-		partSize:        "100",
 	}
 	store.EXPECT().
 		FindByID(ctx, taskID).
@@ -62,7 +66,7 @@ func TestManagerComponentCancelUsesTaskJobStore(t *testing.T) {
 			return ok
 		})).
 		Return(true, nil)
-	syncCache.EXPECT().DeleteRepoSyncCache(ctx, int64(456), "100").Return(nil)
+	syncCache.EXPECT().DeleteRepoSyncCache(ctx, int64(456)).Return(nil)
 
 	ok, err := manager.Cancel(ctx, taskID)
 

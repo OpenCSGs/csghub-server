@@ -200,6 +200,148 @@ func TestNormalizeChatRole(t *testing.T) {
 	}
 }
 
+func TestRequiresMergedDeveloperInstructionsForQwenModels(t *testing.T) {
+	tests := []struct {
+		name      string
+		modelName string
+		want      bool
+	}{
+		{name: "qwen 3.5 with namespace", modelName: "Qwen/Qwen3.5-27B-GGUF", want: true},
+		{name: "qwen 3.6 mixed case", modelName: "org/qWeN3.6-32B", want: true},
+		{name: "qwen 3.8", modelName: "QWEN3.8-Flash", want: true},
+		{name: "qwen 3", modelName: "Qwen3-0.6B-GGUF", want: false},
+		{name: "qwen 3.7", modelName: "Qwen3.7-Plus", want: false},
+		{name: "unrelated", modelName: "gpt-4o", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, requiresMergedDeveloperInstructions(tt.modelName))
+		})
+	}
+}
+
+func TestResponsesToChatRequestMergesQwenInstructionsAndDeveloperMessages(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:        "public",
+		Instructions: json.RawMessage(`"base instruction"`),
+		Input: json.RawMessage(`[
+			{"type":"message","role":"developer","content":"first developer instruction"},
+			{"type":"message","role":"user","content":"hello"},
+			{"type":"message","role":"assistant","content":"hi"},
+			{"type":"message","role":"developer","content":[
+				{"type":"input_text","text":"second "},
+				{"type":"text","text":"developer instruction"}
+			]},
+			{"type":"message","role":"user","content":"continue"}
+		]`),
+	}
+
+	chatReq, err := responsesToChatRequest(context.Background(), req, "Qwen/Qwen3.5-27B-GGUF", nil)
+	require.NoError(t, err)
+	body, err := marshalChatRequestBody(chatReq, "Qwen/Qwen3.5-27B-GGUF")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "Qwen/Qwen3.5-27B-GGUF",
+		"messages": [
+			{"role":"system","content":"base instruction\n\nfirst developer instruction\n\nsecond developer instruction"},
+			{"role":"user","content":"hello"},
+			{"role":"assistant","content":"hi"},
+			{"role":"user","content":"continue"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestMergesQwenDeveloperOnlyAndSkipsEmptyContent(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"message","role":"developer","content":""},
+			{"type":"message","role":"developer","content":"developer instruction"},
+			{"type":"message","role":"user","content":"hello"}
+		]`),
+	}
+
+	chatReq, err := responsesToChatRequest(context.Background(), req, "Qwen3.6-32B", nil)
+	require.NoError(t, err)
+	body, err := marshalChatRequestBody(chatReq, "Qwen3.6-32B")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "Qwen3.6-32B",
+		"messages": [
+			{"role":"system","content":"developer instruction"},
+			{"role":"user","content":"hello"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestRejectsQwenNonTextDeveloperContent(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"message","role":"developer","content":[
+				{"type":"input_image","image_url":"https://example.test/a.png"}
+			]}
+		]`),
+	}
+
+	_, err := responsesToChatRequest(context.Background(), req, "Qwen3.8-Flash", nil)
+	require.EqualError(t, err, "unsupported_feature:input.developer.content.input_image")
+}
+
+func TestResponsesToChatRequestKeepsNonQwenDeveloperConversion(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:        "public",
+		Instructions: json.RawMessage(`"base instruction"`),
+		Input: json.RawMessage(`[
+			{"type":"message","role":"developer","content":"developer instruction"},
+			{"type":"message","role":"user","content":"hello"}
+		]`),
+	}
+
+	chatReq, err := responsesToChatRequest(context.Background(), req, "Qwen3.7-Plus", nil)
+	require.NoError(t, err)
+	body, err := marshalChatRequestBody(chatReq, "Qwen3.7-Plus")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "Qwen3.7-Plus",
+		"messages": [
+			{"role":"system","content":"base instruction"},
+			{"role":"system","content":"developer instruction"},
+			{"role":"user","content":"hello"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestKeepsExplicitSystemOutsideQwenDeveloperMerge(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:        "public",
+		Instructions: json.RawMessage(`"base instruction"`),
+		Input: json.RawMessage(`[
+			{"type":"message","role":"system","content":"explicit system"},
+			{"type":"message","role":"developer","content":"developer instruction"},
+			{"type":"message","role":"user","content":"hello"}
+		]`),
+	}
+
+	chatReq, err := responsesToChatRequest(context.Background(), req, "Qwen3.5-27B", nil)
+	require.NoError(t, err)
+	body, err := marshalChatRequestBody(chatReq, "Qwen3.5-27B")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "Qwen3.5-27B",
+		"messages": [
+			{"role":"system","content":"base instruction\n\ndeveloper instruction"},
+			{"role":"system","content":"explicit system"},
+			{"role":"user","content":"hello"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
 func TestResponsesToChatRequestMapsStringInputAndInstructions(t *testing.T) {
 	req := &types.ResponsesRequest{
 		Model:        "public",
@@ -1593,14 +1735,14 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 				usage.PromptTokens == tokenUsage.PromptTokens &&
 				usage.CompletionTokens == tokenUsage.CompletionTokens &&
 				usage.TotalTokens == tokenUsage.TotalTokens
-		}), "api-key", mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
+		}), mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, _ int64) error {
 			wg.Done()
 			return nil
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 	wg.Wait()
 }
 
@@ -1622,14 +1764,14 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 				usage.PromptTokens == 5 &&
 				usage.CompletionTokens == 6 &&
 				usage.TotalTokens == 11
-		}), "api-key", mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
+		}), mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, _ int64) error {
 			wg.Done()
 			return nil
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 	wg.Wait()
 }
 

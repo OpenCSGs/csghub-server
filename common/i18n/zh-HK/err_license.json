@@ -13,5 +13,11 @@
     },
     "error.LICENSE-ERR-4": {
         "other": "許可證擴展數據無效。"
+    },
+    "error.LICENSE-ERR-5": {
+        "other": "未找到目前使用者所請求產品的有效許可證"
+    },
+    "error.LICENSE-ERR-6": {
+        "other": "許可證產品 {{.actual}} 與預期產品 {{.expected}} 不符"
     }
 }

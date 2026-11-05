@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -24,8 +25,16 @@ const (
 	// max content length for moderation
 	defaultMaxContentLength = 2000 // sliding window size
 	slidingWindowSize       = 2000
-	// cache ttl
+	// cache ttl for the legacy prompt cache (guard-only strategy)
 	cacheTTL = 24 * time.Hour
+	// promptCacheTTLWhenInjectionEnabled matches the moderation service's
+	// prompt_prefixes instruction-cache TTL (builder/sensitive
+	// instructionsCacheTTL): the gateway cannot observe the DB instruction
+	// override the moderation service reads at runtime, so with the
+	// prompt-injection provider enabled a cached verdict is only trusted for
+	// that window — after it the prompt is re-checked against the current
+	// instructions and model.
+	injectionPromptCacheTTL = time.Minute
 	// moderation cache prefix
 	moderationCachePromptPrefix = "moderation:prompt:"
 	// default session cache size
@@ -72,6 +81,17 @@ type moderationImpl struct {
 	// one call, the check runs asynchronously. Zero keeps the legacy
 	// all-synchronous behavior.
 	promptMaxChunks int
+	// cacheVersion is derived from the detection policy and embedded in the
+	// prompt-cache keys: enabling the prompt-injection provider or changing
+	// the strategy changes the version, so verdicts cached as safe under the
+	// old policy are never served against the new one (stale entries expire
+	// with the TTL instead).
+	cacheVersion string
+	// promptCacheTTL is the expiry for prompt-cache entries: 24h for the
+	// legacy strategy, the instruction-effect window (1m) when the
+	// prompt-injection provider is enabled, because the verdicts then also
+	// depend on the moderation service's runtime DB instruction state.
+	promptCacheTTL time.Duration
 	// pendingPromptChecks tracks the in-flight asynchronous prompt moderation
 	// of one request, keyed by its moderation session id, so the response
 	// emitted for that request can gate on the verdict: stream chunk checks
@@ -200,10 +220,6 @@ func (a *asyncStreamChecker) executeAsyncCheck(text string, sessionId string) {
 	}
 
 	if result.IsSensitive {
-		if a.modImpl.config != nil && a.modImpl.config.AIGateway.ModerationBypassSensitiveCheck {
-			return
-		}
-
 		slog.ErrorContext(bgCtx, "sensitive content found asynchronously", slog.Any("reason", result.Reason))
 
 		if s, ok := a.sessionCache.Get(sessionId); ok {
@@ -273,6 +289,8 @@ func NewModerationImpl(config *config.Config) Moderation {
 		cacheClient:         cacheClient,
 		promptMaxChunks:     promptMaxChunksFromConfig(config),
 		pendingPromptChecks: newPendingPromptCheckCache(),
+		cacheVersion:        moderationCachePolicyVersion(config),
+		promptCacheTTL:      promptCacheTTLFromConfig(config),
 		config:              config,
 	}
 
@@ -292,6 +310,8 @@ func NewModerationImplWithClient(config *config.Config, modSvcClient rpc.Moderat
 		promptMaxChunks:     promptMaxChunksFromConfig(config),
 		pendingPromptChecks: newPendingPromptCheckCache(),
 		pendingVerdictWait:  asyncPromptCheckTimeout,
+		cacheVersion:        moderationCachePolicyVersion(config),
+		promptCacheTTL:      promptCacheTTLFromConfig(config),
 		config:              config,
 	}
 
@@ -306,6 +326,45 @@ func newPendingPromptCheckCache() *lru.Cache[string, *pendingPromptCheck] {
 		return nil
 	}
 	return checks
+}
+
+// moderationCachePolicyVersion derives the prompt-cache key version from
+// the detection policy: check chain, guard LLM enablement and rules, and the
+// prompt-injection provider switches. Baking it into the keys means enabling
+// the provider or flipping its mode/threshold orphans the old key space
+// instead of serving stale safe verdicts against the new policy; the stale
+// entries simply expire with the TTL.
+func moderationCachePolicyVersion(cfg *config.Config) string {
+	if cfg == nil {
+		return ""
+	}
+	h := fnv.New64a()
+	fmt.Fprintf(h, "chain=%v;", cfg.SensitiveCheck.CheckChain)
+	fmt.Fprintf(h, "llm=%t;", cfg.SensitiveCheck.LLM.Enable)
+	fmt.Fprintf(h, "unsafe_rules=%v;", cfg.SensitiveCheck.LLM.UnsafeRules)
+	pi := cfg.SensitiveCheck.PromptInjection
+	fmt.Fprintf(h, "pi=%t|%s|%v;", pi.Enable, pi.Mode, pi.RiskThreshold)
+	// Model identity is config too: switching a model or its endpoint
+	// changes the verdicts, so it must change the key space — this covers
+	// both the injection decision model and the guard_llm models whose
+	// verdicts land in the same prompt cache.
+	fmt.Fprintf(h, "model=%s|%s;", pi.Model.Model, pi.Model.Endpoint)
+	fmt.Fprintf(h, "guard=%s|%s;stream=%s|%s;",
+		cfg.SensitiveCheck.LLM.Guard.Model, cfg.SensitiveCheck.LLM.Guard.Endpoint,
+		cfg.SensitiveCheck.LLM.GuardStream.Model, cfg.SensitiveCheck.LLM.GuardStream.Endpoint)
+	return fmt.Sprintf("%016x", h.Sum64())
+}
+
+// promptCacheTTLFromConfig derives the prompt-cache expiry: the
+// instruction-effect window when the prompt-injection provider is enabled
+// (its verdicts also depend on the moderation service's runtime DB
+// instruction state, which the gateway cannot observe), the legacy 24h
+// otherwise.
+func promptCacheTTLFromConfig(cfg *config.Config) time.Duration {
+	if cfg == nil || !cfg.SensitiveCheck.PromptInjection.Enable {
+		return cacheTTL
+	}
+	return injectionPromptCacheTTL
 }
 
 func promptMaxChunksFromConfig(cfg *config.Config) int {
@@ -376,8 +435,7 @@ func (modImpl *moderationImpl) cachedPromptChunkResult(ctx context.Context, chun
 	if modImpl.cacheClient == nil {
 		return nil, false
 	}
-	chunkHash := md5.Sum([]byte(chunk))
-	cacheKey := moderationCachePromptPrefix + fmt.Sprintf("%x", chunkHash)
+	cacheKey := modImpl.promptCacheKey(chunk)
 	cached, err := modImpl.cacheClient.Get(ctx, cacheKey)
 	if err != nil {
 		slog.Debug("failed to get cached prompt chunk in redis", slog.String("error", err.Error()))
@@ -388,6 +446,21 @@ func (modImpl *moderationImpl) cachedPromptChunkResult(ctx context.Context, chun
 		return nil, false
 	}
 	return &result, true
+}
+
+// effectivePromptCacheTTL falls back to the legacy TTL for hand-built impls
+// that did not derive one from config.
+func (modImpl *moderationImpl) effectivePromptCacheTTL() time.Duration {
+	if modImpl.promptCacheTTL <= 0 {
+		return cacheTTL
+	}
+	return modImpl.promptCacheTTL
+}
+
+// promptCacheKey builds the Redis key for one cached prompt verdict.
+func (modImpl *moderationImpl) promptCacheKey(chunk string) string {
+	chunkHash := md5.Sum([]byte(chunk))
+	return moderationCachePromptPrefix + modImpl.cacheVersion + fmt.Sprintf("%x", chunkHash)
 }
 
 // used for single chunk or short content
@@ -413,11 +486,10 @@ func (modImpl *moderationImpl) checkSingleChunk(ctx context.Context, content, ke
 
 	if modImpl.cacheClient != nil {
 		// Cache the result for the single chunk
-		chunkHash := md5.Sum([]byte(content))
-		cacheKey := moderationCachePromptPrefix + fmt.Sprintf("%x", chunkHash)
+		cacheKey := modImpl.promptCacheKey(content)
 		resultBytes, err := json.Marshal(result)
 		if err == nil {
-			err := modImpl.cacheClient.SetEx(ctx, cacheKey, string(resultBytes), cacheTTL)
+			err := modImpl.cacheClient.SetEx(ctx, cacheKey, string(resultBytes), modImpl.effectivePromptCacheTTL())
 			if err != nil {
 				slog.Warn("failed to cache moderation result", slog.String("error", err.Error()))
 			}
@@ -451,11 +523,10 @@ func (modImpl *moderationImpl) checkBuffer(
 	// moderation call.
 	if modImpl.cacheClient != nil {
 		for _, chunk := range currentBufferChunks {
-			chunkHash := md5.Sum([]byte(chunk))
-			cacheKey := moderationCachePromptPrefix + fmt.Sprintf("%x", chunkHash)
+			cacheKey := modImpl.promptCacheKey(chunk)
 			resultBytes, err := json.Marshal(result)
 			if err == nil {
-				err := modImpl.cacheClient.SetEx(ctx, cacheKey, string(resultBytes), cacheTTL)
+				err := modImpl.cacheClient.SetEx(ctx, cacheKey, string(resultBytes), modImpl.effectivePromptCacheTTL())
 				if err != nil {
 					slog.Warn("failed to cache moderation result", slog.String("error", err.Error()))
 				}
@@ -949,11 +1020,6 @@ func writeTextModerationPart(b *strings.Builder, text string) {
 func (modImpl *moderationImpl) postCheck(ctx context.Context, result *rpc.CheckResult) {
 	if result.IsSensitive {
 		slog.ErrorContext(ctx, "sensitive content found", slog.Any("reason", result.Reason))
-		// If ModerationBypassSensitiveCheck is enabled, don't block the response
-		if modImpl.config != nil && modImpl.config.AIGateway.ModerationBypassSensitiveCheck {
-			result.IsSensitive = false
-			result.Reason = ""
-		}
 	}
 }
 

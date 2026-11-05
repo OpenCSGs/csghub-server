@@ -452,8 +452,11 @@ type waitRerouteAdmissionChecker struct {
 
 func (m *waitRerouteAdmissionChecker) CheckAdmission(_ context.Context, _ *types.RequestMetadata, _ *types.ModelTarget) (*types.AdmissionOutcome, error) {
 	m.calls++
+	// Mirrors the real admission layer: a reroute exit is a queued exit, so
+	// the decision carries Queued=true and its wait/depth are recorded.
 	return &types.AdmissionOutcome{Decision: &types.AdmissionDecision{
 		Action:      types.AdmissionReroute,
 		QueueWaitMs: 500,
+		Queued:      true,
 	}}, nil
 }

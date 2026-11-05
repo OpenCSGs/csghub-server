@@ -59,7 +59,7 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 		req.OwnerNamespace = req.CurrentUser
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find user for notebook creation, %w", err)
 	}

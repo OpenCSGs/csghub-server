@@ -125,6 +125,12 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		err := fmt.Errorf("current user is required")
 		return nil, errorx.BadRequest(err, errorx.Ctx().Set("current user", req.CurrentUser))
 	}
+	if strings.TrimSpace(req.SourceNamespace) == "" || strings.TrimSpace(req.SourceName) == "" ||
+		strings.TrimSpace(req.ForkNamespace) == "" || strings.TrimSpace(req.ForkName) == "" {
+		return nil, errorx.BadRequest(
+			errors.New("source namespace, source name, fork namespace and fork name are required"), nil,
+		)
+	}
 	priority, err := normalizeMirrorPriority(req.Priority)
 	if err != nil {
 		return nil, err
@@ -140,10 +146,7 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	req.Username = username
 	req.AccessToken = accessToken
 
-	namespace, name, err := m.resolveMirrorRepoTarget(req)
-	if err != nil {
-		return nil, err
-	}
+	namespace, name := resolveMirrorRepoTarget(req)
 	if namespace == "" || name == "" {
 		err := fmt.Errorf("fork namespace and fork name are required")
 		return nil, errorx.BadRequest(err,
@@ -245,6 +248,7 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		)
 	}
 
+	// Request ingress selects public defaults; internal callers retain their private fallback.
 	private := true
 	if req.Private != nil {
 		private = *req.Private
@@ -276,6 +280,11 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	dbRepo, targetNamespace, err := m.prepareMirrorRepository(ctx, createRepoReq, sourceType, sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare mirror repository, error: %w", err)
+	}
+	// Models stay hidden until synchronization finishes; other types use the requested visibility immediately.
+	if req.RepoType == types.ModelRepo {
+		dbRepo.Private = true
+		dbRepo.PendingPublish = !private
 	}
 
 	repoNamespace, _ := dbRepo.NamespaceAndName()
@@ -521,7 +530,16 @@ func normalizeMirrorPriority(priority types.MirrorPriority) (types.MirrorPriorit
 	return priority, nil
 }
 
+// ValidateMirrorSourceURL checks a source URL, including embedded credentials, without accessing external dependencies.
+// Handlers can use it to report an invalid URL when derived source fields are missing.
+func ValidateMirrorSourceURL(sourceURL string) error {
+	_, _, _, err := normalizeMirrorSource(sourceURL, "", "")
+	return err
+}
+
 // normalizeMirrorSource validates and canonicalizes an HTTP(S) mirror source and its credentials.
+// Sources must include a namespace and repository; invalid URLs return ErrMirrorSourceURLInvalid.
+// Nested namespaces are supported, and credential errors retain their own error type.
 func normalizeMirrorSource(sourceURL, username, accessToken string) (string, string, string, error) {
 	hasUsername := username != ""
 	hasAccessToken := accessToken != ""
@@ -534,29 +552,32 @@ func normalizeMirrorSource(sourceURL, username, accessToken string) (string, str
 	sourceURL = strings.TrimRight(strings.TrimSpace(sourceURL), "/")
 	parsedURL, err := url.Parse(sourceURL)
 	if err != nil {
-		return "", "", "", errorx.BadRequest(
+		return "", "", "", errorx.MirrorSourceURLInvalid(
 			fmt.Errorf("invalid source git clone url: %w", err), errorx.Ctx(),
 		)
 	}
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return "", "", "", errorx.BadRequest(
+		return "", "", "", errorx.MirrorSourceURLInvalid(
 			errors.New("source git clone url scheme must be http or https"), errorx.Ctx(),
 		)
 	}
 	if parsedURL.Host == "" || parsedURL.Hostname() == "" {
-		return "", "", "", errorx.BadRequest(
+		return "", "", "", errorx.MirrorSourceURLInvalid(
 			errors.New("source git clone url must have a host"), errorx.Ctx(),
 		)
 	}
 	if parsedURL.Path == "" || parsedURL.Path == "/" {
-		return "", "", "", errorx.BadRequest(
+		return "", "", "", errorx.MirrorSourceURLInvalid(
 			errors.New("source git clone url must have a repository path"), errorx.Ctx(),
 		)
 	}
 	if parsedURL.RawQuery != "" || parsedURL.Fragment != "" {
-		return "", "", "", errorx.BadRequest(
+		return "", "", "", errorx.MirrorSourceURLInvalid(
 			errors.New("source git clone url must not contain query or fragment"), errorx.Ctx(),
 		)
+	}
+	if _, err := mirrorSourcePathSegments(parsedURL.Path); err != nil {
+		return "", "", "", err
 	}
 	if parsedURL.User != nil {
 		if hasUsername {
@@ -580,25 +601,32 @@ func normalizeMirrorSource(sourceURL, username, accessToken string) (string, str
 	return parsedURL.String(), username, accessToken, nil
 }
 
-// resolveMirrorRepoTarget chooses and trims the local mirror target path from fork fields or namespace mapping.
-func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepoReq) (string, string, error) {
-	namespace := req.ForkNamespace
-	if namespace == "" {
-		var err error
-		namespace, err = m.mapNamespaceAndName(req.SourceNamespace, "Aiwizards")
-		if err != nil {
-			return "", "", err
+// mirrorSourcePathSegments validates the namespace and repository path shared by mirror writes.
+// A trailing slash and optional .git suffix are ignored, but empty segments are rejected.
+func mirrorSourcePathSegments(sourcePath string) ([]string, error) {
+	sourcePath = strings.TrimSuffix(strings.TrimRight(sourcePath, "/"), ".git")
+	segments := strings.Split(strings.TrimPrefix(sourcePath, "/"), "/")
+	if len(segments) < 2 {
+		return nil, errorx.MirrorSourceURLInvalid(errors.New("source git clone url must include a namespace and repository"), errorx.Ctx())
+	}
+	for _, segment := range segments {
+		if strings.TrimSpace(segment) == "" {
+			return nil, errorx.MirrorSourceURLInvalid(errors.New("source git clone url must not contain empty namespace or repository path segments"), errorx.Ctx())
 		}
 	}
-	name := req.ForkName
-	if name == "" {
-		name = req.SourceName
-	}
-	return strings.TrimSpace(namespace), strings.TrimSpace(name), nil
+	return segments, nil
+}
+
+// resolveMirrorRepoTarget trims the explicit local target selected by the single-repository API.
+func resolveMirrorRepoTarget(req types.CreateMirrorRepoReq) (string, string) {
+	return strings.TrimSpace(req.ForkNamespace), strings.TrimSpace(req.ForkName)
 }
 
 // createMirrorRepoRecords creates mirror rows transactionally, and optionally the target repo rows too.
 func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req types.CreateMirrorRepoReq, repo *database.Repository, namespace, name string, createRepository bool, metadata *mirrorRepoMetadata, targetNamespace *database.Namespace) (*database.Mirror, error) {
+	if createRepository && targetNamespace == nil {
+		return nil, fmt.Errorf("mirror repository namespace is required")
+	}
 	mirror := buildMirrorRepoRecord(req, repo, namespace, name)
 	if !createRepository && !req.SkipSourcePath {
 		sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
@@ -627,14 +655,6 @@ func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req t
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror repo records: %w", err)
-	}
-	if createRepository {
-		if targetNamespace == nil {
-			return nil, fmt.Errorf("mirror repository namespace is required")
-		}
-		if err := ensureRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, *targetNamespace, reqMirror.RepositoryID, false); err != nil {
-			return nil, fmt.Errorf("failed to synchronize mirror repository namespace relationship: %w", err)
-		}
 	}
 	return reqMirror, nil
 }

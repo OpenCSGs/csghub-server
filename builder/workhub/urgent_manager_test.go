@@ -57,35 +57,39 @@ func (c *fakeQueueController) calls() (int, int) {
 	return c.removeCalls, c.addCalls
 }
 
-// controlledRemoveQueueController exposes the two RemoveQueue phases used when an abandoned cycle is reconciled.
+// controlledRemoveQueueController gates the initial removal and later retries or failed-Add cleanup.
 type controlledRemoveQueueController struct {
-	mu               sync.Mutex
-	removeCalls      int
-	addCalls         int
-	firstStarted     chan struct{}
-	firstCanceled    chan struct{}
-	allowFirst       chan struct{}
-	reconcileStarted chan struct{}
-	allowReconcile   chan struct{}
-	addCalled        chan struct{}
+	mu             sync.Mutex
+	removeCalls    int
+	addCalls       int
+	firstError     error
+	removeContexts []context.Context
+	firstStarted   chan struct{}
+	firstCanceled  chan struct{}
+	allowFirst     chan struct{}
+	nextStarted    chan struct{}
+	allowNext      chan struct{}
+	addCalled      chan struct{}
+	addError       error
 }
 
 // newControlledRemoveQueueController creates queue synchronization gates for preemption tests.
 func newControlledRemoveQueueController() *controlledRemoveQueueController {
 	return &controlledRemoveQueueController{
-		firstStarted:     make(chan struct{}),
-		firstCanceled:    make(chan struct{}),
-		allowFirst:       make(chan struct{}),
-		reconcileStarted: make(chan struct{}),
-		allowReconcile:   make(chan struct{}),
-		addCalled:        make(chan struct{}, 1),
+		firstStarted:  make(chan struct{}),
+		firstCanceled: make(chan struct{}),
+		allowFirst:    make(chan struct{}),
+		nextStarted:   make(chan struct{}),
+		allowNext:     make(chan struct{}),
+		addCalled:     make(chan struct{}, 1),
 	}
 }
 
-// RemoveQueue blocks the first removal until cancellation and gates the reconciliation removal.
+// RemoveQueue records bounded attempt contexts and blocks each removal until released or canceled.
 func (c *controlledRemoveQueueController) RemoveQueue(ctx context.Context, queue string) error {
 	c.mu.Lock()
 	c.removeCalls++
+	c.removeContexts = append(c.removeContexts, ctx)
 	call := c.removeCalls
 	c.mu.Unlock()
 
@@ -97,18 +101,18 @@ func (c *controlledRemoveQueueController) RemoveQueue(ctx context.Context, queue
 			close(c.firstCanceled)
 			return ctx.Err()
 		case <-c.allowFirst:
-			return nil
+			return c.firstError
 		}
-	case 2:
-		close(c.reconcileStarted)
+	default:
+		if call == 2 {
+			close(c.nextStarted)
+		}
 		select {
-		case <-c.allowReconcile:
+		case <-c.allowNext:
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-	default:
-		return nil
 	}
 }
 
@@ -121,7 +125,7 @@ func (c *controlledRemoveQueueController) AddQueue(queue string, config river.Qu
 	case c.addCalled <- struct{}{}:
 	default:
 	}
-	return nil
+	return c.addError
 }
 
 // calls returns the recorded RemoveQueue and AddQueue call counts.
@@ -129,6 +133,13 @@ func (c *controlledRemoveQueueController) calls() (int, int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.removeCalls, c.addCalls
+}
+
+// contexts returns a snapshot of the removal contexts without exposing the mutable slice.
+func (c *controlledRemoveQueueController) contexts() []context.Context {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]context.Context(nil), c.removeContexts...)
 }
 
 // synchronizedLogBuffer safely captures logs written by asynchronous manager callbacks.
@@ -177,42 +188,18 @@ func TestUrgentManagerLogsPreemptionAndRestoreLifecycle(t *testing.T) {
 	output := captureUrgentManagerLogs(t)
 	manager := newTestUrgentManager(&fakeQueueController{}, 10*time.Millisecond)
 	defer manager.Close(ErrWorkerShutdown)
-
-	_, normalDone, allowed := manager.BeginNormal(context.Background())
-	require.True(t, allowed)
-
-	urgentReady := make(chan error, 1)
-	var urgentDone func()
-	go func() {
-		var err error
-		urgentDone, err = manager.BeginUrgent(context.Background())
-		urgentReady <- err
-	}()
+	done, err := manager.BeginUrgent(context.Background())
+	require.NoError(t, err)
+	done()
 	require.Eventually(t, func() bool {
-		return manager.State() == UrgentStatePreempting
+		return manager.State() == UrgentStateNormal && strings.Contains(output.String(), `"msg":"normal queue restored"`)
 	}, time.Second, time.Millisecond)
-	normalDone()
-	require.NoError(t, <-urgentReady)
-	urgentDone()
-	require.Eventually(t, func() bool {
-		return manager.State() == UrgentStateNormal
-	}, time.Second, time.Millisecond)
-	require.Eventually(t, func() bool {
-		return strings.Contains(output.String(), `"msg":"normal queue restored"`)
-	}, time.Second, time.Millisecond)
-
 	logs := output.String()
-	require.Contains(t, logs, `"msg":"urgent work triggered"`)
-	require.Contains(t, logs, `"msg":"preempting normal work"`)
-	require.Contains(t, logs, `"msg":"normal queue removed for urgent execution"`)
+	for _, message := range []string{"urgent work triggered", "preempting normal work", "normal queue removed for urgent execution", "urgent work finished", "normal queue restored"} {
+		require.Contains(t, logs, `"msg":"`+message+`"`)
+	}
 	require.Contains(t, logs, `"remove_duration":`)
-	require.Contains(t, logs, `"msg":"normal work drained for urgent execution"`)
-	require.Contains(t, logs, `"msg":"urgent work finished"`)
-	require.Contains(t, logs, `"msg":"normal queue restored"`)
-	require.Contains(t, logs, `"state":"PREEMPTING"`)
-	require.Contains(t, logs, `"state":"URGENT"`)
 	require.Contains(t, logs, `"state":"URGENT_IDLE"`)
-	require.Contains(t, logs, `"state":"NORMAL"`)
 }
 
 func TestUrgentManagerAlreadyCanceledUrgentDoesNotStartCycle(t *testing.T) {
@@ -231,61 +218,35 @@ func TestUrgentManagerAlreadyCanceledUrgentDoesNotStartCycle(t *testing.T) {
 	require.Zero(t, removeCalls)
 }
 
-func TestUrgentManagerBeginNormalIsPreemptedBeforeUrgentStarts(t *testing.T) {
-	controller := &fakeQueueController{}
+// TestUrgentManagerWaitsForRiverRemoval verifies River's result barrier gates urgent execution.
+func TestUrgentManagerWaitsForRiverRemoval(t *testing.T) {
+	controller := newControlledRemoveQueueController()
 	manager := newTestUrgentManager(controller, time.Hour)
 	defer manager.Close(ErrWorkerShutdown)
-
-	ctx, done, allowed := manager.BeginNormal(context.Background())
-	require.True(t, allowed)
-
-	urgentReady := make(chan error, 1)
-	var urgentDone func()
+	ready := make(chan error, 1)
 	go func() {
-		var err error
-		urgentDone, err = manager.BeginUrgent(context.Background())
-		urgentReady <- err
+		done, err := manager.BeginUrgent(context.Background())
+		if done != nil {
+			defer done()
+		}
+		ready <- err
 	}()
-
-	require.Eventually(t, func() bool {
-		return errors.Is(context.Cause(ctx), ErrUrgentPreempt)
-	}, time.Second, time.Millisecond)
+	<-controller.firstStarted
+	require.Equal(t, UrgentStatePreempting, manager.State())
 	select {
-	case err := <-urgentReady:
-		t.Fatalf("urgent work started before normal work exited: %v", err)
+	case err := <-ready:
+		t.Fatalf("urgent started before River settled normal claims: %v", err)
 	default:
 	}
-
-	done()
-	require.NoError(t, <-urgentReady)
-	require.NotNil(t, urgentDone)
-	urgentDone()
-
-	removeCalls, _ := controller.calls()
-	require.Equal(t, 1, removeCalls)
+	close(controller.allowFirst)
+	require.NoError(t, <-ready)
 }
 
-func TestUrgentManagerRejectsNormalDuringUrgentCycle(t *testing.T) {
-	manager := newTestUrgentManager(&fakeQueueController{}, time.Hour)
-	defer manager.Close(ErrWorkerShutdown)
-
-	done, err := manager.BeginUrgent(context.Background())
-	require.NoError(t, err)
-	defer done()
-
-	ctx, normalDone, allowed := manager.BeginNormal(context.Background())
-	require.False(t, allowed)
-	require.Nil(t, ctx)
-	require.Nil(t, normalDone)
-}
-
+// TestUrgentManagerSharesOnePreemptionCycle verifies concurrent urgent reservations share a River removal.
 func TestUrgentManagerSharesOnePreemptionCycle(t *testing.T) {
-	controller := &fakeQueueController{}
+	controller := newControlledRemoveQueueController()
 	manager := newTestUrgentManager(controller, time.Hour)
 	defer manager.Close(ErrWorkerShutdown)
-
-	_, normalDone, allowed := manager.BeginNormal(context.Background())
-	require.True(t, allowed)
 
 	results := make(chan struct {
 		done func()
@@ -304,7 +265,7 @@ func TestUrgentManagerSharesOnePreemptionCycle(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return manager.UrgentReservations() == 2
 	}, time.Second, time.Millisecond)
-	normalDone()
+	close(controller.allowFirst)
 
 	first := <-results
 	second := <-results
@@ -317,6 +278,7 @@ func TestUrgentManagerSharesOnePreemptionCycle(t *testing.T) {
 	require.Equal(t, 1, removeCalls)
 }
 
+// TestUrgentManagerRestoresOnlyAfterLastUrgentAndIdleDelay verifies duplicate releases cannot restore early.
 func TestUrgentManagerRestoresOnlyAfterLastUrgentAndIdleDelay(t *testing.T) {
 	controller := &fakeQueueController{}
 	manager := newTestUrgentManager(controller, 20*time.Millisecond)
@@ -328,10 +290,13 @@ func TestUrgentManagerRestoresOnlyAfterLastUrgentAndIdleDelay(t *testing.T) {
 	require.NoError(t, err)
 
 	firstDone()
+	firstDone()
+	require.Equal(t, 1, manager.UrgentReservations())
 	time.Sleep(40 * time.Millisecond)
 	_, addCalls := controller.calls()
 	require.Zero(t, addCalls)
 
+	secondDone()
 	secondDone()
 	require.Eventually(t, func() bool {
 		_, addCalls := controller.calls()
@@ -364,6 +329,7 @@ func TestUrgentManagerRetriesNormalQueueRestoreAfterAddFailure(t *testing.T) {
 	require.Contains(t, output.String(), `"retry_delay":10000000`)
 }
 
+// TestUrgentManagerNewUrgentInvalidatesIdleRestore verifies a new reservation restarts the complete debounce.
 func TestUrgentManagerNewUrgentInvalidatesIdleRestore(t *testing.T) {
 	controller := &fakeQueueController{}
 	manager := newTestUrgentManager(controller, 50*time.Millisecond)
@@ -380,39 +346,13 @@ func TestUrgentManagerNewUrgentInvalidatesIdleRestore(t *testing.T) {
 	_, addCalls := controller.calls()
 	require.Zero(t, addCalls)
 
+	secondFinished := time.Now()
 	secondDone()
 	require.Eventually(t, func() bool {
 		_, addCalls := controller.calls()
 		return addCalls == 1
 	}, time.Second, time.Millisecond)
-}
-
-func TestUrgentManagerCanceledLastWaiterStillFinishesAndRestoresCycle(t *testing.T) {
-	controller := &fakeQueueController{}
-	manager := newTestUrgentManager(controller, 10*time.Millisecond)
-	defer manager.Close(ErrWorkerShutdown)
-
-	_, normalDone, allowed := manager.BeginNormal(context.Background())
-	require.True(t, allowed)
-
-	jobCtx, cancelJob := context.WithCancel(context.Background())
-	result := make(chan error, 1)
-	go func() {
-		_, err := manager.BeginUrgent(jobCtx)
-		result <- err
-	}()
-	require.Eventually(t, func() bool {
-		return manager.UrgentReservations() == 1
-	}, time.Second, time.Millisecond)
-
-	cancelJob()
-	require.ErrorIs(t, <-result, context.Canceled)
-	normalDone()
-
-	require.Eventually(t, func() bool {
-		_, addCalls := controller.calls()
-		return manager.State() == UrgentStateNormal && addCalls == 1
-	}, time.Second, time.Millisecond)
+	require.GreaterOrEqual(t, time.Since(secondFinished), 50*time.Millisecond)
 }
 
 func TestUrgentManagerCanceledWaiterKeepsCycleForOtherReservation(t *testing.T) {
@@ -461,9 +401,11 @@ func TestUrgentManagerCanceledWaiterKeepsCycleForOtherReservation(t *testing.T) 
 	second.done()
 }
 
-func TestUrgentManagerCanceledFinalWaiterInterruptsAndReconcilesPreemption(t *testing.T) {
+// TestUrgentManagerCanceledFinalWaiterKeepsRemoval verifies cancellation releases only the reservation and retains one removal.
+func TestUrgentManagerCanceledFinalWaiterKeepsRemoval(t *testing.T) {
 	controller := newControlledRemoveQueueController()
-	manager := newTestUrgentManager(controller, time.Millisecond)
+	idleDelay := 20 * time.Millisecond
+	manager := newTestUrgentManager(controller, idleDelay)
 	defer manager.Close(ErrWorkerShutdown)
 
 	jobCtx, cancelJob := context.WithCancel(context.Background())
@@ -474,24 +416,18 @@ func TestUrgentManagerCanceledFinalWaiterInterruptsAndReconcilesPreemption(t *te
 	}()
 
 	<-controller.firstStarted
+	removeCtx := controller.contexts()[0]
 	cancelJob()
 	require.ErrorIs(t, <-result, context.Canceled)
-	select {
-	case <-controller.firstCanceled:
-	case <-time.After(time.Second):
-		t.Fatal("preemption removal was not canceled after the final reservation left")
-	}
-	select {
-	case <-controller.reconcileStarted:
-	case <-time.After(time.Second):
-		t.Fatal("normal queue removal was not reconciled")
-	}
+	require.NoError(t, removeCtx.Err())
+	require.Zero(t, manager.UrgentReservations())
+	require.Equal(t, UrgentStatePreempting, manager.State())
+	removeCalls, addCalls := controller.calls()
+	require.Equal(t, 1, removeCalls)
+	require.Zero(t, addCalls)
 
-	_, normalDone, allowed := manager.BeginNormal(context.Background())
-	require.False(t, allowed)
-	require.Nil(t, normalDone)
-
-	close(controller.allowReconcile)
+	settledAfter := time.Now()
+	close(controller.allowFirst)
 	select {
 	case <-controller.addCalled:
 	case <-time.After(time.Second):
@@ -500,9 +436,14 @@ func TestUrgentManagerCanceledFinalWaiterInterruptsAndReconcilesPreemption(t *te
 	require.Eventually(t, func() bool {
 		return manager.State() == UrgentStateNormal
 	}, time.Second, time.Millisecond)
+	require.GreaterOrEqual(t, time.Since(settledAfter), idleDelay)
+	removeCalls, addCalls = controller.calls()
+	require.Equal(t, 1, removeCalls)
+	require.Equal(t, 1, addCalls)
 }
 
-func TestUrgentManagerNewWaiterContinuesReconciledPreemption(t *testing.T) {
+// TestUrgentManagerNewWaiterJoinsRemoval verifies a later urgent job reuses removal after all earlier waiters cancel.
+func TestUrgentManagerNewWaiterJoinsRemoval(t *testing.T) {
 	controller := newControlledRemoveQueueController()
 	manager := newTestUrgentManager(controller, time.Hour)
 	defer manager.Close(ErrWorkerShutdown)
@@ -516,7 +457,7 @@ func TestUrgentManagerNewWaiterContinuesReconciledPreemption(t *testing.T) {
 	<-controller.firstStarted
 	cancelFirst()
 	require.ErrorIs(t, <-firstResult, context.Canceled)
-	<-controller.reconcileStarted
+	require.NoError(t, controller.contexts()[0].Err())
 
 	secondResult := make(chan struct {
 		done func()
@@ -532,16 +473,23 @@ func TestUrgentManagerNewWaiterContinuesReconciledPreemption(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return manager.UrgentReservations() == 1
 	}, time.Second, time.Millisecond)
-	close(controller.allowReconcile)
+	select {
+	case <-secondResult:
+		t.Fatal("new urgent job started before removal completed")
+	default:
+	}
+	close(controller.allowFirst)
 
 	second := <-secondResult
 	require.NoError(t, second.err)
 	require.NotNil(t, second.done)
-	_, addCalls := controller.calls()
+	removeCalls, addCalls := controller.calls()
+	require.Equal(t, 1, removeCalls)
 	require.Zero(t, addCalls)
 	second.done()
 }
 
+// TestUrgentManagerClosePreventsRestoreAndNewWork verifies shutdown invalidates timers and rejects urgent work.
 func TestUrgentManagerClosePreventsRestoreAndNewWork(t *testing.T) {
 	output := captureUrgentManagerLogs(t)
 	controller := &fakeQueueController{}
@@ -557,33 +505,246 @@ func TestUrgentManagerClosePreventsRestoreAndNewWork(t *testing.T) {
 	require.Zero(t, addCalls)
 	require.Equal(t, UrgentStateClosed, manager.State())
 
-	_, _, allowed := manager.BeginNormal(context.Background())
-	require.False(t, allowed)
 	_, err = manager.BeginUrgent(context.Background())
 	require.ErrorIs(t, err, ErrWorkerShutdown)
 	require.Contains(t, output.String(), `"msg":"urgent manager closed"`)
 	require.Contains(t, output.String(), `"state":"CLOSED"`)
 	require.Contains(t, output.String(), `"urgent_reservations":0`)
-	require.Contains(t, output.String(), `"normal_work_count":0`)
 	require.Contains(t, output.String(), `"cause":"mirror worker shutting down"`)
 }
 
-func TestUrgentManagerRemoveFailureReturnsToNormal(t *testing.T) {
-	output := captureUrgentManagerLogs(t)
-	removeErr := errors.New("remove failed")
-	manager := newTestUrgentManager(&fakeQueueController{removeErr: removeErr}, time.Hour)
+// TestUrgentManagerRemoveFailureKeepsBarrierClosed verifies failure never reopens a stopping producer.
+func TestUrgentManagerRemoveFailureKeepsBarrierClosed(t *testing.T) {
+	controller := newControlledRemoveQueueController()
+	controller.firstError = context.DeadlineExceeded
+	manager := newTestUrgentManager(controller, 10*time.Millisecond)
 	defer manager.Close(ErrWorkerShutdown)
+	ready := make(chan error, 1)
+	go func() {
+		done, err := manager.BeginUrgent(context.Background())
+		if done != nil {
+			defer done()
+		}
+		ready <- err
+	}()
+	<-controller.firstStarted
+	close(controller.allowFirst)
+	<-controller.nextStarted
+	require.Equal(t, UrgentStatePreempting, manager.State())
+	_, adds := controller.calls()
+	require.Zero(t, adds)
+	select {
+	case err := <-ready:
+		t.Fatalf("urgent started after an incomplete removal: %v", err)
+	default:
+	}
+	close(controller.allowNext)
+	require.NoError(t, <-ready)
+	require.Eventually(t, func() bool { return manager.State() == UrgentStateNormal }, time.Second, time.Millisecond)
+}
 
+// TestUrgentManagerRemovalRetryUsesFreshContexts verifies timeout failures retain the barrier and retry with a fresh bounded context.
+func TestUrgentManagerRemovalRetryUsesFreshContexts(t *testing.T) {
+	controller := newControlledRemoveQueueController()
+	controller.firstError = context.DeadlineExceeded
+	manager := newTestUrgentManager(controller, time.Hour)
+	defer manager.Close(ErrWorkerShutdown)
+	ready := make(chan error, 1)
+	go func() {
+		done, err := manager.BeginUrgent(context.Background())
+		if done != nil {
+			defer done()
+		}
+		ready <- err
+	}()
+	<-controller.firstStarted
+	firstCtx := controller.contexts()[0]
+	firstDeadline, ok := firstCtx.Deadline()
+	require.True(t, ok)
+	require.Positive(t, time.Until(firstDeadline))
+	require.LessOrEqual(t, time.Until(firstDeadline), 30*time.Second)
+	failedAfter := time.Now()
+	close(controller.allowFirst)
+	select {
+	case <-controller.nextStarted:
+	case <-time.After(normalQueueRemoveRetryDelay + time.Second):
+		t.Fatal("timed-out removal was not retried")
+	}
+	require.GreaterOrEqual(t, time.Since(failedAfter), normalQueueRemoveRetryDelay)
+	secondCtx := controller.contexts()[1]
+	require.NotSame(t, firstCtx, secondCtx)
+	require.ErrorIs(t, firstCtx.Err(), context.Canceled)
+	require.NoError(t, secondCtx.Err())
+	secondDeadline, ok := secondCtx.Deadline()
+	require.True(t, ok)
+	require.True(t, secondDeadline.After(firstDeadline))
+	require.LessOrEqual(t, time.Until(secondDeadline), 30*time.Second)
+	require.Equal(t, UrgentStatePreempting, manager.State())
+	select {
+	case err := <-ready:
+		t.Fatalf("urgent started before the retry settled: %v", err)
+	default:
+	}
+	close(controller.allowNext)
+	require.NoError(t, <-ready)
+	removes, adds := controller.calls()
+	require.Equal(t, 2, removes)
+	require.Zero(t, adds)
+}
+
+// TestUrgentManagerCloseCancelsRemoval verifies shutdown cancels the active attempt and releases waiting jobs with the shutdown cause.
+func TestUrgentManagerCloseCancelsRemoval(t *testing.T) {
+	controller := newControlledRemoveQueueController()
+	manager := newTestUrgentManager(controller, time.Millisecond)
+	defer manager.Close(ErrWorkerShutdown)
+	result := make(chan error, 1)
+	go func() {
+		_, err := manager.BeginUrgent(context.Background())
+		result <- err
+	}()
+	<-controller.firstStarted
+	removeCtx := controller.contexts()[0]
+	manager.Close(ErrWorkerShutdown)
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, ErrWorkerShutdown)
+	case <-time.After(time.Second):
+		t.Fatal("urgent waiter did not exit during shutdown")
+	}
+	select {
+	case <-controller.firstCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not cancel the active removal")
+	}
+	require.ErrorIs(t, removeCtx.Err(), context.Canceled)
+	require.Zero(t, manager.UrgentReservations())
+	require.Equal(t, UrgentStateClosed, manager.State())
+	removes, adds := controller.calls()
+	require.Equal(t, 1, removes)
+	require.Zero(t, adds)
+}
+
+// TestUrgentManagerCloseDuringRemovalRetryDelay verifies shutdown ends the retry wait without issuing another removal.
+func TestUrgentManagerCloseDuringRemovalRetryDelay(t *testing.T) {
+	controller := newControlledRemoveQueueController()
+	controller.firstError = errors.New("database unavailable")
+	manager := newTestUrgentManager(controller, time.Millisecond)
+	defer manager.Close(ErrWorkerShutdown)
+	result := make(chan error, 1)
+	go func() {
+		_, err := manager.BeginUrgent(context.Background())
+		result <- err
+	}()
+	<-controller.firstStarted
+	removeCtx := controller.contexts()[0]
+	close(controller.allowFirst)
+	select {
+	case <-removeCtx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("failed removal did not release its attempt context")
+	}
+	manager.Close(ErrWorkerShutdown)
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, ErrWorkerShutdown)
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not interrupt the retry delay")
+	}
+	removes, adds := controller.calls()
+	require.Equal(t, 1, removes)
+	require.Zero(t, adds)
+}
+
+// TestUrgentManagerAbsentQueueIsSettled verifies an already removed producer admits urgent work and can later be added.
+func TestUrgentManagerAbsentQueueIsSettled(t *testing.T) {
+	controller := &fakeQueueController{removeErr: &river.QueueNotFoundError{Name: MirrorRepoQueue}}
+	manager := newTestUrgentManager(controller, time.Millisecond)
+	defer manager.Close(ErrWorkerShutdown)
 	done, err := manager.BeginUrgent(context.Background())
-	require.Nil(t, done)
-	require.ErrorIs(t, err, removeErr)
-	require.Equal(t, UrgentStateNormal, manager.State())
+	require.NoError(t, err)
+	done()
+	require.Eventually(t, func() bool { return manager.State() == UrgentStateNormal }, time.Second, time.Millisecond)
+	removes, adds := controller.calls()
+	require.Equal(t, 1, removes)
+	require.Equal(t, 1, adds)
+}
 
-	ctx, normalDone, allowed := manager.BeginNormal(context.Background())
-	require.True(t, allowed)
-	require.NotNil(t, ctx)
-	normalDone()
-	require.Contains(t, output.String(), `"msg":"failed to remove normal queue for urgent execution"`)
-	require.Contains(t, output.String(), `"remove_duration":`)
-	require.Contains(t, output.String(), `"error":"remove failed"`)
+// TestUrgentManagerCloseInterruptsFailedRestoreCleanup cancels restoration cleanup promptly.
+func TestUrgentManagerCloseInterruptsFailedRestoreCleanup(t *testing.T) {
+	controller := &fakeQueueController{addErr: errors.New("start failed"), addFailures: 1}
+	manager := newTestUrgentManager(controller, time.Millisecond)
+	done, err := manager.BeginUrgent(context.Background())
+	require.NoError(t, err)
+	controller.mu.Lock()
+	controller.removeErr = errors.New("database unavailable")
+	controller.mu.Unlock()
+	done()
+	require.Eventually(t, func() bool {
+		removes, adds := controller.calls()
+		return adds == 1 && removes >= 2
+	}, time.Second, time.Millisecond)
+	closed := make(chan struct{})
+	go func() { manager.Close(ErrWorkerShutdown); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close blocked behind removal cleanup")
+	}
+	require.Equal(t, UrgentStateClosed, manager.State())
+	_, adds := controller.calls()
+	require.Equal(t, 1, adds)
+}
+
+// TestUrgentManagerStaleTimerCannotRestore verifies generation checks reject an already queued callback.
+func TestUrgentManagerStaleTimerCannotRestore(t *testing.T) {
+	controller := &fakeQueueController{}
+	manager := newTestUrgentManager(controller, time.Hour)
+	defer manager.Close(ErrWorkerShutdown)
+	done, err := manager.BeginUrgent(context.Background())
+	require.NoError(t, err)
+	done()
+	manager.mu.Lock()
+	oldGeneration := manager.timerGeneration
+	manager.mu.Unlock()
+	done, err = manager.BeginUrgent(context.Background())
+	require.NoError(t, err)
+	done()
+	manager.restoreNormal(oldGeneration)
+	_, adds := controller.calls()
+	require.Zero(t, adds)
+}
+
+// TestUrgentManagerNewUrgentWaitsForFailedAddCleanup reuses the barrier without blocking reservation cancellation.
+func TestUrgentManagerNewUrgentWaitsForFailedAddCleanup(t *testing.T) {
+	controller := newControlledRemoveQueueController()
+	controller.addError = errors.New("producer start failed")
+	close(controller.allowFirst)
+	manager := newTestUrgentManager(controller, time.Millisecond)
+	defer manager.Close(ErrWorkerShutdown)
+	done, err := manager.BeginUrgent(context.Background())
+	require.NoError(t, err)
+	done()
+	<-controller.nextStarted
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		done, err := manager.BeginUrgent(ctx)
+		if done != nil {
+			defer done()
+		}
+		result <- err
+	}()
+	require.Eventually(t, func() bool { return manager.UrgentReservations() == 1 }, time.Second, time.Millisecond)
+	cancel()
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("reservation cancellation blocked behind failed Add cleanup")
+	}
+	_, adds := controller.calls()
+	require.Equal(t, 1, adds)
+	require.Equal(t, UrgentStatePreempting, manager.State())
 }

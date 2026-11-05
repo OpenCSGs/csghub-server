@@ -39,22 +39,39 @@ var bucketLookupMapping = map[string]minio.BucketLookupType{
 	"path": minio.BucketLookupPath,
 }
 
-func NewMinioCore(cfg *config.Config) (Core, error) {
+// ClientOption customizes an S3 client's transport without changing shared defaults.
+type ClientOption func(*minio.Options)
+
+// WithTransport installs a caller-owned transport, for example LFS byte observation.
+func WithTransport(transport http.RoundTripper) ClientOption {
+	return func(options *minio.Options) { options.Transport = transport }
+}
+
+// clientOptions preserves common S3 signing and endpoint behavior before customization.
+func clientOptions(cfg *config.Config, lookup minio.BucketLookupType, options []ClientOption) *minio.Options {
+	result := &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret, ""),
+		Secure: cfg.S3.EnableSSL, BucketLookup: lookup, Region: cfg.S3.Region,
+	}
+	for _, option := range options {
+		option(result)
+	}
+	return result
+}
+
+// NewMinioCore creates the multipart client with optional transport instrumentation.
+func NewMinioCore(cfg *config.Config, options ...ClientOption) (Core, error) {
 	var bucketLookupType minio.BucketLookupType
 	if val, ok := bucketLookupMapping[cfg.S3.BucketLookup]; ok {
 		bucketLookupType = val
 	} else {
 		bucketLookupType = minio.BucketLookupAuto
 	}
-	core, err := minio.NewCore(cfg.S3.Endpoint, &minio.Options{
-		Creds:        credentials.NewStaticV4(cfg.S3.AccessKeyID, cfg.S3.AccessKeySecret, ""),
-		Secure:       cfg.S3.EnableSSL,
-		BucketLookup: bucketLookupType,
-		Region:       cfg.S3.Region,
-	})
+	core, err := minio.NewCore(cfg.S3.Endpoint, clientOptions(cfg, bucketLookupType, options))
 	if err != nil {
 		return nil, fmt.Errorf("failed to init s3 core, error:%w", err)
 	}
+	core.SetS3EnableDualstack(cfg.S3.EnableDualstack)
 
 	return core, nil
 }

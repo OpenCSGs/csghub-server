@@ -7,6 +7,13 @@ import (
 	"opencsg.com/csghub-server/builder/rebac"
 )
 
+// UserQueryOption controls optional data loaded alongside a user's active roles.
+type UserQueryOption uint8
+
+// UserWithAdminPermissions loads administrator definitions and grants for permission checks.
+// Without this option, user queries load role codes only.
+const UserWithAdminPermissions UserQueryOption = 1
+
 // UserRole represents a user's permission level in an organization.
 type UserRole string
 
@@ -48,6 +55,7 @@ type CreateUserRequest struct {
 	RegProvider string `json:"reg_provider"`
 }
 
+// UpdateUserRequest contains editable user profile fields.
 type UpdateUserRequest struct {
 	// Display name of the user
 	Nickname *string `json:"name,omitempty"`
@@ -58,11 +66,9 @@ type UpdateUserRequest struct {
 	Phone                 *string `json:"phone,omitempty"`
 	PhoneArea             *string `json:"phone_area,omitempty"`
 	UUID                  *string `json:"-"`
-	// should be updated by admin
-	Roles    *[]string `json:"roles,omitempty" example:"[super_user, admin, personal_user]"`
-	Avatar   *string   `json:"avatar,omitempty"`
-	Homepage *string   `json:"homepage,omitempty"`
-	Bio      *string   `json:"bio,omitempty"`
+	Avatar                *string `json:"avatar,omitempty"`
+	Homepage              *string `json:"homepage,omitempty"`
+	Bio                   *string `json:"bio,omitempty"`
 
 	//if use want to change username, this should be the only field to send in request body
 	NewUserName *string `json:"new_username,omitempty"`
@@ -316,35 +322,71 @@ type OffsetPagination struct {
 	Offset int `json:"offset"`
 }
 
-type User struct {
-	ID                int64          `json:"id,omitempty"`
-	Username          string         `json:"username"`
-	Nickname          string         `json:"nickname"`
-	Phone             string         `json:"phone,omitempty"`
-	PhoneArea         string         `json:"phone_area,omitempty"`
-	Email             string         `json:"email,omitempty"`
-	UUID              string         `json:"uuid,omitempty"`
-	Avatar            string         `json:"avatar,omitempty"`
-	Bio               string         `json:"bio,omitempty"`
-	Homepage          string         `json:"homepage,omitempty"`
-	Roles             []string       `json:"roles,omitempty"`
-	LastLoginAt       string         `json:"last_login_at,omitempty"`
-	Orgs              []Organization `json:"orgs,omitempty"`
-	CanChangeUserName bool           `json:"can_change_username,omitempty"`
-	VerifyStatus      string         `json:"verify_status,omitempty"`
-	Labels            []string       `json:"labels,omitempty"`
-	CreatedAt         time.Time      `json:"created_at"`
-	Tags              []RepoTag      `json:"tags,omitempty"`
-	Namespaces        []Namespace    `json:"namespaces,omitempty"`
+// UserChoice contains only identifiers and display fields needed by administrator selectors.
+// It intentionally excludes account contact details, roles, tags, and authentication metadata.
+type UserChoice struct {
+	ID       int64  `json:"id"`
+	UUID     string `json:"uuid"`
+	Username string `json:"username"`
+	Nickname string `json:"nickname"`
+	Avatar   string `json:"avatar"`
 }
 
-func (u User) IsAdmin() bool {
-	for _, role := range u.Roles {
-		if role == "admin" || role == "super_user" {
-			return true
-		}
-	}
-	return false
+// UserChoiceDetail adds only active personal namespace identifiers needed to issue a voucher.
+type UserChoiceDetail struct {
+	UserChoice
+	Namespaces []NamespaceChoice `json:"namespaces"`
+}
+
+// UserChoiceList preserves the existing nested pagination envelope for user selectors.
+type UserChoiceList struct {
+	Data  []UserChoice `json:"data"`
+	Total int          `json:"total"`
+}
+
+// ContactRiskStatus describes a contact's current match against risk rules.
+type ContactRiskStatus string
+
+const (
+	ContactRiskNormal     ContactRiskStatus = "normal"
+	ContactRiskSuspicious ContactRiskStatus = "suspicious"
+	ContactRiskMissing    ContactRiskStatus = "missing"
+	ContactRiskUnknown    ContactRiskStatus = "unknown"
+)
+
+// User contains visible profile data and authorization facts computed by the user service.
+type User struct {
+	ID                int64             `json:"id,omitempty"`
+	Username          string            `json:"username"`
+	Nickname          string            `json:"nickname"`
+	Phone             string            `json:"phone,omitempty"`
+	PhoneArea         string            `json:"phone_area,omitempty"`
+	Email             string            `json:"email,omitempty"`
+	EmailRiskStatus   ContactRiskStatus `json:"email_risk_status,omitempty"`
+	PhoneRiskStatus   ContactRiskStatus `json:"phone_risk_status,omitempty"`
+	UUID              string            `json:"uuid,omitempty"`
+	Avatar            string            `json:"avatar,omitempty"`
+	Bio               string            `json:"bio,omitempty"`
+	Homepage          string            `json:"homepage,omitempty"`
+	Roles             []string          `json:"roles,omitempty"`
+	LastLoginAt       string            `json:"last_login_at,omitempty"`
+	Orgs              []Organization    `json:"orgs,omitempty"`
+	CanChangeUserName bool              `json:"can_change_username,omitempty"`
+	VerifyStatus      string            `json:"verify_status,omitempty"`
+	Labels            []string          `json:"labels,omitempty"`
+	CreatedAt         time.Time         `json:"created_at"`
+	Tags              []RepoTag         `json:"tags,omitempty"`
+	Namespaces        []Namespace       `json:"namespaces,omitempty"`
+	// Admin identifies membership in an existing administrator role, regardless of its grants.
+	Admin bool `json:"is_admin,omitempty"`
+	// SuperAdmin identifies an active role assignment granting the global wildcard permission.
+	SuperAdmin bool `json:"is_super_admin,omitempty"`
+}
+
+// IsSuperAdmin reports global administrator authorization verified by the user service.
+// Role names alone never grant the unrestricted access required by legacy consumers.
+func (u User) IsSuperAdmin() bool {
+	return u.SuperAdmin
 }
 
 type UserLikesRequest struct {
@@ -457,6 +499,150 @@ type CloseAccountReq struct {
 	Discussion bool `json:"discussion"`
 }
 
+// RiskCheckAction identifies the authentication transition casdoor is about to
+// complete when it calls the risk-check endpoint.
+type RiskCheckAction string
+
+const (
+	RiskCheckActionSignin RiskCheckAction = "signin"
+	RiskCheckActionSignup RiskCheckAction = "signup"
+	// RiskCheckActionRequest gates resource requests such as sending email
+	// or SMS verification codes; it consults the block_request switches only.
+	RiskCheckActionRequest RiskCheckAction = "request"
+	// RiskCheckActionUpdate gates in-process profile contact updates (email
+	// or phone rebinding on starhub-server); it consults the block_signup
+	// switches, since binding a new contact brings it into the system the
+	// same way registration does.
+	RiskCheckActionUpdate RiskCheckAction = "update"
+)
+
+// RiskCheck reason codes returned to the SSO provider.
+const (
+	// RiskCheckReasonOK indicates the transition is allowed.
+	RiskCheckReasonOK = "ok"
+	// RiskCheckReasonDisposableEmail blocks a registration whose email domain is
+	// on the disposable email list.
+	RiskCheckReasonDisposableEmail = "disposable_email"
+	// RiskCheckReasonVirtualPhone blocks a registration whose phone number falls
+	// under a virtual phone prefix.
+	RiskCheckReasonVirtualPhone = "virtual_phone"
+	// RiskCheckReasonIPRegistrationLimit denies a sign-up because the source
+	// IP has exceeded the configured registration limit within the window.
+	RiskCheckReasonIPRegistrationLimit = "ip_registration_limit"
+	// RiskCheckReasonUsernameExists denies a sign-up whose username is already
+	// taken in the users table, including soft-deleted accounts.
+	RiskCheckReasonUsernameExists = "username_exists"
+	// RiskCheckReasonEmailExists denies a sign-up whose email is already
+	// taken in the users table, including soft-deleted accounts.
+	RiskCheckReasonEmailExists = "email_exists"
+	// RiskCheckReasonPhoneExists denies a sign-up whose phone number is
+	// already taken in the users table, including soft-deleted accounts.
+	RiskCheckReasonPhoneExists = "phone_exists"
+	// RiskCheckReasonPolicyDenied denies the transition because no risk rule
+	// matched and the configured default policy is deny.
+	RiskCheckReasonPolicyDenied = "policy_denied"
+)
+
+// RiskCheckRequest is the identity snapshot casdoor sends before completing a
+// third-party sign-in or sign-up.
+type RiskCheckRequest struct {
+	Provider   string          `json:"provider" binding:"required"`
+	ProviderID string          `json:"provider_id" binding:"required"`
+	Username   string          `json:"username"`
+	Email      string          `json:"email"`
+	Phone      string          `json:"phone"`
+	PhoneArea  string          `json:"phone_area"`
+	ClientIP   string          `json:"client_ip"`
+	Action     RiskCheckAction `json:"action" binding:"required,oneof=signin signup request update"`
+}
+
+// RiskCheckResult is the allow/deny decision returned to casdoor. Matched*
+// fields are populated when the check links the identity to an existing
+// account; TraceID carries the distributed tracing ID for cross-service
+// correlation in Grafana/Loki.
+type RiskCheckResult struct {
+	Allowed         bool   `json:"allowed"`
+	ReasonCode      string `json:"reason_code"`
+	Message         string `json:"message"`
+	TraceID         string `json:"trace_id"`
+	MatchedUsername string `json:"matched_username,omitempty"`
+	MatchedUUID     string `json:"matched_uuid,omitempty"`
+}
+
+// RiskCheckHitFilter queries persisted risk-check decisions.
+type RiskCheckHitFilter struct {
+	// Decision filters by outcome: "allow" or "deny". Empty matches both.
+	Decision string `json:"decision" binding:"omitempty,oneof=allow deny"`
+	// Action filters by transition: "signin", "signup", or "request". Empty matches all.
+	Action string `json:"action" binding:"omitempty,oneof=signin signup request update"`
+	// Search matches trace_id, matched_rule, email, phone, or provider.
+	Search string `json:"search"`
+	Per    int    `json:"per"`
+	Page   int    `json:"page"`
+}
+
+// RiskCheckHit is one persisted risk-check decision for the administration
+// API.
+type RiskCheckHit struct {
+	TraceID     string    `json:"trace_id"`
+	Provider    string    `json:"provider"`
+	ProviderID  string    `json:"provider_id,omitempty"`
+	Action      string    `json:"action"`
+	Decision    string    `json:"decision"`
+	ReasonCode  string    `json:"reason_code"`
+	CheckCode   string    `json:"check_code"`
+	MatchedRule string    `json:"matched_rule"`
+	Email       string    `json:"email"`
+	Phone       string    `json:"phone"`
+	ClientIP    string    `json:"client_ip"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// RiskCheckPolicy is the runtime global policy for the risk-check endpoint:
+// the kill switch and the default behavior when no rule matches. Per-model
+// scene switches live in RiskCheckModel. The zero value disables the check;
+// the seeded defaults keep the check enabled with fail-open behavior.
+type RiskCheckPolicy struct {
+	Enabled      bool      `json:"enabled"`
+	DefaultAllow bool      `json:"default_allow"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	UpdatedBy    string    `json:"updated_by"`
+}
+
+// UpdateRiskCheckPolicyReq updates the global policy. UpdatedBy is filled in
+// by the server from the authenticated administrator, not from the body.
+type UpdateRiskCheckPolicyReq struct {
+	Enabled      bool   `json:"enabled"`
+	DefaultAllow bool   `json:"default_allow"`
+	UpdatedBy    string `json:"-"`
+}
+
+// RiskCheckItem is the per-check configuration for the risk-check endpoint.
+// One row per risk check item; the scene switches select which transitions the
+// check applies to. BlockRequest is a reserved switch with no consumer yet.
+type RiskCheckItem struct {
+	CheckCode    string    `json:"check_code"`
+	Enabled      bool      `json:"enabled"`
+	BlockSignin  bool      `json:"block_signin"`
+	BlockSignup  bool      `json:"block_signup"`
+	BlockRequest bool      `json:"block_request"`
+	Threshold    int       `json:"threshold"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	UpdatedBy    string    `json:"updated_by"`
+}
+
+// UpdateRiskCheckItemReq updates one check item's switches. The display name
+// is seed-owned and cannot be changed. UpdatedBy is filled in by the server
+// from the authenticated administrator, not from the body.
+type UpdateRiskCheckItemReq struct {
+	Enabled      bool   `json:"enabled"`
+	BlockSignin  bool   `json:"block_signin"`
+	BlockSignup  bool   `json:"block_signup"`
+	BlockRequest bool   `json:"block_request"`
+	Threshold    int    `json:"threshold"`
+	UpdatedBy    string `json:"-"`
+}
+
 type UserIndexReq struct {
 	Search       string       `json:"search"`
 	VerifyStatus VerifyStatus `json:"verify_status"`
@@ -489,4 +675,93 @@ type RefreshTokenReq struct {
 	TokenName    string    `json:"token_name"`
 	App          string    `json:"app"`
 	NewExpiredAt time.Time `json:"new_expired_at"`
+}
+
+// IdentityStartRequest contains provider-neutral identity verification input.
+// Sensitive fields must never be logged or serialized in API responses.
+type IdentityStartRequest struct {
+	OrderNo        string
+	RealName       string
+	IDNumber       string
+	ReturnURL      string
+	VerificationID string
+}
+
+// IdentityStartResult identifies a flow and its browser entry point.
+type IdentityStartResult struct {
+	VerificationID string
+	URL            string
+}
+
+// IdentityQueryResult distinguishes a verified identity from an unfinished flow.
+// A negative result is not terminal: providers may report it before interaction.
+type IdentityQueryResult struct {
+	Passed  bool
+	Expired bool
+}
+
+// IdentityCreateRequest is submitted by the authenticated account owner.
+type IdentityCreateRequest struct {
+	RealName string `json:"real_name" binding:"required"`
+	IDNumber string `json:"id_number" binding:"required"`
+}
+
+// IdentityResponse exposes only flow metadata, never credentials or identity data.
+type IdentityResponse struct {
+	ID         int64        `json:"attempt_id"`
+	Provider   string       `json:"provider"`
+	Status     VerifyStatus `json:"status"`
+	CertifyURL string       `json:"certify_url,omitempty"`
+	ExpiresAt  *time.Time   `json:"expires_at,omitempty"`
+	Retryable  bool         `json:"retryable"`
+	// Message contains a USER-ERR code until httpbase.OK localizes the response.
+	Message string `json:"message,omitempty" i18n:"error"`
+}
+
+// RiskEmailDomainRule is one disposable email domain rule for the
+// administration API. Disabling a rule also stops the registration reward
+// deferral for the same domain because both consumers share the table.
+type RiskEmailDomainRule struct {
+	Domain    string    `json:"domain"`
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// RiskPhonePrefixRule is one virtual phone prefix rule for the
+// administration API.
+type RiskPhonePrefixRule struct {
+	PhoneArea string    `json:"phone_area"`
+	Prefix    string    `json:"prefix"`
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// RiskRuleListFilter queries rule rows.
+type RiskRuleListFilter struct {
+	Search  string `form:"search"`
+	Enabled string `form:"enabled" binding:"omitempty,oneof=true false"`
+	Per     int    `form:"per"`
+	Page    int    `form:"page"`
+}
+
+// BulkCreateEmailDomainReq imports email domain rules; duplicates are skipped.
+type BulkCreateEmailDomainReq struct {
+	Domains []string `json:"domains" binding:"required,min=1"`
+}
+
+// BulkCreatePhonePrefixReq imports phone prefix rules; duplicates are skipped.
+type BulkCreatePhonePrefixReq struct {
+	PhoneArea string   `json:"phone_area" binding:"required"`
+	Prefixes  []string `json:"prefixes" binding:"required,min=1"`
+}
+
+// SetRiskRuleEnabledReq enables or disables one rule.
+type SetRiskRuleEnabledReq struct {
+	Enabled bool `json:"enabled"`
+}
+
+// BulkCreateResult reports the import outcome.
+type BulkCreateResult struct {
+	Inserted int `json:"inserted"`
+	Skipped  int `json:"skipped"`
 }

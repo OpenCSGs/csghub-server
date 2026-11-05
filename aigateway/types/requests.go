@@ -75,32 +75,45 @@ func (r *ChatCompletionRequest) PromptText() string {
 	}
 	var b strings.Builder
 	for _, msg := range r.Messages {
-		switch rawContent := msg.GetContent().AsAny().(type) {
-		case string:
-			b.WriteString(rawContent)
-			b.WriteByte('\n')
-		case *string:
-			b.WriteString(*rawContent)
-			b.WriteByte('\n')
-		case []interface{}:
-			for _, item := range rawContent {
-				if itemMap, ok := item.(map[string]interface{}); ok {
-					if text, exists := itemMap["text"].(string); exists {
-						b.WriteString(text)
-						b.WriteByte(' ')
-					}
-				}
-			}
-			b.WriteByte('\n')
-		default:
-			contentBytes, _ := json.Marshal(rawContent)
-			if len(contentBytes) > 0 {
-				b.Write(contentBytes)
-				b.WriteByte('\n')
-			}
+		text, ok := chatMessageText(msg)
+		if !ok {
+			continue
 		}
+		b.WriteString(text)
+		b.WriteByte('\n')
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// chatMessageText flattens one chat message's content to plain text.  The
+// second return value is false only when the content is of an unknown
+// shape that could not be marshaled at all, in which case the message
+// contributes nothing.  Shared by PromptText and AutoRouteContext so both
+// see the same text.
+func chatMessageText(msg openai.ChatCompletionMessageParamUnion) (string, bool) {
+	switch rawContent := msg.GetContent().AsAny().(type) {
+	case string:
+		return rawContent, true
+	case *string:
+		return *rawContent, true
+	case []interface{}:
+		var b strings.Builder
+		for _, item := range rawContent {
+			if itemMap, ok := item.(map[string]interface{}); ok {
+				if text, exists := itemMap["text"].(string); exists {
+					b.WriteString(text)
+					b.WriteByte(' ')
+				}
+			}
+		}
+		return b.String(), true
+	default:
+		contentBytes, _ := json.Marshal(rawContent)
+		if len(contentBytes) == 0 {
+			return "", false
+		}
+		return string(contentBytes), true
+	}
 }
 
 // HasMultimodalContent reports whether any message carries non-text content

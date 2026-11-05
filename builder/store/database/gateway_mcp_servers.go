@@ -19,6 +19,7 @@ type GatewayMCPServers struct {
 	Description string         `bun:",nullzero" json:"description"`
 	Protocol    string         `bun:",notnull" json:"protocol"`
 	URL         string         `bun:",notnull" json:"url"`
+	SvcName     string         `bun:",nullzero" json:"svc_name"`
 	Headers     map[string]any `bun:",type:jsonb,nullzero" json:"headers"`
 	Env         map[string]any `bun:",type:jsonb,nullzero" json:"env"`
 	Metadata    map[string]any `bun:",type:jsonb,nullzero" json:"metadata"`
@@ -28,21 +29,24 @@ type GatewayMCPServers struct {
 
 // GatewayMCPServerView is the row type for the gateway_mcp_servers_view view.
 type GatewayMCPServerView struct {
-	bun.BaseModel `bun:"table:gateway_mcp_servers_view"`
-	ID            int64          `bun:"id,pk" json:"id"`
-	Name          string         `bun:"name,notnull" json:"name"`
-	Description   string         `bun:"description" json:"description"`
-	Protocol      string         `bun:"protocol,notnull" json:"protocol"`
-	URL           string         `bun:"url,notnull" json:"url"`
-	Headers       map[string]any `bun:"headers,type:jsonb" json:"headers"`
-	Env           map[string]any `bun:"env,type:jsonb" json:"env"`
-	Metadata      map[string]any `bun:"metadata,type:jsonb" json:"metadata"`
-	Capabilities  map[string]any `bun:"capabilities,type:jsonb" json:"capabilities"`
-	Status        string         `bun:"status" json:"status"`
-	Error         string         `bun:"error" json:"error"`
-	RefreshedAt   *time.Time     `bun:"refreshed_at" json:"refreshed_at"`
-	CreatedAt     time.Time      `bun:"created_at" json:"created_at"`
-	UpdatedAt     time.Time      `bun:"updated_at" json:"updated_at"`
+	bun.BaseModel   `bun:"table:gateway_mcp_servers_view"`
+	ID              int64          `bun:"id,pk" json:"id"`
+	Name            string         `bun:"name,notnull" json:"name"`
+	Description     string         `bun:"description" json:"description"`
+	Protocol        string         `bun:"protocol,notnull" json:"protocol"`
+	URL             string         `bun:"url,notnull" json:"url"`
+	SvcName         string         `bun:"svc_name" json:"svc_name"`
+	RepoPath        string         `bun:"repo_path" json:"repo_path"`
+	Headers         map[string]any `bun:"headers,type:jsonb" json:"headers"`
+	Env             map[string]any `bun:"env,type:jsonb" json:"env"`
+	Metadata        map[string]any `bun:"metadata,type:jsonb" json:"metadata"`
+	Capabilities    map[string]any `bun:"capabilities,type:jsonb" json:"capabilities"`
+	Status          string         `bun:"status" json:"status"`
+	Error           string         `bun:"error" json:"error"`
+	ProtocolVersion string         `bun:"protocol_version" json:"protocol_version"`
+	RefreshedAt     *time.Time     `bun:"refreshed_at" json:"refreshed_at"`
+	CreatedAt       time.Time      `bun:"created_at" json:"created_at"`
+	UpdatedAt       time.Time      `bun:"updated_at" json:"updated_at"`
 }
 
 // GatewayMCPServersStore provides database operations for GatewayMCPServers
@@ -178,10 +182,10 @@ func (s *gatewayMCPServersStoreImpl) applyGatewayMCPServerFilters(query *bun.Sel
 		filter.Search = strings.TrimSpace(filter.Search)
 		if filter.Search != "" {
 			if filter.ExactMatch {
-				query = query.Where("LOWER(name) = LOWER(?) OR LOWER(description) = LOWER(?)", strings.ToLower(filter.Search), strings.ToLower(filter.Search))
+				query = query.Where("LOWER(name) = LOWER(?) OR LOWER(description) = LOWER(?) OR LOWER(svc_name) = LOWER(?)", strings.ToLower(filter.Search), strings.ToLower(filter.Search), strings.ToLower(filter.Search))
 			} else {
 				searchPattern := "%" + filter.Search + "%"
-				query = query.Where("LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?)", searchPattern, searchPattern)
+				query = query.Where("LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?) OR LOWER(svc_name) LIKE LOWER(?)", searchPattern, searchPattern, searchPattern)
 			}
 		}
 	}

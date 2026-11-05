@@ -52,16 +52,16 @@ func TestAccountStatementDailySummaryStore_UpsertSummary(t *testing.T) {
 		byKey[s.UserUUID+"|"+strconv.FormatInt(s.SkuID, 10)+"|"+strconv.Itoa(int(s.Scene))+"|"+s.CustomerID] = s
 	}
 
-	a1 := byKey["user-a|1|" + strconv.Itoa(int(types.SceneModelInference)) + "|inst-1"]
+	a1 := byKey["user-a|1|"+strconv.Itoa(int(types.SceneModelInference))+"|inst-1"]
 	require.Equal(t, 30.0, a1.TotalValue)
 	require.Equal(t, 3.0, a1.TotalConsumption)
 	require.Equal(t, int64(2), a1.TotalCount)
 
-	a2 := byKey["user-a|2|" + strconv.Itoa(int(types.SceneModelInference)) + "|inst-1"]
+	a2 := byKey["user-a|2|"+strconv.Itoa(int(types.SceneModelInference))+"|inst-1"]
 	require.Equal(t, 5.0, a2.TotalValue)
 	require.Equal(t, int64(1), a2.TotalCount)
 
-	b1 := byKey["user-b|1|" + strconv.Itoa(int(types.SceneSpace)) + "|inst-2"]
+	b1 := byKey["user-b|1|"+strconv.Itoa(int(types.SceneSpace))+"|inst-2"]
 	require.Equal(t, 7.0, b1.TotalValue)
 
 	// re-run must be idempotent (upsert overwrites, no duplicate rows)
@@ -138,10 +138,10 @@ func TestAccountStatementDailySummaryStore_UpsertSummary_MixedNullAndZeroDimensi
 		customerID any
 		value      float64
 	}{
-		{nil, nil, -10},    // NULL, NULL
-		{0, "", -20},       // zero, empty
-		{nil, "", -30},     // NULL, empty
-		{0, nil, -40},      // zero, NULL
+		{nil, nil, -10}, // NULL, NULL
+		{0, "", -20},    // zero, empty
+		{nil, "", -30},  // NULL, empty
+		{0, nil, -40},   // zero, NULL
 	}
 	for _, r := range rows {
 		_, err := db.Core.ExecContext(ctx, `INSERT INTO account_statements
@@ -329,6 +329,40 @@ func TestAccountStatementDailySummaryStore_ListByUserAndSku_FiltersAndPaging(t *
 	require.Nil(t, err)
 	require.Equal(t, 3, total)
 	require.Len(t, results, 1)
+}
+
+func TestAccountStatementDailySummaryStore_ListByUserAndSku_ExcludesApiScenes(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountStatementDailySummaryStoreWithDB(db)
+
+	jul1 := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	// one compute scene + the two API (serverless token) scenes the consumption
+	// report must exclude
+	seed := []database.AccountStatementDailySummary{
+		{BillDate: jul1, UserUUID: "user-a", SkuID: 1, Scene: types.SceneModelInference, CustomerID: "inst-1", TotalValue: 10, TotalCount: 1, MinID: 10, MinCreatedAt: jul1},
+		{BillDate: jul1, UserUUID: "user-a", SkuID: 2, Scene: types.SceneModelServerless, CustomerID: "inst-2", TotalValue: 20, TotalCount: 1, MinID: 20, MinCreatedAt: jul1},
+		{BillDate: jul1, UserUUID: "user-a", SkuID: 3, Scene: types.SceneMultiModalServerless, CustomerID: "inst-3", TotalValue: 30, TotalCount: 1, MinID: 30, MinCreatedAt: jul1},
+	}
+	for _, s := range seed {
+		_, err := db.Core.NewInsert().Model(&s).Exec(ctx)
+		require.Nil(t, err)
+	}
+
+	// no scene filter -> API scenes (15/16) excluded, only the compute scene remains
+	results, total, err := store.ListByUserAndSku(ctx, types.ActStatementsReq{
+		StartTime: "2026-07-01",
+		EndTime:   "2026-08-01",
+		Per:       10,
+		Page:      1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, results, 1)
+	require.Equal(t, types.SceneModelInference, results[0].Scene)
+	require.Equal(t, 10.0, results[0].TotalValue)
 }
 
 func TestAccountStatementDailySummaryStore_UpsertSummaryAndCheckpoint(t *testing.T) {

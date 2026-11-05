@@ -67,8 +67,9 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 			SessionHeader: "X-Session-ID",
 			HashReplicas:  128,
 		},
-		Metadata:   map[string]any{"tasks": []any{"text-generation"}},
-		ModelSizeB: 7.5,
+		Metadata:     map[string]any{"tasks": []any{"text-generation"}},
+		ModelSizeB:   7.5,
+		AccessPolicy: types.LLMAccessPolicyPublic,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.CreateLLMConfig(ctx, req)
 	require.Nil(t, err)
@@ -112,9 +113,10 @@ func TestLLMServiceComponent_CreateLLMConfig_TrimsWhitespace(t *testing.T) {
 	}
 	dbLLMConfig := &database.LLMConfig{ID: 123, ModelName: "new-model", Type: 16, Enabled: true}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
-		ModelName: "new-model",
-		Type:      16,
-		Enabled:   true,
+		ModelName:    "new-model",
+		Type:         16,
+		Enabled:      true,
+		AccessPolicy: types.LLMAccessPolicyPublic,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.CreateLLMConfig(ctx, req)
 	require.Nil(t, err)
@@ -169,9 +171,10 @@ func TestLLMServiceComponent_CreateLLMConfig_MultiType(t *testing.T) {
 		Enabled:   true,
 	}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
-		ModelName: "multi-type-model",
-		Type:      database.LLMTypeSummaryReadme | database.LLMTypeAigatewayExternal,
-		Enabled:   true,
+		ModelName:    "multi-type-model",
+		Type:         database.LLMTypeSummaryReadme | database.LLMTypeAigatewayExternal,
+		Enabled:      true,
+		AccessPolicy: types.LLMAccessPolicyPublic,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.CreateLLMConfig(ctx, req)
 	require.Nil(t, err)
@@ -1041,9 +1044,10 @@ func TestLLMServiceComponent_CreateLLMConfig_HealthCheckPersistedFalse(t *testin
 	}
 	dbLLMConfig := &database.LLMConfig{ID: 123, ModelName: "test-model", Type: 16, Enabled: true}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
-		ModelName: "test-model",
-		Type:      16,
-		Enabled:   true,
+		ModelName:    "test-model",
+		Type:         16,
+		Enabled:      true,
+		AccessPolicy: types.LLMAccessPolicyPublic,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.CreateLLMConfig(ctx, req)
 	require.Nil(t, err)
@@ -1086,9 +1090,10 @@ func TestLLMServiceComponent_CreateLLMConfig_HealthCheckPersistedTrue(t *testing
 	}
 	dbLLMConfig := &database.LLMConfig{ID: 123, ModelName: "test-model", Type: 16, Enabled: true}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
-		ModelName: "test-model",
-		Type:      16,
-		Enabled:   true,
+		ModelName:    "test-model",
+		Type:         16,
+		Enabled:      true,
+		AccessPolicy: types.LLMAccessPolicyPublic,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.CreateLLMConfig(ctx, req)
 	require.Nil(t, err)

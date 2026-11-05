@@ -1,12 +1,18 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -21,13 +27,22 @@ func NewMirrorHandler(config *config.Config) (*MirrorHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &MirrorHandler{
+	handler := &MirrorHandler{
 		mirror: mc,
-	}, nil
+	}
+	if err := configureBatchMirrorHandler(handler, mc); err != nil {
+		return nil, err
+	}
+	return handler, nil
+}
+
+type batchMirrorComponent interface {
+	BatchCreate(ctx context.Context, req types.BatchCreateMirrorReq) error
 }
 
 type MirrorHandler struct {
-	mirror component.MirrorComponent
+	mirror      component.MirrorComponent
+	batchMirror batchMirrorComponent
 }
 
 // CreateMirrorRepo godoc
@@ -48,6 +63,15 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	var req types.CreateMirrorRepoReq
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
+		// A decoded URL may be invalid even when its derived source fields are missing.
+		// Prioritize that error only after successful JSON decoding; preserve transport errors.
+		var fieldErrors validator.ValidationErrors
+		if errors.As(err, &fieldErrors) && req.SourceGitCloneUrl != "" {
+			if sourceErr := component.ValidateMirrorSourceURL(req.SourceGitCloneUrl); sourceErr != nil {
+				httpbase.BadRequestWithExt(ctx, sourceErr)
+				return
+			}
+		}
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -57,6 +81,10 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	}
 
 	req.CurrentUser = currentUser
+	// Mirror API requests default to public while preserving explicit private settings.
+	if req.Private == nil {
+		req.Private = new(false)
+	}
 	req.AllowAutoCreateOrganization = req.AutoCreateOrganization == nil || *req.AutoCreateOrganization
 	m, err := h.mirror.CreateMirrorRepo(ctx.Request.Context(), req)
 	if err != nil {
@@ -83,7 +111,8 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 
 // GetMirrorRepos godoc
 // @Security     ApiKey
-// @Summary      Get mirror repos, used for admin
+// @Summary      Get repositories in the multi-source synchronization queue
+// @Description  Requires asset/sync administrator permission.
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -91,6 +120,8 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 // @Param        page query int false "page" default(1)
 // @Success      200  {object}  types.Response{data=[]types.MirrorRepo,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repos [get]
 func (h *MirrorHandler) Repos(ctx *gin.Context) {
@@ -183,39 +214,6 @@ func (h *MirrorHandler) Statistics(ctx *gin.Context) {
 	httpbase.OK(ctx, statusCounts)
 }
 
-// BatchCreateMirrors godoc
-// @Security     ApiKey
-// @Summary      Batch create mirrors
-// @Tags         Mirror
-// @Accept       json
-// @Produce      json
-// @Param        body body types.BatchCreateMirrorReq true "body"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /mirror/batch [post]
-func (h *MirrorHandler) BatchCreate(ctx *gin.Context) {
-	var req types.BatchCreateMirrorReq
-	err := ctx.ShouldBindJSON(&req)
-	if err != nil {
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	err = h.mirror.BatchCreate(ctx.Request.Context(), req)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to bluk create mirrors", slog.Any("error", err))
-		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
-			httpbase.BadRequestWithExt(ctx, err)
-			return
-		}
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	httpbase.OK(ctx, nil)
-}
-
 // DeleteMirrorTasks godoc
 // @Security     ApiKey
 // @Summary      Batch create mirrors
@@ -275,4 +273,99 @@ func (h *MirrorHandler) ResolveNamespace(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, resp)
+}
+
+// MirrorMetricsHandler serves the independent, read-only mirror telemetry API.
+type MirrorMetricsHandler struct {
+	read func(context.Context, types.MirrorMetricsQuery) (*types.MirrorMetricsResponse, error)
+}
+
+// NewMirrorMetricsHandler builds telemetry dependencies without requiring Redis
+// availability at process startup. Outages are reported only by this endpoint.
+func NewMirrorMetricsHandler(cfg *config.Config) *MirrorMetricsHandler {
+	comp := component.NewMirrorMetricsComponent(cfg)
+	return &MirrorMetricsHandler{read: comp.Get}
+}
+
+// Get godoc
+// @Security ApiKey
+// @Summary Read ephemeral mirror runtime metrics
+// @Tags Mirror
+// @Produce json
+// @Param service query string false "all, repo, or lfs"
+// @Param instance_id query string false "Instance UUID"
+// @Param task_id query string false "Task ID"
+// @Param page query int false "Task page" default(1)
+// @Param per query int false "Tasks per page, at most 100" default(20)
+// @Param instance_page query int false "Instance page" default(1)
+// @Param instance_per query int false "Instances per page, at most 100" default(20)
+// @Success 200 {object} types.Response{data=types.MirrorMetricsResponse}
+// @Failure 400 {object} types.APIBadRequest
+// @Failure 401 {object} types.APIUnauthorized
+// @Failure 403 {object} types.APIForbidden
+// @Failure 503 {object} types.APIInternalServerError
+// @Router /admin/asset/mirror/metrics [get]
+func (h *MirrorMetricsHandler) Get(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	// Reject malformed encoding before extracting supported metric filters.
+	values, err := url.ParseQuery(c.Request.URL.RawQuery)
+	if err != nil {
+		httpbase.BadRequest(c, "invalid metrics query parameter")
+		return
+	}
+	query, err := parseMirrorMetricsQuery(values)
+	if err != nil {
+		httpbase.BadRequest(c, err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	result, err := h.read(ctx, query)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, httpbase.R{Msg: "mirror metrics cache unavailable"})
+		return
+	}
+	httpbase.OK(c, result)
+}
+
+// parseMirrorMetricsQuery validates supported filters and ignores unrelated query parameters.
+// Instance UUIDs are canonicalized; numeric IDs remain strings throughout the response contract.
+func parseMirrorMetricsQuery(values url.Values) (types.MirrorMetricsQuery, error) {
+	q := types.MirrorMetricsQuery{Service: "all", Page: 1, Per: 20, InstancePage: 1, InstancePer: 20}
+	invalid := errors.New("invalid metrics query parameter")
+	for _, name := range []string{"service", "instance_id", "task_id", "page", "per", "instance_page", "instance_per"} {
+		if vals, present := values[name]; present && (len(vals) != 1 || vals[0] == "") {
+			return q, invalid
+		}
+	}
+	if v := values.Get("service"); v != "" {
+		if v != "all" && v != "repo" && v != "lfs" {
+			return q, invalid
+		}
+		q.Service = v
+	}
+	if v := values.Get("instance_id"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			return q, invalid
+		}
+		q.InstanceID = id.String()
+	}
+	if v := values.Get("task_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 || strconv.FormatInt(id, 10) != v {
+			return q, invalid
+		}
+		q.TaskID = v
+	}
+	for name, target := range map[string]*int{"page": &q.Page, "per": &q.Per, "instance_page": &q.InstancePage, "instance_per": &q.InstancePer} {
+		if v := values.Get(name); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 || (name == "per" || name == "instance_per") && n > 100 {
+				return q, invalid
+			}
+			*target = n
+		}
+	}
+	return q, nil
 }

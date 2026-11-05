@@ -55,6 +55,40 @@ func ParseUpstreamCostResourceID(resourceID string) (upstreamID int64, err error
 	return upstreamID, nil
 }
 
+// ModelIDFromResourceID extracts the model identifier carried by a gateway
+// billing resource_id:
+//   - thirdparty://{model_id} -> {model_id}
+//   - csghub://serverless/{repo_path} -> {repo_path}
+//   - csghub://inference/{repo_path} -> {repo_path} only when includeInference
+//     is true
+//
+// It returns an empty string for unrecognized, unsupported or incomplete
+// resource ids.
+func ModelIDFromResourceID(resourceID string, includeInference bool) string {
+	switch {
+	case strings.HasPrefix(resourceID, ExternalLLMResourcePrefix):
+		return strings.TrimPrefix(resourceID, ExternalLLMResourcePrefix)
+	case strings.HasPrefix(resourceID, CSGHubResourcePrefix):
+		// The type segment and the model segment must both be present:
+		// csghub:///ns/model and csghub://serverless/ are incomplete and
+		// resolve to no model id. Inference types are only accepted when the
+		// caller opts in via includeInference, so billing falls back to
+		// CustomerID for everything else instead of matching a quota by a
+		// malformed or unsupported key.
+		resourceType, modelID, found := strings.Cut(strings.TrimPrefix(resourceID, CSGHubResourcePrefix), "/")
+		if !found || modelID == "" {
+			return ""
+		}
+		if resourceType == ProviderTypeServerless ||
+			(includeInference && resourceType == ProviderTypeInference) {
+			return modelID
+		}
+		return ""
+	default:
+		return ""
+	}
+}
+
 // Provider type values for Metadata[MetaKeyLLMType].
 const (
 	ProviderTypeServerless  = "serverless"
@@ -65,24 +99,25 @@ const (
 // InternalModelInfo carries deploy-derived fields for an internal (csghub) upstream.
 // It is stored as part of UpstreamMetadata in the upstream's metadata JSONB column.
 type InternalModelInfo struct {
-	CSGHubModelID    string `json:"csghub_model_id"`   // deploy.Repository.Path
-	RepoName         string `json:"repo_name"`         // deploy.Repository.Name
-	HFPath           string `json:"hf_path"`           // deploy.Repository.HFPath
-	LegacyModelID    string `json:"legacy_model_id"`   // BuildModelID result (matches public model ID)
-	OwnerUUID        string `json:"owner_uuid"`        // deploy.User.UUID
-	OwnerUsername    string `json:"owner_username"`    // deploy.User.Username
-	OwnerNamespace   string `json:"owner_namespace"`   // billing/listing namespace (username or org)
-	OwnerType        string `json:"owner_type"`        // "user" or "organization"
-	ClusterID        string `json:"cluster_id"`        // deploy.ClusterID
-	SvcName          string `json:"svc_name"`          // deploy.SvcName
-	SvcType          int    `json:"svc_type"`          // deploy.Type
-	ImageID          string `json:"image_id"`          // deploy.ImageID
-	RuntimeFramework string `json:"runtime_framework"` // deploy.RuntimeFramework
-	EngineArgs       string `json:"engine_args"`       // deploy.EngineArgs
-	Task             string `json:"task"`              // deploy.Task
-	SourceDeployID   int64  `json:"source_deploy_id"`  // deploy.ID
-	CreatedAt        int64  `json:"created_at"`        // deploy.CreatedAt.Unix()
-	Host             string `json:"host,omitempty"`    // k8s Host header override (hostname from deploy endpoint)
+	CSGHubModelID    string   `json:"csghub_model_id"`   // deploy.Repository.Path
+	RepoName         string   `json:"repo_name"`         // deploy.Repository.Name
+	HFPath           string   `json:"hf_path"`           // deploy.Repository.HFPath
+	LegacyModelID    string   `json:"legacy_model_id"`   // BuildModelID result (matches public model ID)
+	OwnerUUID        string   `json:"owner_uuid"`        // deploy.User.UUID
+	OwnerUsername    string   `json:"owner_username"`    // deploy.User.Username
+	OwnerNamespace   string   `json:"owner_namespace"`   // billing/listing namespace (username or org)
+	OwnerType        string   `json:"owner_type"`        // "user" or "organization"
+	ClusterID        string   `json:"cluster_id"`        // deploy.ClusterID
+	SvcName          string   `json:"svc_name"`          // deploy.SvcName
+	SvcType          int      `json:"svc_type"`          // deploy.Type
+	ImageID          string   `json:"image_id"`          // deploy.ImageID
+	RuntimeFramework string   `json:"runtime_framework"` // deploy.RuntimeFramework
+	EngineArgs       string   `json:"engine_args"`       // deploy.EngineArgs
+	Task             string   `json:"task"`              // deploy.Task (raw single task; exact-match consumers rely on it)
+	Tasks            []string `json:"tasks,omitempty"`   // sync-owned capability labels (see InternalModelSyncTasks)
+	SourceDeployID   int64    `json:"source_deploy_id"`  // deploy.ID
+	CreatedAt        int64    `json:"created_at"`        // deploy.CreatedAt.Unix()
+	Host             string   `json:"host,omitempty"`    // k8s Host header override (hostname from deploy endpoint)
 	// 1-public, 2-private, 3-extension in future
 	SecureLevel int `json:"secure_level"`
 }
@@ -254,6 +289,11 @@ type UpstreamConfig struct {
 	// appended). When false the URL is a base URL and the client protocol
 	// path is appended for natively supported API formats.
 	IsFullURL bool `json:"is_full_url"`
+	// Priority is the routing channel tier of this upstream (0..100): higher
+	// numbers are preferred for non-low-priority callers, zero (the default)
+	// is the low-priority channel. Callers whose user priority is lower than
+	// an upstream's priority never route to it.
+	Priority int `json:"priority"`
 	// SupportedEndpoints maps a protocol (chat / responses / messages) to an
 	// optional per-protocol endpoint URL. An empty value means the protocol
 	// is served by the main URL field (full URL as-is, or base URL with the
@@ -459,9 +499,70 @@ func probeURLFor(rawURL string, format ApiFormat) (string, bool) {
 // csghubDeployServesChat reports whether a CSGHub deploy with the given
 // InternalModelInfo.Task serves chat completions. An unknown task ("") keeps
 // the chat probe (LLM deploys are the norm); known multimodal tasks opt out.
+// Task always carries the raw single deploy task (the expanded capability
+// labels live in InternalModelInfo.Tasks), so the exact-match comparison
+// here stays meaningful.
 func csghubDeployServesChat(task string) bool {
 	t := strings.ToLower(strings.TrimSpace(task))
 	return t == "" || t == "text-generation"
+}
+
+// textGenerationExpandingTasks lists deploy tasks that produce text output in
+// addition to their primary (multimodal) capability. Each is synced with the
+// text-generation label appended to InternalModelInfo.Tasks so /models
+// filtering by task=text-generation also surfaces these models.
+var textGenerationExpandingTasks = map[string]bool{
+	string(ImageText2Text): true,
+}
+
+// InternalModelSyncTasks maps a deploy's pipeline task to the capability
+// labels persisted in InternalModelInfo.Tasks. A multimodal task that also
+// generates text (currently image-text-to-text) expands to both labels; any
+// other task yields a single-label list carrying the task as-is. Task itself
+// keeps the raw single deploy task so exact-match consumers are unaffected.
+//
+// typed-decisions is deliberately not expanded to text-generation: decision
+// models answer typed questions through SystemOne, not chat completions.
+func InternalModelSyncTasks(task string) []string {
+	t := strings.ToLower(strings.TrimSpace(task))
+	switch {
+	case t == "":
+		return nil
+	case textGenerationExpandingTasks[t]:
+		return []string{string(ImageText2Text), string(TextGeneration)}
+	default:
+		return []string{task}
+	}
+}
+
+// EngineServesSystemOne reports whether a deploy engine implements the
+// SystemOne (typed decisions) API. Only these engines can serve a deploy whose
+// task is typed-decisions; llama.cpp and amd-llama.cpp still need the decision
+// model task, which callers check separately.
+func EngineServesSystemOne(runtimeFramework string) bool {
+	switch InferenceEngine(strings.ToLower(strings.TrimSpace(runtimeFramework))) {
+	case Laya, LlamaCpp, AMDLlamaCpp:
+		return true
+	default:
+		return false
+	}
+}
+
+// TaskLabels returns the capability labels of an internal model: the
+// sync-owned Tasks list when present, otherwise the raw single Task (rows
+// synced before Tasks existed). The returned slice aliases the receiver's
+// Tasks field — callers must not modify it.
+func (i *InternalModelInfo) TaskLabels() []string {
+	if i == nil {
+		return nil
+	}
+	if len(i.Tasks) > 0 {
+		return i.Tasks
+	}
+	if i.Task == "" {
+		return nil
+	}
+	return []string{i.Task}
 }
 
 // EffectiveSampleEndpoint resolves the health-check / connection-test probe
@@ -672,10 +773,13 @@ type LLMConfig struct {
 	Repo               *RepositoryLite  `json:"repo"`
 	NeedSensitiveCheck bool             `json:"need_sensitive_check"`
 	ModelSizeB         float64          `json:"model_size_b,omitempty"`
-	IsAvailable        bool             `json:"is_available"`
-	AvailabilityReason string           `json:"availability_reason,omitempty"`
-	CreatedAt          time.Time        `json:"created_at"`
-	UpdatedAt          time.Time        `json:"updated_at"`
+	// AccessPolicy controls who can view and call the model:
+	// LLMAccessPolicyPublic (default) or LLMAccessPolicyWhitelist.
+	AccessPolicy       string    `json:"access_policy"`
+	IsAvailable        bool      `json:"is_available"`
+	AvailabilityReason string    `json:"availability_reason,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type PromptPrefix struct {
@@ -698,6 +802,70 @@ type SearchLLMConfig struct {
 	AvailableFirst bool `json:"available_first"`
 }
 
+// GatewayModelListQuery carries the aigateway /v1/models list filters that
+// LLMConfigStore.ListGatewayModels pushes down to SQL. Field semantics mirror
+// the in-memory model list filters of the aigateway component.
+type GatewayModelListQuery struct {
+	// Keyword is a fuzzy, case-insensitive match on the public model ID
+	// (legacy_model_id for internal models, model_name for external ones).
+	Keyword string `json:"keyword"`
+	// LLMTypes filters by provider type: external_llm | serverless | inference.
+	LLMTypes []string `json:"llm_types"`
+	// Task filters by pipeline task (exact element match, case-insensitive).
+	Task string `json:"task"`
+	// HasAssociatedModel filters by whether the model is linked to a CSGHub
+	// model repository (internal models, or externals with a linked repo).
+	HasAssociatedModel *bool `json:"has_associated_model"`
+	// CallerUUID drives visibility: private internal models are only visible
+	// to their deploy owner. Empty means anonymous (private models hidden).
+	CallerUUID string `json:"caller_uuid"`
+	// PinnedUserUUID enables pinned-first ordering for the given user.
+	// Empty disables it (CE edition or anonymous callers).
+	PinnedUserUUID string `json:"pinned_user_uuid"`
+	// RequireConfiguredPrice restricts serverless and external_llm models to
+	// those whose metering resource id has a configured enabled price in
+	// account_prices (the SaaS price-configured filter, evaluated against the
+	// inlined gatewayModelPricesQuery); inference models are unaffected.
+	// Disabled on CE/EE, which carry no prices.
+	RequireConfiguredPrice bool `json:"require_configured_price"`
+	// WhitelistCaller identifies who is listing; whitelist-mode models are
+	// only visible to callers with a matching grant. Nil means anonymous
+	// (whitelist models hidden).
+	WhitelistCaller *GatewayWhitelistCaller `json:"-"`
+}
+
+// GatewayWhitelistCaller identifies the authenticated caller of the
+// aigateway model query functions (catalogue listing, single-model fetch,
+// target resolution). It is the single identity carrier for those functions:
+// adding an identity dimension (e.g. whitelist enforcement) means adding a
+// field here, not changing every function signature.
+//
+// NsUUID doubles as the general identity: private-model owner visibility and
+// pinned-preference matching use it directly.
+type GatewayWhitelistCaller struct {
+	// NsUUID is the caller's namespace uuid: personal namespaces carry the
+	// user's uuid, organization namespaces the organization's uuid. Drives
+	// private-model owner visibility and pinned preferences. Empty for the
+	// platform SystemApiKey and anonymous callers.
+	NsUUID string
+	// NamespaceUUID is the whitelist matching uuid for API-key identities
+	// (the namespace uuid the api key resolves to — direct equality against
+	// grants). Empty for non-api-key identities.
+	NamespaceUUID string
+	// UserUUID is the whitelist matching uuid for personal JWT/token
+	// identities (grants match the user's own namespace uuid plus the
+	// namespace uuids of the organizations the user belongs to, expanded
+	// inline in SQL). Empty for non-personal identities.
+	UserUUID string
+	// UserPriority carries the caller's resolved upstream channel priority,
+	// derived once by the gateway user-tags middleware from the user's
+	// routing tags (low_priority / priority:<n>). nil means unrestricted:
+	// the caller may route to every upstream and prefers the highest tier.
+	UserPriority *int
+	// Bypass disables whitelist filtering (platform SystemApiKey).
+	Bypass bool
+}
+
 // AIGatewayMetricEventQuery is the filter/pagination parameters for listing
 // raw AI Gateway metric events (model request logs). StartTime/EndTime are
 // mandatory and filter on the minute-truncated bucket_time hypertable
@@ -705,7 +873,8 @@ type SearchLLMConfig struct {
 type AIGatewayMetricEventQuery struct {
 	StartTime    time.Time `json:"start_time"`     // required, bucket_time >= StartTime
 	EndTime      time.Time `json:"end_time"`       // required, bucket_time <= EndTime
-	Model        string    `json:"model"`          // optional exact match
+	Model        string    `json:"model"`          // optional exact match (upstream model)
+	RequestModel string    `json:"request_model"`  // optional exact match (requested model)
 	StatusCode   int       `json:"status_code"`    // optional exact match, 0 means all
 	Username     string    `json:"username"`       // optional exact match
 	APIKeyMasked string    `json:"api_key_masked"` // optional exact match
@@ -728,8 +897,11 @@ type AIGatewayMetricEventLog struct {
 	// the global product timezone ("2006-01-02 15:04:05"); empty for rows
 	// written before the diagnostics columns existed, so the frontend can
 	// fall back to CreatedAt.
-	StartTime           string `json:"start_time,omitempty"`
-	CreatedAt           string `json:"created_at"`
+	StartTime string `json:"start_time,omitempty"`
+	CreatedAt string `json:"created_at"`
+	// RequestModel is the model ID the client asked for; Model is the
+	// upstream model that served the request.
+	RequestModel        string `json:"request_model"`
 	Model               string `json:"model"`
 	Provider            string `json:"provider"`
 	APIKeyMasked        string `json:"api_key_masked"`
@@ -741,6 +913,7 @@ type AIGatewayMetricEventLog struct {
 	LatencyMs           int64  `json:"latency_ms"`
 	TTFTMs              int64  `json:"ttft_ms"`
 	QueueWaitMs         int64  `json:"queue_wait_ms"`
+	QueueDepth          int64  `json:"queue_depth"`
 	PromptTokens        int64  `json:"prompt_tokens"`
 	CompletionTokens    int64  `json:"completion_tokens"`
 	TotalTokens         int64  `json:"total_tokens"`
@@ -766,6 +939,7 @@ type UpdateLLMConfigReq struct {
 	NeedSensitiveCheck *bool             `json:"need_sensitive_check"`
 	RepoID             *int64            `json:"repo_id"`
 	ModelSizeB         *float64          `json:"model_size_b"`
+	AccessPolicy       *string           `json:"access_policy"`
 }
 
 type UpdatePromptPrefixReq struct {
@@ -785,6 +959,47 @@ type CreateLLMConfigReq struct {
 	RepoID             *int64           `json:"repo_id"`
 	NeedSensitiveCheck bool             `json:"need_sensitive_check"`
 	ModelSizeB         float64          `json:"model_size_b,omitempty"`
+	AccessPolicy       string           `json:"access_policy,omitempty"` // defaults to LLMAccessPolicyPublic when empty
+}
+
+// Access policy modes for LLM configs (AI Gateway model access whitelist).
+const (
+	// LLMAccessPolicyPublic allows every registered user and valid API key.
+	LLMAccessPolicyPublic = "public"
+	// LLMAccessPolicyWhitelist restricts access to the explicit grants of the config.
+	LLMAccessPolicyWhitelist = "whitelist"
+)
+
+// Subject types of an LLM config access grant.
+const (
+	// LLMAuthorizationSubjectUser grants a single individual user.
+	LLMAuthorizationSubjectUser = "user"
+	// LLMAuthorizationSubjectOrganization grants every member of an organization.
+	LLMAuthorizationSubjectOrganization = "organization"
+)
+
+// LLMConfigModelGrant is the API representation of one access grant on an
+// LLM config. Namespace is the granted namespace path (a username or an
+// organization path), which is also the identity the gateway authenticates.
+type LLMConfigModelGrant struct {
+	ID            int64  `json:"id"`
+	LLMConfigID   int64  `json:"llm_config_id"`
+	NamespaceType string `json:"namespace_type"` // user | organization
+	Namespace     string `json:"namespace"`
+	// NamespaceUUID is the uuid of the granted namespace (gateway enforcement key).
+	NamespaceUUID string    `json:"namespace_uuid"`
+	Note          string    `json:"note,omitempty"`
+	CreatedBy     string    `json:"created_by,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// CreateLLMConfigModelGrantReq adds a namespace to an LLM config's access
+// whitelist. NamespaceType must be user|organization and Namespace the
+// corresponding namespace path (username or organization path).
+type CreateLLMConfigModelGrantReq struct {
+	NamespaceType string `json:"namespace_type" binding:"required,oneof=user organization"`
+	Namespace     string `json:"namespace" binding:"required"`
+	Note          string `json:"note" binding:"max=200"`
 }
 
 type CreatePromptPrefixReq struct {
@@ -811,9 +1026,12 @@ type CreateUpstreamReq struct {
 	// SupportedEndpoints maps a declared protocol to an optional per-protocol
 	// endpoint URL (empty value = the main URL serves that protocol).
 	SupportedEndpoints map[ApiFormat]string `json:"supported_endpoints,omitempty"`
-	CapacityPolicy     *CapacityPolicy      `json:"capacity_policy,omitempty"`
-	Tags               map[string]string    `json:"tags,omitempty"`
-	Metadata           *UpstreamMetadata    `json:"metadata,omitempty"`
+	// Priority is the routing channel tier (0 = low-priority channel, the
+	// default; higher numbers are preferred by non-low-priority callers).
+	Priority       int               `json:"priority,omitempty"`
+	CapacityPolicy *CapacityPolicy   `json:"capacity_policy,omitempty"`
+	Tags           map[string]string `json:"tags,omitempty"`
+	Metadata       *UpstreamMetadata `json:"metadata,omitempty"`
 }
 
 // UpdateUpstreamReq is the request to update an existing upstream.
@@ -839,9 +1057,12 @@ type UpdateUpstreamReq struct {
 	// omitted (keep stored value), non-nil = replace.
 	IsFullURL          *bool                 `json:"is_full_url"`
 	SupportedEndpoints *map[ApiFormat]string `json:"supported_endpoints"`
-	CapacityPolicy     **CapacityPolicy      `json:"capacity_policy"`
-	Tags               *map[string]string    `json:"tags"`
-	Metadata           *UpstreamMetadata     `json:"metadata"`
+	// Priority follows the same pointer contract: nil = keep the stored
+	// value, non-nil = replace (negative values are clamped to 0).
+	Priority       *int               `json:"priority"`
+	CapacityPolicy **CapacityPolicy   `json:"capacity_policy"`
+	Tags           *map[string]string `json:"tags"`
+	Metadata       *UpstreamMetadata  `json:"metadata"`
 }
 
 // CheckUpstreamReq is the request to test connectivity to an upstream endpoint.

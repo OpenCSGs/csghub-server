@@ -19,7 +19,11 @@ type modelResolverAdapter struct {
 }
 
 func (a *modelResolverAdapter) ResolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header, opts plan.ResolveOptions) (*types.ModelTarget, error) {
-	resolved, err := a.handler.resolveModelTargetWithOptions(ctx, nsUUID, modelID, headers, modelTargetResolveOptions{
+	resolved, err := a.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{
+		Ctx:                ctx,
+		Caller:             opts.Caller,
+		ModelID:            modelID,
+		Headers:            headers,
 		RequiredUpstreamID: opts.RequiredUpstreamID,
 		ClientProtocol:     opts.ClientProtocol,
 	})
@@ -77,6 +81,10 @@ func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
 // build-tag-gated SetMetricsModelTarget helper.  In CE builds the helper is a
 // no-op, so this adapter is also a no-op.
 type metricsEnricherAdapter struct{}
+
+func (metricsEnricherAdapter) SetRequestModel(c *gin.Context, requestModel string) {
+	SetMetricsRequestModel(c, requestModel)
+}
 
 func (metricsEnricherAdapter) SetModelTarget(c *gin.Context, modelID string, target *types.ModelTarget, isStream bool) {
 	var rt *resolvedModelTarget

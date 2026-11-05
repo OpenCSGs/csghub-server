@@ -63,7 +63,7 @@
         "other": "{{.instance_type}} provision request field {{.field}} must not be empty"
     },
     "error.AGENT-ERR-21": {
-        "other": "llm model {{.model}} is not available for {{.instance_type}}"
+        "other": "Available text-generation model {{.model}} was not found"
     },
     "error.AGENT-ERR-22": {
         "other": "csgclaw template not found for repository path {{.repo_path}}"
@@ -94,5 +94,23 @@
     },
     "error.AGENT-ERR-31": {
         "other": "Agent runtime lifecycle conflict"
+    },
+    "error.AGENT-ERR-35": {
+        "other": "field {{.field}} is managed by the code repository and cannot be modified"
+    },
+    "error.AGENT-ERR-36": {
+        "other": "Model {{.model}} must support text-generation for {{.instance_type}}"
+    },
+    "error.AGENT-ERR-37": {
+        "other": "Model {{.model}} must support function calling for {{.instance_type}}"
+    },
+    "error.AGENT-ERR-38": {
+        "other": "No eligible default model is available for {{.instance_type}}"
+    },
+    "error.AGENT-ERR-39": {
+        "other": "AI Gateway model service configuration is invalid"
+    },
+    "error.AGENT-ERR-40": {
+        "other": "Failed to retrieve AI Gateway models for {{.instance_type}}"
     }
 }

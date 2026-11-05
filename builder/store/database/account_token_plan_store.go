@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +25,7 @@ type AccountTokenPlanStore interface {
 	Create(ctx context.Context, input AccountTokenPlan) (*AccountTokenPlan, error)
 	GetByID(ctx context.Context, id int64) (*AccountTokenPlan, error)
 	GetByPlanCode(ctx context.Context, planCode string) (*AccountTokenPlan, error)
+	GetByPlanName(ctx context.Context, planName string) (*AccountTokenPlan, error)
 	Update(ctx context.Context, input AccountTokenPlan) (*AccountTokenPlan, error)
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, req types.AcctTokenPlanListReq) ([]AccountTokenPlan, int, error)
@@ -35,6 +37,20 @@ type AccountTokenPlanStore interface {
 	GetActiveInstanceByNsUUID(ctx context.Context, req types.AcctTokenPlanNSGetReq) ([]AccountTokenPlanInstance, error)
 	ListActiveTokenPlanNamespaces(ctx context.Context) ([]string, error)
 	ListInstancesByNsUUID(ctx context.Context, req types.AcctTokenPlanHistoryReq) ([]AccountTokenPlanInstance, int, error)
+	// ListInstances returns one page of token plan subscription instances for
+	// the admin listing, newest instance first, together with the total count
+	// of every instance matching the same filters. Every filter is optional.
+	ListInstances(ctx context.Context, req types.AcctTokenPlanInstanceListReq) ([]AccountTokenPlanInstance, types.AcctTokenPlanInstanceTotalValue, error)
+	// ListPeriodsForNS returns the paginated billing periods of a namespace,
+	// newest period first, each paired with the plan version bound to it. The
+	// result also carries the total count and summed amount of every period
+	// matching the filter.
+	ListPeriodsForNS(ctx context.Context, filter types.AcctTokenPlanPeriodsFilter) (*TokenPlanPeriodListResult, error)
+	// ListPeriodsForInstance returns the paginated billing periods of one
+	// instance for the admin listing, highest period number first, each paired
+	// with the plan version bound to it. The result also carries the total
+	// count and summed amount of every period matching the filter.
+	ListPeriodsForInstance(ctx context.Context, filter types.AcctTokenPlanInstancePeriodsFilter) (*TokenPlanPeriodListResult, error)
 	CreateInstanceWithPeriod(ctx context.Context, req types.AcctTokenPlanPurchaseReq) (*AccountTokenPlanInstance, error)
 	UpgradeInstance(ctx context.Context, req types.AcctTokenPlanUpgradeReq) (*AccountTokenPlanInstance, error)
 	RecycleNSInstance(ctx context.Context, req types.AcctTokenPlanRecycleReq) error
@@ -49,6 +65,10 @@ type AccountTokenPlanStore interface {
 	// period, in one read-only query. It returns nil when the instance has no
 	// period yet; Quota is nil when the period does not cover the model.
 	GetLatestPeriodModelQuota(ctx context.Context, instanceID int64, modelID string) (*TokenPlanPeriodQuota, error)
+	// GetPeriodByEvent reconciles the namespace's token plan subscription and
+	// returns the legitimate paid billing period whose window covers the
+	// metering event time, or nil when no period qualifies.
+	GetPeriodByEvent(ctx context.Context, req types.AcctTokenPlanNSEventReq) (*AccountTokenPlanInstancePeriod, error)
 }
 
 type InstanceReconcileResult struct {
@@ -97,10 +117,69 @@ func NewAccountTokenPlanStoreWithDB(db *DB) AccountTokenPlanStore {
 	}
 }
 
+// tokenPlanNameLockKey namespaces the advisory lock that serializes token plan
+// writes sharing a plan name, so it cannot collide with other advisory locks.
+func tokenPlanNameLockKey(planName string) string {
+	return "account_token_plan_name:" + planName
+}
+
+// lockTokenPlanName is the first step of the duplicate-name guard: it takes a
+// transaction-scoped advisory lock on the plan name so concurrent creates and
+// renames of the same name run one at a time. The lock is released when the
+// transaction commits or rolls back.
+func lockTokenPlanName(ctx context.Context, tx bun.Tx, planName string) error {
+	_, err := tx.NewRaw("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", tokenPlanNameLockKey(planName)).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire token plan name lock of %q, error: %w", planName, err)
+	}
+	return nil
+}
+
+// assertTokenPlanNameAvailable is the second step of the duplicate-name guard:
+// with the name lock held, it re-checks the table so a writer that committed
+// while this transaction waited is observed. excludeID lets an update keep its
+// own name, and soft-deleted plans are ignored by the model's soft-delete scope.
+func assertTokenPlanNameAvailable(ctx context.Context, tx bun.Tx, planName string, excludeID int64) error {
+	q := tx.NewSelect().Model((*AccountTokenPlan)(nil)).Where("plan_name = ?", planName)
+	if excludeID > 0 {
+		q = q.Where("id <> ?", excludeID)
+	}
+	exists, err := q.Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("check token plan name %q, error: %w", planName, err)
+	}
+	if exists {
+		return errorx.TokenPlanNameDuplicate(planName)
+	}
+	return nil
+}
+
+// tokenPlanWriteError preserves the duplicate-name error so callers and the API
+// layer can match it, and converts every other database error as usual.
+func tokenPlanWriteError(err error) error {
+	if errors.Is(err, errorx.ErrTokenPlanNameDuplicate) {
+		return err
+	}
+	return errorx.HandleDBError(err, nil)
+}
+
 func (a *accountTokenPlanStoreImpl) Create(ctx context.Context, input AccountTokenPlan) (*AccountTokenPlan, error) {
-	res, err := a.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
-	if err := assertAffectedOneRow(res, err); err != nil {
-		return nil, errorx.HandleDBError(err, nil)
+	err := a.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := lockTokenPlanName(ctx, tx, input.PlanName); err != nil {
+			return err
+		}
+		if err := assertTokenPlanNameAvailable(ctx, tx, input.PlanName, 0); err != nil {
+			return err
+		}
+
+		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err := assertAffectedOneRow(res, err); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, tokenPlanWriteError(err)
 	}
 	return &input, nil
 }
@@ -123,12 +202,32 @@ func (a *accountTokenPlanStoreImpl) GetByPlanCode(ctx context.Context, planCode 
 	return &result, nil
 }
 
+func (a *accountTokenPlanStoreImpl) GetByPlanName(ctx context.Context, planName string) (*AccountTokenPlan, error) {
+	var result AccountTokenPlan
+	err := a.db.Core.NewSelect().Model(&result).Where("plan_name = ?", planName).Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &result, nil
+}
+
 func (a *accountTokenPlanStoreImpl) Update(ctx context.Context, input AccountTokenPlan) (*AccountTokenPlan, error) {
 	err := a.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var locked AccountTokenPlan
 		err := tx.NewSelect().Model(&locked).Where("id = ?", input.ID).For("UPDATE").Scan(ctx)
 		if err != nil {
 			return err
+		}
+
+		// Only a rename can introduce a duplicate name; a no-op update must not
+		// conflict with the plan's own current name.
+		if input.PlanName != locked.PlanName {
+			if err := lockTokenPlanName(ctx, tx, input.PlanName); err != nil {
+				return err
+			}
+			if err := assertTokenPlanNameAvailable(ctx, tx, input.PlanName, input.ID); err != nil {
+				return err
+			}
 		}
 
 		res, err := tx.NewUpdate().Model(&input).WherePK().Returning("*").Exec(ctx, &input)
@@ -184,7 +283,7 @@ func (a *accountTokenPlanStoreImpl) Update(ctx context.Context, input AccountTok
 	})
 
 	if err != nil {
-		return nil, errorx.HandleDBError(err, nil)
+		return nil, tokenPlanWriteError(err)
 	}
 
 	return &input, nil
@@ -468,6 +567,486 @@ func (a *accountTokenPlanStoreImpl) ListInstancesByNsUUID(ctx context.Context, r
 	return result, total, nil
 }
 
+// ListInstances returns one page of token plan subscription instances for the
+// admin listing, newest instance first. Every filter is an optional pointer
+// that combines with AND: NsUUIDs matches any of the given namespaces,
+// CreatedAtStart and CreatedAtEnd bound the instance creation time in Unix
+// seconds with an inclusive start and an exclusive end, Status and PlanID
+// filter on the subscription state and the plan it binds to, and PlanCode
+// matches plans whose code contains it, ignoring case, including soft-deleted
+// plans so historical subscriptions remain reportable. Each instance is
+// enriched with the namespace path, the plan version of its latest billing
+// period and the summed amount and cost of all of its periods. Total counts
+// every instance matching the same filters, not only the returned page. All of
+// these reads share one transaction, so a concurrent renewal or statement
+// update cannot make the count, the rows and their sums disagree.
+func (a *accountTokenPlanStoreImpl) ListInstances(ctx context.Context, req types.AcctTokenPlanInstanceListReq) ([]AccountTokenPlanInstance, types.AcctTokenPlanInstanceTotalValue, error) {
+	var result []AccountTokenPlanInstance
+	var totalValue types.AcctTokenPlanInstanceTotalValue
+
+	applyFilters := func(q *bun.SelectQuery, planCodeIDs *bun.SelectQuery) *bun.SelectQuery {
+		if req.NsUUIDs != nil {
+			if len(*req.NsUUIDs) > 0 {
+				q = q.Where("ns_uuid IN (?)", bun.In(*req.NsUUIDs))
+			} else {
+				// An explicitly empty namespace list filters on nothing.
+				q = q.Where("1 = 0")
+			}
+		}
+		if req.Status != nil {
+			q = q.Where("status = ?", *req.Status)
+		}
+		if req.PlanID != nil {
+			q = q.Where("plan_id = ?", *req.PlanID)
+		}
+		if planCodeIDs != nil {
+			// The plan code only lives on the plan table, so instances are
+			// matched through the plans carrying that code.
+			q = q.Where("plan_id IN (?)", planCodeIDs)
+		}
+		if req.CreatedAtStart != nil {
+			q = q.Where("created_at >= ?", time.Unix(*req.CreatedAtStart, 0).In(config.GetGlobalTimeZone()))
+		}
+		if req.CreatedAtEnd != nil {
+			q = q.Where("created_at < ?", time.Unix(*req.CreatedAtEnd, 0).In(config.GetGlobalTimeZone()))
+		}
+		return q
+	}
+
+	// Every read of the page, its display fields and its totals runs in one
+	// transaction, so a concurrent renewal or statement update cannot make the
+	// count, the rows and their sums disagree.
+	err := a.db.Operator.Core.RunInTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead}, func(ctx context.Context, tx bun.Tx) error {
+		// A plan code filter has to read the plan table, so its subquery is
+		// built on the same transaction to keep every read of the listing on
+		// one connection.
+		var planCodeIDs *bun.SelectQuery
+		if req.PlanCode != nil {
+			// The plan code filter is a case-insensitive substring match, so a
+			// user can search a plan by part of its code. The wildcard
+			// characters are escaped to keep them literal instead of letting a
+			// query of "%" match every plan.
+			pattern := "%" + escapeLikePattern(strings.ToLower(*req.PlanCode)) + "%"
+			planCodeIDs = tx.NewSelect().
+				Model((*AccountTokenPlan)(nil)).
+				WhereAllWithDeleted().
+				Column("id").
+				Where("LOWER(plan_code) LIKE ? ESCAPE '\\'", pattern)
+		}
+
+		count, err := applyFilters(tx.NewSelect().Model((*AccountTokenPlanInstance)(nil)), planCodeIDs).Count(ctx)
+		if err != nil {
+			return err
+		}
+
+		err = applyFilters(tx.NewSelect().Model(&result), planCodeIDs).
+			Order("id DESC").
+			Limit(req.Per).
+			Offset((req.Page - 1) * req.Per).
+			Scan(ctx)
+		if err != nil {
+			return err
+		}
+		totalValue.Total = int(count)
+
+		if len(result) > 0 {
+			if err := a.fillInstanceDisplayFields(ctx, tx, result); err != nil {
+				return err
+			}
+			if err := a.fillInstancePeriodTotals(ctx, tx, result); err != nil {
+				return err
+			}
+		}
+
+		// The summed amount and cost cover every matching instance, not only the
+		// returned page, so they are computed from the ids matching the same
+		// filter without the pagination of the page being listed.
+		matchingIDs := applyFilters(tx.NewSelect(), planCodeIDs).
+			Model((*AccountTokenPlanInstance)(nil)).
+			Column("id")
+		filterTotals, err := a.sumInstancePeriodTotals(ctx, tx, matchingIDs)
+		if err != nil {
+			return err
+		}
+		totalValue.TotalAmount = filterTotals.TotalAmount
+		totalValue.TotalCost = filterTotals.TotalCost
+
+		return nil
+	})
+	if err != nil {
+		return nil, types.AcctTokenPlanInstanceTotalValue{}, errorx.HandleDBError(err, nil)
+	}
+
+	return result, totalValue, nil
+}
+
+// fillInstanceDisplayFields enriches each instance with the path of the
+// namespace that owns it and the plan version bound to its latest billing
+// period. Both are resolved with one batched query per field so a page of
+// instances does not fan out into per-row lookups. An instance whose namespace
+// or latest period is missing keeps a nil field rather than failing the page.
+func (a *accountTokenPlanStoreImpl) fillInstanceDisplayFields(ctx context.Context, tx bun.Tx, instances []AccountTokenPlanInstance) error {
+	nsUUIDs := make([]string, 0, len(instances))
+	seenNsUUID := make(map[string]struct{}, len(instances))
+	for i := range instances {
+		nsUUID := instances[i].NsUUID
+		if nsUUID == "" {
+			continue
+		}
+		if _, ok := seenNsUUID[nsUUID]; ok {
+			continue
+		}
+		seenNsUUID[nsUUID] = struct{}{}
+		nsUUIDs = append(nsUUIDs, nsUUID)
+	}
+
+	pathByNsUUID := map[string]string{}
+	if len(nsUUIDs) > 0 {
+		var namespaces []Namespace
+		err := tx.NewSelect().
+			Model(&namespaces).
+			Column("uuid").
+			Column("path").
+			Where("uuid IN (?)", bun.In(nsUUIDs)).
+			Scan(ctx)
+		if err != nil {
+			return err
+		}
+		for _, namespace := range namespaces {
+			pathByNsUUID[namespace.UUID] = namespace.Path
+		}
+	}
+
+	instanceIDs := make([]int64, 0, len(instances))
+	for i := range instances {
+		instanceIDs = append(instanceIDs, instances[i].ID)
+	}
+
+	// The latest period of an instance is the one with the greatest id, so the
+	// highest period per instance is picked with a single DISTINCT ON pass.
+	var latestPeriods []AccountTokenPlanInstancePeriod
+	err := tx.NewSelect().
+		Model(&latestPeriods).
+		ColumnExpr("DISTINCT ON (instance_id) instance_id, id, plan_version_id").
+		Where("instance_id IN (?)", bun.In(instanceIDs)).
+		OrderExpr("instance_id ASC, id DESC").
+		Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	versionByInstanceID := make(map[int64]int64, len(latestPeriods))
+	for _, period := range latestPeriods {
+		versionByInstanceID[period.InstanceID] = period.PlanVersionID
+	}
+
+	versionIDs := make([]int64, 0, len(versionByInstanceID))
+	seenVersionID := make(map[int64]struct{}, len(versionByInstanceID))
+	for _, versionID := range versionByInstanceID {
+		if versionID <= 0 {
+			continue
+		}
+		if _, ok := seenVersionID[versionID]; ok {
+			continue
+		}
+		seenVersionID[versionID] = struct{}{}
+		versionIDs = append(versionIDs, versionID)
+	}
+
+	versionByID := map[int64]*AccountTokenPlanVersion{}
+	if len(versionIDs) > 0 {
+		var versions []AccountTokenPlanVersion
+		err := tx.NewSelect().
+			Model(&versions).
+			Where("id IN (?)", bun.In(versionIDs)).
+			Scan(ctx)
+		if err != nil {
+			return err
+		}
+		for i := range versions {
+			versionByID[versions[i].ID] = &versions[i]
+		}
+	}
+
+	for i := range instances {
+		instance := &instances[i]
+		instance.NamespacePath = pathByNsUUID[instance.NsUUID]
+		if versionID, ok := versionByInstanceID[instance.ID]; ok {
+			instance.LatestPlanVersion = versionByID[versionID]
+		}
+	}
+	return nil
+}
+
+// fillInstancePeriodTotals sums the amount paid and the metered cost of every
+// billing period of each instance with one grouped query, so a page of
+// instances does not fan out into per-row period lookups. Both totals stay in
+// cents, as stored; converting them to yuan is the caller's job. An instance
+// without any period keeps both totals at zero.
+func (a *accountTokenPlanStoreImpl) fillInstancePeriodTotals(ctx context.Context, tx bun.Tx, instances []AccountTokenPlanInstance) error {
+	if len(instances) == 0 {
+		return nil
+	}
+
+	instanceIDs := make([]int64, 0, len(instances))
+	for i := range instances {
+		instanceIDs = append(instanceIDs, instances[i].ID)
+	}
+
+	var sums []struct {
+		InstanceID int64   `bun:"instance_id"`
+		Amount     float64 `bun:"amount"`
+		CostAmount float64 `bun:"cost_amount"`
+	}
+	err := tx.NewSelect().
+		Model((*AccountTokenPlanInstancePeriod)(nil)).
+		Column("instance_id").
+		ColumnExpr("COALESCE(SUM(amount), 0) AS amount").
+		ColumnExpr("COALESCE(SUM(cost_amount), 0) AS cost_amount").
+		Where("instance_id IN (?)", bun.In(instanceIDs)).
+		Group("instance_id").
+		Scan(ctx, &sums)
+	if err != nil {
+		return err
+	}
+
+	amountByInstanceID := make(map[int64]float64, len(sums))
+	costByInstanceID := make(map[int64]float64, len(sums))
+	for _, sum := range sums {
+		amountByInstanceID[sum.InstanceID] = sum.Amount
+		costByInstanceID[sum.InstanceID] = sum.CostAmount
+	}
+
+	for i := range instances {
+		instance := &instances[i]
+		instance.TotalAmount = amountByInstanceID[instance.ID]
+		instance.TotalCost = costByInstanceID[instance.ID]
+	}
+	return nil
+}
+
+// sumInstancePeriodTotals sums the amount paid and the metered cost of the
+// billing periods of every instance whose id the given subquery returns, in
+// cents. Filtering by a subquery of instance ids keeps the sums independent of
+// the pagination of the page being listed.
+func (a *accountTokenPlanStoreImpl) sumInstancePeriodTotals(ctx context.Context, tx bun.Tx, matchingIDs *bun.SelectQuery) (types.AcctTokenPlanInstanceTotalValue, error) {
+	var totals types.AcctTokenPlanInstanceTotalValue
+
+	var sums []struct {
+		Amount     float64 `bun:"amount"`
+		CostAmount float64 `bun:"cost_amount"`
+	}
+	err := tx.NewSelect().
+		TableExpr("account_token_plan_instance_periods AS p").
+		Where("p.instance_id IN (?)", matchingIDs).
+		ColumnExpr("COALESCE(SUM(p.amount), 0) AS amount").
+		ColumnExpr("COALESCE(SUM(p.cost_amount), 0) AS cost_amount").
+		Scan(ctx, &sums)
+	if err != nil {
+		return totals, err
+	}
+	if len(sums) > 0 {
+		totals.TotalAmount = sums[0].Amount
+		totals.TotalCost = sums[0].CostAmount
+	}
+	return totals, nil
+}
+
+// ListPeriodsForNS returns the paginated billing periods of a namespace,
+// newest period first. The date range filters on the period start time:
+// StartAt is inclusive and EndAt is exclusive, and a zero value leaves that
+// side open. A non-empty Status filters on the period billing status. Each
+// period carries the plan version bound to it so callers can show the plan
+// terms that applied when the period was created. Total and TotalAmount cover
+// every period matching the filter, not only the returned page. TotalCost is
+// left zero because namespace-facing responses do not expose metered cost.
+func (a *accountTokenPlanStoreImpl) ListPeriodsForNS(ctx context.Context, filter types.AcctTokenPlanPeriodsFilter) (*TokenPlanPeriodListResult, error) {
+	var periods []AccountTokenPlanInstancePeriod
+	result := &TokenPlanPeriodListResult{}
+
+	err := a.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		newQuery := func() *bun.SelectQuery {
+			q := tx.NewSelect().
+				TableExpr("account_token_plan_instance_periods AS p").
+				Join("JOIN account_token_plan_instances AS i ON i.id = p.instance_id").
+				Where("i.ns_uuid = ?", filter.NsUUID)
+			if filter.StartAt > 0 {
+				q = q.Where("p.start_at >= ?", filter.StartAt)
+			}
+			if filter.EndAt > 0 {
+				q = q.Where("p.start_at < ?", filter.EndAt)
+			}
+			if filter.Status != "" {
+				q = q.Where("p.status = ?", filter.Status)
+			}
+			return q
+		}
+
+		count, err := newQuery().Count(ctx)
+		if err != nil {
+			return err
+		}
+		result.Total = count
+
+		var sum struct {
+			TotalAmount int64 `bun:"total_amount"`
+		}
+		err = newQuery().
+			ColumnExpr("COALESCE(SUM(p.amount), 0) AS total_amount").
+			Scan(ctx, &sum)
+		if err != nil {
+			return err
+		}
+		result.TotalAmount = sum.TotalAmount
+
+		err = newQuery().
+			ColumnExpr("p.*").
+			OrderExpr("p.start_at DESC, p.id DESC").
+			Limit(filter.Per).
+			Offset((filter.Page-1)*filter.Per).
+			Scan(ctx, &periods)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	planVersions, err := a.loadPlanVersions(ctx, periods)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Periods = make([]TokenPlanPeriodWithPlanVersion, 0, len(periods))
+	for i := range periods {
+		result.Periods = append(result.Periods, TokenPlanPeriodWithPlanVersion{
+			AccountTokenPlanInstancePeriod: periods[i],
+			PlanVersion:                    planVersions[periods[i].PlanVersionID],
+		})
+	}
+	return result, nil
+}
+
+// ListPeriodsForInstance returns the paginated billing periods of one token
+// plan instance for the admin listing, highest period number first. The date
+// range filters on the period start time: StartAt is inclusive and EndAt is
+// exclusive, and a zero value leaves that side open. A non-empty Status
+// filters on the period billing status. Each period carries the plan version
+// bound to it so the admin console can show the plan terms that applied when
+// the period was created. Total, TotalAmount and TotalCost cover every period
+// matching the filter, not only the returned page. An instance without
+// periods, or an unknown instance id, yields an empty result rather than an
+// error.
+func (a *accountTokenPlanStoreImpl) ListPeriodsForInstance(ctx context.Context, filter types.AcctTokenPlanInstancePeriodsFilter) (*TokenPlanPeriodListResult, error) {
+	var periods []AccountTokenPlanInstancePeriod
+	result := &TokenPlanPeriodListResult{}
+
+	err := a.db.Operator.Core.RunInTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead}, func(ctx context.Context, tx bun.Tx) error {
+		newQuery := func() *bun.SelectQuery {
+			q := tx.NewSelect().
+				TableExpr("account_token_plan_instance_periods AS p").
+				Where("p.instance_id = ?", filter.InstanceID)
+			if filter.StartAt > 0 {
+				q = q.Where("p.start_at >= ?", filter.StartAt)
+			}
+			if filter.EndAt > 0 {
+				q = q.Where("p.start_at < ?", filter.EndAt)
+			}
+			if filter.Status != "" {
+				q = q.Where("p.status = ?", filter.Status)
+			}
+			return q
+		}
+
+		count, err := newQuery().Count(ctx)
+		if err != nil {
+			return err
+		}
+		result.Total = count
+
+		var sum struct {
+			TotalAmount int64   `bun:"total_amount"`
+			TotalCost   float64 `bun:"total_cost"`
+		}
+		err = newQuery().
+			ColumnExpr("COALESCE(SUM(p.amount), 0) AS total_amount").
+			ColumnExpr("COALESCE(SUM(p.cost_amount), 0) AS total_cost").
+			Scan(ctx, &sum)
+		if err != nil {
+			return err
+		}
+		result.TotalAmount = sum.TotalAmount
+		result.TotalCost = sum.TotalCost
+
+		// The admin listing is ordered by the billing period number so the
+		// newest cycle of the subscription comes first; the id breaks ties for
+		// periods that share a number after a failed renewal.
+		err = newQuery().
+			ColumnExpr("p.*").
+			OrderExpr("p.period_no DESC, p.id DESC").
+			Limit(filter.Per).
+			Offset((filter.Page-1)*filter.Per).
+			Scan(ctx, &periods)
+		return err
+	})
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	planVersions, err := a.loadPlanVersions(ctx, periods)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Periods = make([]TokenPlanPeriodWithPlanVersion, 0, len(periods))
+	for i := range periods {
+		result.Periods = append(result.Periods, TokenPlanPeriodWithPlanVersion{
+			AccountTokenPlanInstancePeriod: periods[i],
+			PlanVersion:                    planVersions[periods[i].PlanVersionID],
+		})
+	}
+	return result, nil
+}
+
+// loadPlanVersions loads the plan versions referenced by periods and indexes
+// them by version ID.
+func (a *accountTokenPlanStoreImpl) loadPlanVersions(ctx context.Context, periods []AccountTokenPlanInstancePeriod) (map[int64]*AccountTokenPlanVersion, error) {
+	result := make(map[int64]*AccountTokenPlanVersion, len(periods))
+	if len(periods) == 0 {
+		return result, nil
+	}
+
+	ids := make([]int64, 0, len(periods))
+	seen := make(map[int64]struct{}, len(periods))
+	for _, period := range periods {
+		if period.PlanVersionID <= 0 {
+			continue
+		}
+		if _, ok := seen[period.PlanVersionID]; ok {
+			continue
+		}
+		seen[period.PlanVersionID] = struct{}{}
+		ids = append(ids, period.PlanVersionID)
+	}
+	if len(ids) == 0 {
+		return result, nil
+	}
+
+	var versions []AccountTokenPlanVersion
+	err := a.db.Core.NewSelect().Model(&versions).
+		Where("id IN (?)", bun.In(ids)).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	for i := range versions {
+		result[versions[i].ID] = &versions[i]
+	}
+	return result, nil
+}
+
 // loadLatestPeriodAndVersion fills the latest billing period and its bound
 // plan version on an instance. Instances without any period are left empty.
 func loadLatestPeriodAndVersion(ctx context.Context, tx bun.Tx, instance *AccountTokenPlanInstance) error {
@@ -622,6 +1201,72 @@ func (a *accountTokenPlanStoreImpl) GetLatestPeriodModelQuota(ctx context.Contex
 		periodQuota.Quota = quota
 	}
 	return periodQuota, nil
+}
+
+// GetPeriodByEvent returns the legitimate token plan billing period that
+// covers one metering event, or nil when the event has no token plan coverage.
+//
+// The namespace's instances are reconciled first in the same transaction, as
+// of RequestTime (the processing time) — an event that arrives just after the
+// current period window closed must roll the subscription into its renewal
+// period — and the covering period is then selected by EventTime (the usage
+// time, which may be in the past) instead of "latest", so a late or replayed
+// event is attributed to the period its usage actually happened in.
+//
+// A period qualifies purely by its window covering the event time
+// (start_at <= event time < end_at): neither the period status nor the
+// instance status is filtered, so an unpaid renewal period still covers the
+// events of its window, and cancellation keeps the current period's quota
+// until the window ends. When several periods match — an upgrade leaves the
+// previous period's window overlapping the new one — the newest period wins.
+//
+// The reconcile runs with RunWayAutoScan semantics: a renewal whose fee
+// deduction fails (e.g. insufficient balance) is logged and leaves the new
+// period unpaid instead of failing the lookup; the unpaid period still covers
+// the event by window.
+func (a *accountTokenPlanStoreImpl) GetPeriodByEvent(ctx context.Context, req types.AcctTokenPlanNSEventReq) (*AccountTokenPlanInstancePeriod, error) {
+	var result *AccountTokenPlanInstancePeriod
+
+	err := a.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		err := reconcileNSTokenPlanInstances(ctx, tx,
+			ReconcileReq{
+				NsUUID:      req.NsUUID,
+				RequestTime: req.RequestTime,
+				EventUUID:   req.EventUUID,
+				CurrentUser: req.CurrentUser,
+				Source:      types.RunWayAutoScan,
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		var period AccountTokenPlanInstancePeriod
+		eventTimeUnix := req.EventTime.Unix()
+		err = tx.NewSelect().
+			TableExpr("account_token_plan_instance_periods AS p").
+			ColumnExpr("p.*").
+			Join("JOIN account_token_plan_instances AS i ON i.id = p.instance_id").
+			Where("i.ns_uuid = ?", req.NsUUID).
+			Where("p.start_at <= ?", eventTimeUnix).
+			Where("p.end_at > ?", eventTimeUnix).
+			OrderExpr("p.id DESC").
+			Limit(1).
+			Scan(ctx, &period)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		result = &period
+		return nil
+	})
+
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return result, nil
 }
 
 func (a *accountTokenPlanStoreImpl) CreateInstanceWithPeriod(ctx context.Context, req types.AcctTokenPlanPurchaseReq) (*AccountTokenPlanInstance, error) {
@@ -1183,6 +1828,7 @@ func checkAndCreatePeriodFeeRecord(ctx context.Context, tx bun.Tx,
 			instance.Status = types.SubscriptionStatusExpired
 			instance.ExpiredAt = requestTime.Unix()
 			currentPeriod.Reason = types.BillingReasonBalanceInsufficient
+			currentPeriod.EndAt = requestTime.Unix() // close period
 		} else {
 			currentPeriod.Reason = types.BillingReasonDeductFailed
 		}

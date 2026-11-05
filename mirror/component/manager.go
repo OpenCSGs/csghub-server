@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"sync"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -26,8 +25,6 @@ type managerComponentImpl struct {
 	// syncCache removes LFS upload cache when a mirror task is cancelled.
 	syncCacheMu sync.Mutex
 	syncCache   mirrorcache.Cache
-	// partSize identifies the LFS multipart cache namespace used by current config.
-	partSize string
 }
 
 func NewMirrorComponent(cfg *config.Config) (ManagerComponent, error) {
@@ -42,7 +39,6 @@ func NewMirrorComponent(cfg *config.Config) (ManagerComponent, error) {
 		mirrorTaskStore: database.NewMirrorTaskJobStore(),
 		jobClient:       jobClient,
 		config:          cfg,
-		partSize:        strconv.Itoa(cfg.Mirror.PartSize),
 	}, nil
 }
 
@@ -93,7 +89,7 @@ func (c *managerComponentImpl) deleteRepoSyncCache(ctx context.Context, repoID i
 			return
 		}
 	}
-	if err := syncCache.DeleteRepoSyncCache(ctx, repoID, c.partSize); err != nil {
+	if err := syncCache.DeleteRepoSyncCache(ctx, repoID); err != nil {
 		slog.WarnContext(ctx, "failed to delete mirror task cache", slog.Any("error", err), slog.Int64("repo_id", repoID))
 	}
 }

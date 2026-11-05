@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	multisync_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
-	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -34,17 +33,6 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	modelParamsValid := true
 	mc := initializeTestMultiSyncComponent(context.TODO(), t)
 	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
-	authorizer.EXPECT().Check(mock.Anything, mock.Anything).Return(rebac.Decision{Allowed: false}, nil).Times(5)
-	var userObjectOwnerTupleWritten bool
-	authorizer.EXPECT().Write(mock.Anything, mock.Anything).Run(func(_ context.Context, relationships []rebac.Relationship) {
-		for _, relationship := range relationships {
-			if relationship.Subject == rebac.UserSubject("sync-user-uuid") &&
-				relationship.Relation == rebac.RelationOwner &&
-				relationship.Object == rebac.UserObject("sync-user-uuid") {
-				userObjectOwnerTupleWritten = true
-			}
-		}
-	}).Return(nil).Times(5)
 	mc.mocks.stores.MultiSyncMock().EXPECT().GetLatest(ctx).Return(database.SyncVersion{
 		Version: 1,
 	}, nil)
@@ -334,7 +322,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 
 	err := mc.SyncAsClient(context.TODO(), mockedClient)
 	require.Nil(t, err)
-	require.True(t, userObjectOwnerTupleWritten)
+	authorizer.AssertNotCalled(t, "Write", mock.Anything, mock.Anything)
 
 }
 

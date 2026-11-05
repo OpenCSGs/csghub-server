@@ -1752,38 +1752,48 @@ func TestRepoHandler_MirrorSourceRepoAuthInvalid(t *testing.T) {
 	})
 }
 
-// TestRepoHandler_MirrorSourceBadRequest verifies malformed mirror source URLs return a bad request.
+// TestRepoHandler_MirrorSourceBadRequest verifies create and update map component source URL errors to HTTP 400.
 func TestRepoHandler_MirrorSourceBadRequest(t *testing.T) {
-	badRequestErr := errorx.BadRequest(errors.New("invalid source git clone url"), errorx.Ctx())
-	want := httpbase.R{Code: "REQ-ERR-0", Msg: "REQ-ERR-0: invalid source git clone url"}
+	for _, tc := range []struct {
+		name string
+		err  error
+		code string
+	}{
+		{"generic request error", errorx.BadRequest(errors.New("invalid source git clone url"), errorx.Ctx()), "REQ-ERR-0"},
+		{"source URL error", errorx.MirrorSourceURLInvalid(errors.New("invalid source git clone url"), errorx.Ctx()), "MIRROR-ERR-8"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want := httpbase.R{Code: tc.code, Msg: tc.code + ": invalid source git clone url"}
 
-	t.Run("CreateMirror", func(t *testing.T) {
-		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-			return rp.CreateMirror
+			t.Run("CreateMirror", func(t *testing.T) {
+				tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+					return rp.CreateMirror
+				})
+				tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.CreateMirrorReq{
+					SourceUrl: "https://example.com/source/repo.git",
+				})
+				tester.mocks.mirror.EXPECT().CreateMirror(tester.Ctx(), mock.Anything).Return(nil, tc.err)
+
+				tester.Execute()
+
+				tester.ResponseEqSimple(t, http.StatusBadRequest, want)
+			})
+
+			t.Run("UpdateMirror", func(t *testing.T) {
+				tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+					return rp.UpdateMirror
+				})
+				tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.UpdateMirrorReq{
+					SourceUrl: "https://example.com/source/repo.git",
+				})
+				tester.mocks.mirror.EXPECT().UpdateMirror(tester.Ctx(), mock.Anything).Return(nil, tc.err)
+
+				tester.Execute()
+
+				tester.ResponseEqSimple(t, http.StatusBadRequest, want)
+			})
 		})
-		tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.CreateMirrorReq{
-			SourceUrl: "https://example.com/source/repo.git",
-		})
-		tester.mocks.mirror.EXPECT().CreateMirror(tester.Ctx(), mock.Anything).Return(nil, badRequestErr)
-
-		tester.Execute()
-
-		tester.ResponseEqSimple(t, http.StatusBadRequest, want)
-	})
-
-	t.Run("UpdateMirror", func(t *testing.T) {
-		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-			return rp.UpdateMirror
-		})
-		tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.UpdateMirrorReq{
-			SourceUrl: "https://example.com/source/repo.git",
-		})
-		tester.mocks.mirror.EXPECT().UpdateMirror(tester.Ctx(), mock.Anything).Return(nil, badRequestErr)
-
-		tester.Execute()
-
-		tester.ResponseEqSimple(t, http.StatusBadRequest, want)
-	})
+	}
 }
 
 func TestRepoHandler_DeleteMirror(t *testing.T) {

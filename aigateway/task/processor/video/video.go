@@ -15,7 +15,7 @@ import (
 	aigatewaycomp "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	taskprocessor "opencsg.com/csghub-server/aigateway/task/processor"
-	aigwtypes "opencsg.com/csghub-server/aigateway/types"
+	types "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
@@ -78,11 +78,24 @@ func (p *videoProcessor) Refresh(ctx context.Context, ref taskprocessor.Generati
 	return providerResponseToGenerationStatus(ref, providerResp), nil
 }
 
-func (p *videoProcessor) resolveModel(ctx context.Context, ref taskprocessor.GenerationRef) (*aigwtypes.Model, error) {
+func (p *videoProcessor) resolveModel(ctx context.Context, ref taskprocessor.GenerationRef) (*types.Model, error) {
 	if p.openaiComponent == nil {
 		return nil, fmt.Errorf("aigateway async generation openai component is not configured")
 	}
-	model, err := p.openaiComponent.GetModelByID(ctx, ref.OwnerUUID, ref.ModelID)
+	// The video task was accepted through the planner, which already
+	// enforced the model access whitelist at submission time; the async
+	// processor reloads the config with filtering bypassed, carrying the
+	// task owner identity for downstream use. NsUUID feeds the owner-only
+	// visibility check for private internal models, NamespaceUUID is the
+	// API-key identity the whitelist would match against.
+	model, err := p.openaiComponent.GetModelByID(ctx, &types.GetModelByIDReq{
+		Caller: &commontypes.GatewayWhitelistCaller{
+			NsUUID:        ref.OwnerUUID,
+			NamespaceUUID: ref.OwnerUUID,
+			Bypass:        true,
+		},
+		ModelID: ref.ModelID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +124,7 @@ func (p *videoProcessor) resolveModel(ctx context.Context, ref taskprocessor.Gen
 	return &modelCopy, nil
 }
 
-func (p *videoProcessor) fetchProviderResponse(ctx context.Context, model *aigwtypes.Model, providerReq *text2video.ProviderRequest) ([]byte, error) {
+func (p *videoProcessor) fetchProviderResponse(ctx context.Context, model *types.Model, providerReq *text2video.ProviderRequest) ([]byte, error) {
 	targetURL, err := providerRequestURL(model.Endpoint, providerReq)
 	if err != nil {
 		return nil, err
@@ -124,7 +137,7 @@ func (p *videoProcessor) fetchProviderResponse(ctx context.Context, model *aigwt
 		req.Header.Set("Content-Type", providerReq.ContentType)
 	}
 	req.Header.Set("Accept-Encoding", "identity")
-	if err := aigwtypes.ApplyRequestAuthHeaders(req.Header, model.AuthHead); err != nil {
+	if err := types.ApplyRequestAuthHeaders(req.Header, model.AuthHead); err != nil {
 		slog.WarnContext(ctx, "invalid async generation auth head", slog.Any("error", err), slog.String("model", model.ID))
 	}
 	if p.httpClient == nil {

@@ -1266,3 +1266,102 @@ func TestSetEngineArgs(t *testing.T) {
 		})
 	}
 }
+
+func TestSetEngineArgs_MultiNodeParallelism(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.Default()
+
+	vllmTemplates := []types.EngineArg{
+		{Name: "tensor-parallel-size", Value: "1", Format: "--tensor-parallel-size %s"},
+		{Name: "data-parallel-size", Value: "1", Format: "--data-parallel-size %s"},
+		{Name: "pipeline-parallel-size", Value: "1", Format: "--pipeline-parallel-size %s"},
+	}
+	sglangTemplates := []types.EngineArg{
+		{Name: "tensor-parallel-size", Value: "1", Format: "--tensor-parallel-size %s"},
+		{Name: "dp-size", Value: "1", Format: "--dp-size %s"},
+	}
+
+	tests := []struct {
+		name             string
+		templates        []types.EngineArg
+		hardware         string
+		deployEngineArgs string
+		pd               bool
+		want             string
+	}{
+		{
+			name:      "multi-node template defaults are corrected",
+			templates: vllmTemplates,
+			hardware:  `{"gpu":{"num":"1"},"replicas":2}`,
+			want:      " --tensor-parallel-size 1 --data-parallel-size 1 --pipeline-parallel-size 2",
+		},
+		{
+			name:      "multi-node with multiple gpus per node uses gpus as tp",
+			templates: vllmTemplates,
+			hardware:  `{"gpu":{"num":"8"},"replicas":2}`,
+			want:      " --tensor-parallel-size 8 --data-parallel-size 1 --pipeline-parallel-size 2",
+		},
+		{
+			name:             "multi-node mismatched user values are corrected",
+			templates:        vllmTemplates,
+			hardware:         `{"gpu":{"num":"4"},"replicas":2}`,
+			deployEngineArgs: `{"tensor-parallel-size":"2","data-parallel-size":"2"}`,
+			want:             " --tensor-parallel-size 4 --data-parallel-size 1 --pipeline-parallel-size 2",
+		},
+		{
+			name:             "multi-node matching user topology is kept",
+			templates:        vllmTemplates,
+			hardware:         `{"gpu":{"num":"4"},"replicas":2}`,
+			deployEngineArgs: `{"tensor-parallel-size":"8"}`,
+			want:             " --tensor-parallel-size 8 --data-parallel-size 1 --pipeline-parallel-size 1",
+		},
+		{
+			name:      "single node is untouched",
+			templates: vllmTemplates,
+			hardware:  `{"gpu":{"num":"2"},"replicas":1}`,
+			want:      " --tensor-parallel-size 1 --data-parallel-size 1 --pipeline-parallel-size 1",
+		},
+		{
+			name:      "pd deploy is untouched",
+			templates: vllmTemplates,
+			hardware:  `{"gpu":{"num":"1"},"replicas":2}`,
+			pd:        true,
+			want:      " --tensor-parallel-size 1 --data-parallel-size 1 --pipeline-parallel-size 1",
+		},
+		{
+			name:      "engine without pipeline parallel template is untouched",
+			templates: sglangTemplates,
+			hardware:  `{"gpu":{"num":"1"},"replicas":2}`,
+			want:      " --tensor-parallel-size 1 --dp-size 1",
+		},
+		{
+			name:      "invalid hardware is untouched",
+			templates: vllmTemplates,
+			hardware:  `not-json`,
+			want:      " --tensor-parallel-size 1 --data-parallel-size 1 --pipeline-parallel-size 1",
+		},
+		{
+			name:             "null engine args does not panic",
+			templates:        vllmTemplates,
+			hardware:         `{"gpu":{"num":"1"},"replicas":2}`,
+			deployEngineArgs: `null`,
+			want:             " --tensor-parallel-size 1 --data-parallel-size 1 --pipeline-parallel-size 1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			activity := &DeployActivity{}
+			envMap := make(map[string]string)
+			deployInfo := &database.Deploy{EngineArgs: tt.deployEngineArgs, Hardware: tt.hardware}
+			if tt.pd {
+				deployInfo.PD = &types.PDConfig{}
+			}
+			rc := runtimeConfig{EngineArgsTemplates: tt.templates}
+
+			activity.setEngineArgs(ctx, logger, envMap, deployInfo, rc, "")
+
+			require.Equal(t, tt.want, envMap["ENGINE_ARGS"])
+		})
+	}
+}

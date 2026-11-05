@@ -11,7 +11,6 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/git"
-	"opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -74,10 +73,6 @@ func buildRepositoryDeletionWorker(cfg *config.Config) (*component.RepositoryDel
 	if err != nil {
 		return nil, fmt.Errorf("create S3 client: %w", err)
 	}
-	authorizer, err := factory.NewAuthorizer()
-	if err != nil {
-		return nil, fmt.Errorf("create ReBAC authorizer: %w", err)
-	}
 	// Repository package removal only needs the package path snapshot and S3.
 	// A repository store is intentionally unnecessary after the row is soft-deleted.
 	packageCleaner := component.NewRepositoryPackageSyncer(cfg, nil, gitServer, s3Client)
@@ -94,7 +89,6 @@ func buildRepositoryDeletionWorker(cfg *config.Config) (*component.RepositoryDel
 	return component.NewRepositoryDeletionWorker(
 		gitServer,
 		resourceCleaner,
-		authorizer,
 		database.NewRepositoryAuthorizationStore(),
 		database.NewRepositoryDeletionFinalizer(),
 		database.NewRepositoryDeletionMirrorTaskStore(),
@@ -107,6 +101,7 @@ func newRepositoryDeletionRiverConfig(worker river.Worker[workhub.RepositoryDele
 		maxWorkers = 1
 	}
 	return &river.Config{
+		JobLease: &river.JobLeaseConfig{},
 		Queues: map[string]river.QueueConfig{
 			workhub.RepositoryDeletionQueue: {MaxWorkers: maxWorkers},
 		},

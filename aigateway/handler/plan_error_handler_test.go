@@ -84,6 +84,41 @@ func TestHandleOpenAIPlanError_ModelNotFound(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
+	// OpenAI renders an unknown model as 404 + type invalid_request_error.
+	var body struct {
+		Error types.Error `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if body.Error.Code != "model_not_found" {
+		t.Errorf("expected code model_not_found, got %q", body.Error.Code)
+	}
+	if body.Error.Type != "invalid_request_error" {
+		t.Errorf("expected type invalid_request_error, got %q", body.Error.Type)
+	}
+}
+
+func TestHandleOpenAIPlanError_InternalErrorType(t *testing.T) {
+	c, w := newPlanErrorContext(t)
+	meta := &types.RequestMetadata{Model: "test-model"}
+	p := &types.RequestPlan{ErrorCode: types.PlanErrInternal}
+
+	handleOpenAIPlanError(c, meta, p, errors.New("boom"), "")
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+	// OpenAI's 500 carries type server_error, not internal_error.
+	var body struct {
+		Error types.Error `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if body.Error.Type != "server_error" {
+		t.Errorf("expected type server_error, got %q", body.Error.Type)
+	}
 }
 
 func TestHandleOpenAIPlanError_InsufficientBalanceWithEmptyFrontendURL(t *testing.T) {

@@ -463,10 +463,10 @@ func TestTagStore_SetMetaTags(t *testing.T) {
 	defer cancel()
 
 	// insert a new repo
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	userName := "user_name_" + uuid.NewString()
 	repoName := "repo_name_" + uuid.NewString()
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName, repoName),
 		GitPath:        fmt.Sprintf("models_%s/%s", userName, repoName),
@@ -475,7 +475,7 @@ func TestTagStore_SetMetaTags(t *testing.T) {
 		Description:    "",
 		Private:        false,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Empty(t, err)
 	require.NotNil(t, repo)
 
@@ -545,10 +545,10 @@ func TestTagStore_SetLibraryTag(t *testing.T) {
 	defer cancel()
 
 	// insert a new repo
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	userName := "user_name_" + uuid.NewString()
 	repoName := "repo_name_" + uuid.NewString()
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName, repoName),
 		GitPath:        fmt.Sprintf("models_%s/%s", userName, repoName),
@@ -557,7 +557,7 @@ func TestTagStore_SetLibraryTag(t *testing.T) {
 		Description:    "",
 		Private:        false,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Empty(t, err)
 	require.NotNil(t, repo)
 
@@ -608,10 +608,10 @@ func TestTagStore_UpsertRepoTags(t *testing.T) {
 	require.Empty(t, err)
 
 	// insert a new repo with tags
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	userName := "user_name_" + uuid.NewString()
 	repoName := "repo_name_" + uuid.NewString()
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName, repoName),
 		GitPath:        fmt.Sprintf("models_%s/%s", userName, repoName),
@@ -621,7 +621,7 @@ func TestTagStore_UpsertRepoTags(t *testing.T) {
 		Private:        false,
 		RepositoryType: types.ModelRepo,
 		Tags:           []database.Tag{*oldTag},
-	})
+	}))
 	require.Empty(t, err)
 	require.NotNil(t, repo)
 	require.Len(t, repo.Tags, 1)
@@ -677,10 +677,10 @@ func TestTagStore_RemoveRepoTags(t *testing.T) {
 	require.NotEmpty(t, tag2.ID)
 
 	// insert a new repo with tags
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	userName := "user_name_" + uuid.NewString()
 	repoName := "repo_name_" + uuid.NewString()
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName, repoName),
 		GitPath:        fmt.Sprintf("models_%s/%s", userName, repoName),
@@ -689,7 +689,7 @@ func TestTagStore_RemoveRepoTags(t *testing.T) {
 		Description:    "",
 		Private:        false,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Empty(t, err)
 	require.NotNil(t, repo)
 	// set repo tags
@@ -737,10 +737,10 @@ func TestTagStore_RemoveRepoTagsByCategory(t *testing.T) {
 	require.NotEmpty(t, tag2.ID)
 
 	// insert a new repo with tags
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	userName := "user_name_" + uuid.NewString()
 	repoName := "repo_name_" + uuid.NewString()
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName, repoName),
 		GitPath:        fmt.Sprintf("models_%s/%s", userName, repoName),
@@ -749,7 +749,7 @@ func TestTagStore_RemoveRepoTagsByCategory(t *testing.T) {
 		Description:    "",
 		Private:        false,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Empty(t, err)
 	require.NotNil(t, repo)
 	// set repo tags
@@ -769,7 +769,7 @@ func TestTagStore_ReplaceRepoTagsByCategoryAndSource_AutoKeepsManual(t *testing.
 	defer cancel()
 
 	ts := database.NewTagStoreWithDB(db)
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	tag1, err := ts.CreateTag(ctx, database.Tag{
 		Category: "industry",
@@ -786,7 +786,7 @@ func TestTagStore_ReplaceRepoTagsByCategoryAndSource_AutoKeepsManual(t *testing.
 	})
 	require.NoError(t, err)
 
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("user_%s/repo_%s", uuid.NewString(), uuid.NewString()),
 		GitPath:        fmt.Sprintf("datasets_user_%s/repo_%s", uuid.NewString(), uuid.NewString()),
@@ -795,7 +795,7 @@ func TestTagStore_ReplaceRepoTagsByCategoryAndSource_AutoKeepsManual(t *testing.
 		Description:    "",
 		Private:        false,
 		RepositoryType: types.DatasetRepo,
-	})
+	}))
 	require.NoError(t, err)
 
 	err = ts.UpsertRepoTags(ctx, repo.ID, nil, []int64{tag1.ID})
@@ -826,7 +826,7 @@ func TestTagStore_ReplaceRepoTagsByCategoryAndSource_ManualPromotesAuto(t *testi
 	defer cancel()
 
 	ts := database.NewTagStoreWithDB(db)
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	tag1, err := ts.CreateTag(ctx, database.Tag{
 		Category: "industry",
@@ -836,7 +836,7 @@ func TestTagStore_ReplaceRepoTagsByCategoryAndSource_ManualPromotesAuto(t *testi
 	})
 	require.NoError(t, err)
 
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("user_%s/repo_%s", uuid.NewString(), uuid.NewString()),
 		GitPath:        fmt.Sprintf("datasets_user_%s/repo_%s", uuid.NewString(), uuid.NewString()),
@@ -845,7 +845,7 @@ func TestTagStore_ReplaceRepoTagsByCategoryAndSource_ManualPromotesAuto(t *testi
 		Description:    "",
 		Private:        false,
 		RepositoryType: types.DatasetRepo,
-	})
+	}))
 	require.NoError(t, err)
 
 	err = ts.ReplaceRepoTagsByCategoryAndSource(ctx, repo.ID, "industry", types.TagSourceAuto, []int64{tag1.ID})
@@ -937,10 +937,10 @@ func TestTagStore_DeleteTagByID(t *testing.T) {
 	require.NotEmpty(t, tag1.ID)
 
 	// insert a new repo with tags
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	userName := "user_name_" + uuid.NewString()
 	repoName := "repo_name_" + uuid.NewString()
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		UserID:         1,
 		Path:           fmt.Sprintf("%s/%s", userName, repoName),
 		GitPath:        fmt.Sprintf("models_%s/%s", userName, repoName),
@@ -949,7 +949,7 @@ func TestTagStore_DeleteTagByID(t *testing.T) {
 		Description:    "",
 		Private:        false,
 		RepositoryType: types.ModelRepo,
-	})
+	}))
 	require.Empty(t, err)
 	require.NotNil(t, repo)
 

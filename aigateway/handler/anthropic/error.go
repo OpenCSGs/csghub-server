@@ -5,18 +5,20 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/aigateway/types"
 )
 
-// Anthropic error type constants.
+// Anthropic error type constants, aliased onto the shared aigateway
+// vocabulary so the wire values have a single definition point.
 const (
-	ErrTypeInvalidRequest    = "invalid_request_error"
-	ErrTypeAuthentication    = "authentication_error"
-	ErrTypePermission        = "permission_error"
-	ErrTypeNotFound          = "not_found_error"
-	ErrTypeRateLimit         = "rate_limit_error"
-	ErrTypeOverloaded        = "overloaded_error"
-	ErrTypeAPI               = "api_error"
-	ErrTypeUnsupported       = "unsupported_capability"
+	ErrTypeInvalidRequest = types.ErrTypeInvalidRequest
+	ErrTypeAuthentication = types.ErrTypeAuthentication
+	ErrTypePermission     = types.ErrTypePermission
+	ErrTypeNotFound       = types.ErrTypeNotFound
+	ErrTypeRateLimit      = types.ErrTypeRateLimit
+	ErrTypeOverloaded     = types.ErrTypeOverloaded
+	ErrTypeAPI            = types.ErrTypeAPI
+	ErrTypeUnsupported    = types.ErrTypeUnsupportedCapability
 )
 
 // writeError sends an Anthropic-format error response.

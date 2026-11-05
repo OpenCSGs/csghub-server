@@ -21,11 +21,11 @@ func TestFileStore_FindByParentPath(t *testing.T) {
 	fs := database.NewFileStoreWithDB(db)
 
 	// Create a repository
-	rs := database.NewRepoStoreWithDB(db)
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name: "test-repo",
-		Path: "test-path",
-	})
+		Path: "fixtures/test-path",
+	}))
 	require.Nil(t, err)
 
 	// Insert files with the same parent path
@@ -71,11 +71,11 @@ func TestFileStore_BatchCreate(t *testing.T) {
 	fs := database.NewFileStoreWithDB(db)
 
 	// Create a repository
-	rs := database.NewRepoStoreWithDB(db)
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name: "test-repo",
-		Path: "test-path",
-	})
+		Path: "fixtures/test-path",
+	}))
 	require.Nil(t, err)
 
 	// Insert multiple files

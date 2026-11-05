@@ -20,8 +20,19 @@ import (
 
 var configFile = ""
 
-// ModelConfig represents per-model endpoint and header configuration.
-// Each guard model (Guard/GuardStream) can have its own endpoint and custom HTTP headers.
+// Default model values of ModelConfig, kept in sync with its envconfig
+// default tags: the prompt-injection provider compares against them to
+// signal an inherited, unconfigured model at startup.
+const (
+	DefaultGuardModel    = "Qwen/Qwen3Guard-Gen-0.6B"
+	DefaultGuardEndpoint = "https://ai.space.opencsg.com"
+)
+
+// ModelConfig is the generic per-model configuration shared by every
+// LLM-based sensitive check (sensitive-word guard, prompt injection): a model
+// name, its endpoint, and custom HTTP headers. The defaults document a
+// working sensitive-word setup and keep existing guard deployments
+// compatible; each check should still point at its own dedicated model.
 type ModelConfig struct {
 	// Model is the model identifier sent in the LLM request body (e.g., "Qwen/Qwen3Guard-Gen-0.6B").
 	Model string `env:"MODEL" default:"Qwen/Qwen3Guard-Gen-0.6B"`
@@ -64,6 +75,32 @@ func (r *LLMUnsafeRules) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// FlowRedirect registers one callback target allowed for the legacy "flows"
+// signin branch.
+type FlowRedirect struct {
+	Name        string `json:"name" toml:"name"`
+	CallbackURL string `json:"callback_url" toml:"callback_url"`
+}
+
+// FlowRedirects is the allowlist of signin callback targets; signin redirects
+// are issued only to these registered targets, never to client-provided URLs.
+type FlowRedirects []FlowRedirect
+
+// UnmarshalJSON lets envconfig load the redirects from a JSON array env var;
+// empty input (unset env or TOML key) decodes to an empty allowlist.
+func (r *FlowRedirects) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 || string(data) == `""` {
+		*r = nil
+		return nil
+	}
+	var redirects []FlowRedirect
+	if err := json.Unmarshal(data, &redirects); err != nil {
+		return err
+	}
+	*r = redirects
+	return nil
+}
+
 type Config struct {
 	Saas          bool   `env:"STARHUB_SERVER_SAAS" default:"false"`
 	Oversea       bool   `env:"STARHUB_SERVER_OVERSEA" default:"false"`
@@ -79,6 +116,7 @@ type Config struct {
 	UniqueServiceName        string            `env:"STARHUB_SERVER_UNIQUE_SERVICE_NAME" default:""`
 	ServerFailureRedirectURL string            `env:"STARHUB_SERVER_FAIL_REDIRECT_URL" default:"http://localhost:3000/errors/server-error"`
 	NeedPhoneVerify          bool              `env:"STARHUB_SERVER_NEED_PHONE_VERIFY" default:"false"`
+	NeedEmailVerify          bool              `env:"STARHUB_SERVER_NEED_EMAIL_VERIFY" default:"true"`
 	// TimeZone is the application-wide timezone used for formatting
 	// timestamps (e.g. Loki log timestamps).
 	TimeZone            string `env:"STARHUB_SERVER_TIMEZONE" default:"Asia/Shanghai"`
@@ -105,6 +143,23 @@ type Config struct {
 		OpenFGAListObjectMaxResult int `env:"STARHUB_SERVER_REBAC_OPENFGA_LIST_OBJECT_MAX_RESULT" default:"1000"`
 	}
 
+	// CORS controls the browser cross-origin policy shared by the API,
+	// AIGateway, and rproxy routers. It replaces the previous
+	// AllowAllOrigins+AllowCredentials combination (CWE-942, issue #1430).
+	CORS struct {
+		// AllowedOrigins is the explicit whitelist of browser origins allowed
+		// to read responses cross-origin. Entries are exact origins such as
+		// "https://hub.opencsg.com" or per-label subdomain wildcards such as
+		// "https://*.opencsg.com". Setting at least one valid entry makes this
+		// list the whole whitelist and disables derivation. When it is empty
+		// the middleware falls back to the deployment's own addresses: the
+		// origins of Frontend.URL and APIServer.PublicDomain (exact), and a
+		// per-label wildcard for both schemes over Space.PublicRootDomain.
+		// Requests without an Origin header (curl, same-origin browser pages)
+		// are always unaffected.
+		AllowedOrigins []string `env:"STARHUB_SERVER_CORS_ALLOWED_ORIGINS" default:"[]"`
+	}
+
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 		PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
@@ -125,6 +180,11 @@ type Config struct {
 		// The capacity of token bucket
 		RateBucketCapacity int `env:"STARHUB_SERVER_MIRROR_RATE_BUCKET_CAPACITY" default:"1"`
 		MaxRetryCount      int `env:"STARHUB_SERVER_MIRROR_MAX_RETRY_COUNT" default:"3"`
+		// Metrics controls ephemeral runtime reporting shared by API, repo, and LFS processes.
+		Metrics struct {
+			Enabled bool   `env:"STARHUB_SERVER_MIRROR_METRICS_ENABLED" default:"true"`
+			Scope   string `env:"STARHUB_SERVER_MIRROR_METRICS_SCOPE" default:"default"`
+		}
 	}
 
 	DocsHost string `env:"STARHUB_SERVER_SERVER_DOCS_HOST" default:"http://localhost:6636"`
@@ -181,6 +241,10 @@ type Config struct {
 		AccessKeySecret string `env:"STARHUB_SERVER_S3_ACCESS_KEY_SECRET"`
 		Region          string `env:"STARHUB_SERVER_S3_REGION"`
 		Endpoint        string `env:"STARHUB_SERVER_S3_ENDPOINT" default:"localhost:9000"`
+		// EnableDualstack controls AWS S3 dual-stack (IPv4+IPv6) endpoints. When true,
+		// an amazonaws.com Endpoint is normalized to its s3.dualstack form at config
+		// load so the host minio signs matches the host the storage gateway forwards to.
+		EnableDualstack bool `env:"STARHUB_SERVER_S3_ENABLE_DUALSTACK" default:"true"`
 		//for better performance of LFS downloading from s3. (can ignore if S3.Endpoint is alreay an internal domain or ip address)
 		InternalEndpoint string `env:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT"`
 		Bucket           string `env:"STARHUB_SERVER_S3_BUCKET" default:"opencsg-test"`
@@ -205,7 +269,21 @@ type Config struct {
 		// image moderation.
 		OSSBucket string `env:"STARHUB_SERVER_SENSITIVE_CHECK_OSS_BUCKET" default:"sensitive-check"`
 
-		DictDir             string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR" default:"/starhub-bin/vocabulary"`
+		DictDir string `env:"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR" default:"/starhub-bin/vocabulary"`
+		// CheckChain selects and orders the sensitive-check providers. Built-in
+		// providers: ac_automaton, mutable_ac_automaton, aliyun_green. EE/SaaS
+		// additionally registers the LLM providers guard_llm (sensitive-word
+		// guard) and prompt_injection (issue #1581); both need their Enable
+		// flag and model config set. The chain short-circuits on the first
+		// sensitive verdict, so ordering matters: a provider earlier in the
+		// chain that flags sensitive suppresses the later ones.
+		//
+		// Budget: the caller's prompt-check RPC timeout (2s in aigateway)
+		// covers the WHOLE chain, so the sum of the LLM providers' TimeoutMS
+		// must stay below it — guard_llm (3s) and prompt_injection (1.5s)
+		// together exceed the budget and the gateway fails that prompt check
+		// open (one warn log, no block). Enable both LLM providers on the
+		// prompt path only together with a raised caller budget.
 		CheckChain          []string `env:"STARHUB_SERVER_SENSITIVE_CHECK_CHECK_CHAIN" default:"[ac_automaton,mutable_ac_automaton,aliyun_green]"`
 		StreamCheckMode     string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_STREAM_CHECK_MODE" default:"async"` // sync | async
 		AsyncBufferMaxChars int      `env:"STARHUB_SERVER_SENSITIVE_CHECK_ASYNC_BUFFER_MAX_CHARS" default:"50"`
@@ -271,6 +349,45 @@ type Config struct {
 			Guard ModelConfig `env:",prefix=STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_"`
 			// GuardStream is the model config for stream sensitive checks.
 			GuardStream ModelConfig `env:",prefix=STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_STREAM_"`
+		}
+
+		// PromptInjection configures the LLM-based prompt-injection detection
+		// provider. It is a member of CheckChain (add "prompt_injection" to
+		// the chain to activate it), mirroring the guard_llm provider: its own
+		// dedicated decision-model endpoint speaking the SystemOne protocol —
+		// never the sensitive-word guard model above. In this first version
+		// only prompt checks carry logic; the image and response slots of the
+		// SensitiveChecker interface are no-ops, ready for later phases.
+		PromptInjection struct {
+			// Enable turns the provider on. Effective only when
+			// SensitiveCheck.Enable is also true AND "prompt_injection" is a
+			// member of CheckChain (same double gate as guard_llm).
+			Enable bool `env:"STARHUB_SERVER_SENSITIVE_CHECK_PROMPT_INJECTION_ENABLE" default:"false"`
+			// Mode controls enforcement: "block" marks the prompt sensitive
+			// when the risk score crosses the threshold; "detect" only records
+			// the verdict (shadow mode, never blocks).
+			Mode string `env:"STARHUB_SERVER_SENSITIVE_CHECK_PROMPT_INJECTION_MODE" default:"block"`
+			// RiskThreshold is the injection risk score (0-1) at or above which
+			// the prompt counts as an injection attempt. The default is
+			// calibrated for convaiinnovations/laya by the issue #1581
+			// evaluation (86% attack detection, 0% benign false positives).
+			// For the more conservative jev-1.13 scoring, lower it to 0.4-0.5
+			// (same 0% false positives at 0.3-0.5 in the evaluation).
+			RiskThreshold float64 `env:"STARHUB_SERVER_SENSITIVE_CHECK_PROMPT_INJECTION_RISK_THRESHOLD" default:"0.6"`
+			// TimeoutMS bounds the decision-model call. It must stay below the
+			// 2s RPC timeout aigateway applies to prompt checks, and it counts
+			// against the whole-chain budget (see CheckChain).
+			TimeoutMS int `env:"STARHUB_SERVER_SENSITIVE_CHECK_PROMPT_INJECTION_TIMEOUT_MS" default:"1500"`
+			// Model is the dedicated decision model (SystemOne protocol),
+			// reusing the generic ModelConfig: STARHUB_SERVER_SENSITIVE_CHECK_
+			// PROMPT_INJECTION_MODEL / _ENDPOINT / _HEADERS. When enabling the
+			// provider, override all three (the inherited defaults document
+			// the sensitive-word guard setup); an unconfigured injection
+			// simply fails open — the wrong endpoint/auth 401s or 404s and
+			// every check degrades to skipped_api_error.
+			//	convaiinnovations/laya: ~0.4s mean latency; RiskThreshold 0.6
+			//	jev-1.13: ~1.5s mean latency, conservative scores; 0.4-0.5
+			Model ModelConfig `env:",prefix=STARHUB_SERVER_SENSITIVE_CHECK_PROMPT_INJECTION_"`
 		}
 	}
 
@@ -355,6 +472,7 @@ type Config struct {
 		Certificate      string `env:"STARHUB_SERVER_CASDOOR_CERTIFICATE" default:"/etc/casdoor/certificate.pem"`
 		OrganizationName string `env:"STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME" default:"opencsg"`
 		ApplicationName  string `env:"STARHUB_SERVER_CASDOOR_APPLICATION_NAME" default:"opencsg"`
+		InvitationQuota  int    `env:"STARHUB_SERVER_CASDOOR_INVITATION_QUOTA" default:"50"`
 	}
 
 	Paraview struct {
@@ -364,6 +482,14 @@ type Config struct {
 		RedirectURI  string `env:"STARHUB_SERVER_PARAVIEW_REDIRECT_URI" default:"http://127.0.0.1:8080/api/v1/callback/paraview"`
 		ApiKey       string `env:"STARHUB_SERVER_PARAVIEW_API_KEY" default:""`
 		ApiSecret    string `env:"STARHUB_SERVER_PARAVIEW_API_SECRET" default:""`
+	}
+
+	Portico struct {
+		Endpoint     string `env:"STARHUB_SERVER_PORTICO_ENDPOINT" default:""`
+		ClientID     string `env:"STARHUB_SERVER_PORTICO_CLIENT_ID" default:""`
+		ClientSecret string `env:"STARHUB_SERVER_PORTICO_CLIENT_SECRET" default:""`
+		RedirectURI  string `env:"STARHUB_SERVER_PORTICO_REDIRECT_URI" default:"http://127.0.0.1:8080/api/v1/callback/portico"`
+		Scopes       string `env:"STARHUB_SERVER_PORTICO_SCOPES" default:"openid profile email phone"`
 	}
 
 	Nats struct {
@@ -381,23 +507,41 @@ type Config struct {
 		ChargingEnable               bool   `env:"OPENCSG_ACCOUNTING_CHARGING_ENABLE" default:"false"`
 		SubscriptionCronExpression   string `env:"OPENCSG_ACCOUNTING_SUBSCRIPTION_CRON_EXPRESSION" default:"*/10 * * * *"`
 		ExpiredPresentCronExpression string `env:"OPENCSG_ACCOUNTING_EXPIRED_PRESENT_CRON_EXPRESSION" default:"0 0 * * *"`
-		ThresholdOfStopDeploy        int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"5000"`
-		ThresholdOfStopLLMInference  int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"5000"`
-		LLMBalanceCheckCacheTTL      int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"120"`
-		RetryLimit                   int    `env:"OPENCSG_ACCOUNTING_RETRY_LIMIT" default:"1"`
-		MaxExportPages               int    `env:"OPENCSG_ACCOUNTING_MAX_EXPORT_PAGES" default:"1000"`
-		AllowedSyncDeductScenes      string `env:"OPENCSG_ACCOUNTING_ALLOWED_SYNC_DEDUCT_SCENES" default:"30"`
-		AccessQuotaTTLInHours        int    `env:"OPENCSG_ACCOUNTING_ACCESS_QUOTA_TTL_IN_HOURS" default:"8"`
+		// AutoExpirePresent bounds the grant window of registration-award
+		// presents (activity CSHHubNewUser) that are force expired
+		// AutoExpirePresentValidDays days after the present is granted
+		// (account_presents.created_at). Empty dates or a non-positive day
+		// count disables the auto-expire scan.
+		AutoExpirePresentStartDate string `env:"OPENCSG_ACCOUNTING_AUTO_EXPIRE_PRESENT_START_DATE" default:"2026-10-14"`
+		AutoExpirePresentEndDate   string `env:"OPENCSG_ACCOUNTING_AUTO_EXPIRE_PRESENT_END_DATE" default:"2026-10-30"`
+		AutoExpirePresentValidDays int    `env:"OPENCSG_ACCOUNTING_AUTO_EXPIRE_PRESENT_VALID_DAYS" default:"30"`
+		// AutoExpirePresentBatchSize bounds one auto-expire activity page. It
+		// keeps the activity, its memory and its retry blast radius small when
+		// the grant window contains a large number of presents.
+		AutoExpirePresentBatchSize  int    `env:"OPENCSG_ACCOUNTING_AUTO_EXPIRE_PRESENT_BATCH_SIZE" default:"500"`
+		ThresholdOfStopDeploy       int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"0"`
+		ThresholdOfStopLLMInference int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"0"`
+		LLMBalanceCheckCacheTTL     int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"120"`
+		RetryLimit                  int    `env:"OPENCSG_ACCOUNTING_RETRY_LIMIT" default:"1"`
+		MaxExportPages              int    `env:"OPENCSG_ACCOUNTING_MAX_EXPORT_PAGES" default:"1000"`
+		AllowedSyncDeductScenes     string `env:"OPENCSG_ACCOUNTING_ALLOWED_SYNC_DEDUCT_SCENES" default:"30"`
+		AccessQuotaTTLInHours       int    `env:"OPENCSG_ACCOUNTING_ACCESS_QUOTA_TTL_IN_HOURS" default:"8"`
 	}
 
 	User struct {
+		// EnableAlipayIdentity initializes the SaaS identity client; disable only to develop without Alipay credentials.
+		EnableAlipayIdentity           bool   `env:"OPENCSG_USER_SERVER_ENABLE_ALIPAY_IDENTITY" default:"true"`
 		Host                           string `env:"OPENCSG_USER_SERVER_HOST" default:"http://localhost"`
 		Port                           int    `env:"OPENCSG_USER_SERVER_PORT" default:"8088"`
 		SigninSuccessRedirectURL       string `env:"OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL" default:"http://localhost:3000/server/callback"`
 		CodeSoulerVScodeRedirectURL    string `env:"OPENCSG_USER_SERVER_CODESOULER_VSCODE_REDIRECT_URL" default:"http://127.0.0.1:37678/callback"`
 		CodeSoulerJetBrainsRedirectURL string `env:"OPENCSG_USER_SERVER_CODESOULER_JETBRAINS_REDIRECT_URL" default:"http://127.0.0.1:37679/callback"`
 		LiteRedirectURL                string `env:"OPENCSG_USER_SERVER_LITE_REDIRECT_URL" default:"http://127.0.0.1:11437/api/cloud/auth/callback"`
-		AwardSelfRegisterCredit        int    `env:"OPENCSG_USER_SERVER_AWARD_SELF_REGISTER_CREDIT" default:"5000"`
+		// FlowRedirects is the allowlist of legacy "flows" signin callback
+		// targets as a JSON array, e.g.
+		// [{"name":"langflow","callback_url":"https://langflow.example.com/api/v1/callback/casdoor"}].
+		// The signin callback never redirects to URLs outside this list.
+		FlowRedirects FlowRedirects `env:"OPENCSG_USER_SERVER_FLOW_REDIRECTS" default:"[]"`
 		// NamespaceLookupMaxUUIDs limits the number of namespace UUIDs accepted by
 		// the batch namespace lookup endpoint.
 		NamespaceLookupMaxUUIDs int `env:"OPENCSG_USER_SERVER_NAMESPACE_LOOKUP_MAX_UUIDS" default:"100"`
@@ -469,6 +613,7 @@ type Config struct {
 		Host                     string `env:"OPENCSG_MODERATION_SERVER_HOST" default:"http://localhost"`
 		Port                     int    `env:"OPENCSG_MODERATION_SERVER_PORT" default:"8089"`
 		RepoFileCheckConcurrency int    `env:"OPENCSG_MODERATION_SERVER_REPO_FILE_CHECK_CONCURRENCY" default:"10"`
+		SecurityScan             SecurityScanConfig
 	}
 
 	Memory MemoryConfig
@@ -571,7 +716,7 @@ type Config struct {
 		AgentHubServiceToken                  string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
 		MCPInspectMaxConcurrency              int    `env:"OPENCSG_AGENT_MCP_INSPECT_MAX_CONCURRENCY" default:"50"`
 		ShareSessionTokenValidDay             int    `env:"STARHUB_SERVER_AGENT_SHARE_SESSION_TOKEN_VALIDATE_Day" default:"365"` // 1 year
-		BalanceThreshold                      int    `env:"OPENCSG_AGENT_BALANCE_THRESHOLD" default:"5000"`
+		BalanceThreshold                      int    `env:"OPENCSG_AGENT_BALANCE_THRESHOLD" default:"0"`
 		BalanceCheckCacheTTL                  int    `env:"OPENCSG_AGENT_BALANCE_CHECK_CACHE_TTL" default:"86400"`
 		OrchestratorReadinessTimeoutSeconds   int    `env:"OPENCSG_AGENT_ORCHESTRATOR_READINESS_TIMEOUT_SECONDS" default:"1800"`
 		OrchestratorGatewayWaitTimeoutSeconds int    `env:"OPENCSG_AGENT_ORCHESTRATOR_GATEWAY_WAIT_TIMEOUT_SECONDS" default:"30"`
@@ -643,7 +788,6 @@ type Config struct {
 		Port                                   int    `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
 		AdvertiseAddr                          string `env:"OPENCSG_AIGATEWAY_ADVERTISE_ADDR" default:""`
 		PublicAIGatewayURL                     string `env:"OPENCSG_AIGATEWAY_PUBLIC_URL" default:""`
-		ModerationBypassSensitiveCheck         bool   `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
 		SensitiveDefaultImg                    string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
 		PresignExpirySeconds                   int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
 		ResponsesIDSecret                      string `env:"OPENCSG_AIGATEWAY_RESPONSES_ID_SECRET" default:"responses-id-secret"`
@@ -735,7 +879,52 @@ type Config struct {
 			// final failure renders as model_unavailable (503).
 			QueueMaxRePlans int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_QUEUE_MAX_REPLANS" default:"1"`
 		}
+		// PIICheckEnabled turns on sensitive-content detection (PII, credentials)
+		// on request prompts. Detection may rewrite what reaches the upstream
+		// (mask/skip today, block later), so it only ever runs when the
+		// deployment enables it AND the client opts in per request with the
+		// X-PII-Check header — the gateway never rewrites payloads silently.
+		// Rules live in the aigateway_pii_rules table and merge over the
+		// compiled-in defaults by name.
+		PIICheckEnabled bool `env:"OPENCSG_AIGATEWAY_PII_CHECK_ENABLED" default:"false"`
+		// PIICheckRefreshIntervalSeconds is how often the gateway reloads
+		// the rule table in the background (lazy, triggered by requests; the
+		// serving request is never blocked). 0 disables refresh: rules load
+		// once at startup.
+		PIICheckRefreshIntervalSeconds  int `env:"OPENCSG_AIGATEWAY_PII_CHECK_REFRESH_INTERVAL_SECONDS" default:"300"`
 		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
+
+		// SemanticRouter configures EE/SaaS automatic model selection. CE
+		// ignores this configuration. When
+		// ServerURL is set and the service answers its health check, the
+		// gateway publishes an extra virtual model (ModelID) that clients
+		// can request instead of naming a concrete model; the service then
+		// ranks the real candidates for each turn and the highest ranked
+		// available one serves the request.  Leaving ServerURL empty
+		// disables the feature entirely and the virtual model is not
+		// published.
+		SemanticRouter struct {
+			ExplorationEnabled       bool   `env:"OPENCSG_AIGATEWAY_ROUTER_EXPLORATION_ENABLED" default:"false"`
+			FeedbackEnabled          bool   `env:"OPENCSG_AIGATEWAY_ROUTER_FEEDBACK_ENABLED" default:"false"`
+			FeedbackShardingEnabled  bool   `env:"OPENCSG_AIGATEWAY_ROUTER_FEEDBACK_SHARDING_ENABLED" default:"false"`
+			GenerationEnabled        bool   `env:"OPENCSG_AIGATEWAY_ROUTER_GENERATION_ENABLED" default:"true"`
+			CacheEnabled             bool   `env:"OPENCSG_AIGATEWAY_ROUTER_CACHE_ENABLED" default:"false"`
+			CacheEnvironment         string `env:"OPENCSG_AIGATEWAY_ROUTER_CACHE_ENVIRONMENT" default:"default"`
+			CacheNamespace           string `env:"OPENCSG_AIGATEWAY_ROUTER_CACHE_NAMESPACE" default:"csghub"`
+			APITokenFile             string `env:"OPENCSG_AIGATEWAY_ROUTER_API_TOKEN_FILE" default:""`
+			CacheEntries             int    `env:"OPENCSG_AIGATEWAY_ROUTER_CACHE_ENTRIES" default:"4096"`
+			CacheBytes               int    `env:"OPENCSG_AIGATEWAY_ROUTER_CACHE_BYTES" default:"16777216"`
+			CacheFallbackConcurrency int    `env:"OPENCSG_AIGATEWAY_ROUTER_CACHE_FALLBACK_CONCURRENCY" default:"16"`
+			CacheRenewConcurrency    int    `env:"OPENCSG_AIGATEWAY_ROUTER_CACHE_RENEW_CONCURRENCY" default:"4"`
+			CacheRedisTimeoutMS      int    `env:"OPENCSG_AIGATEWAY_ROUTER_CACHE_REDIS_TIMEOUT_MS" default:"100"`
+
+			ServerURL      string `env:"OPENCSG_AIGATEWAY_SEMANTIC_ROUTER_SERVER" default:""`
+			ModelID        string `env:"OPENCSG_AIGATEWAY_SEMANTIC_ROUTER_MODEL_ID" default:"auto"`
+			TimeoutSeconds int    `env:"OPENCSG_AIGATEWAY_SEMANTIC_ROUTER_TIMEOUT_SECONDS" default:"5"`
+			// HealthTTLSeconds is how long a readiness probe result is
+			// reused before the next model listing re-probes the service.
+			HealthTTLSeconds int `env:"OPENCSG_AIGATEWAY_SEMANTIC_ROUTER_HEALTH_TTL_SECONDS" default:"300"`
+		}
 
 		Metrics struct {
 			// Enabled controls whether the AIGateway metrics collection
@@ -999,8 +1188,16 @@ type Config struct {
 	}
 
 	Xnet struct {
-		Endpoint string `env:"STARHUB_SERVER_XNET_ENDPOINT" default:"http://localhost:8097"`
-		ApiKey   string `env:"STARHUB_SERVER_XNET_API_KEY" default:"f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"`
+		Endpoint                string `env:"STARHUB_SERVER_XNET_ENDPOINT" default:"http://localhost:8097"`
+		ApiKey                  string `env:"STARHUB_SERVER_XNET_API_KEY" default:"f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"`
+		MigrationBatchSize      int    `env:"STARHUB_SERVER_XNET_MIGRATION_BATCH_SIZE" default:"100"`
+		MigrationMaxInFlight    int    `env:"STARHUB_SERVER_XNET_MIGRATION_MAX_IN_FLIGHT" default:"1000"`
+		MigrationPublishRate    int    `env:"STARHUB_SERVER_XNET_MIGRATION_PUBLISH_RATE" default:"50"`
+		MigrationLeaseSeconds   int    `env:"STARHUB_SERVER_XNET_MIGRATION_LEASE_SECONDS" default:"300"`
+		MigrationPollSeconds    int    `env:"STARHUB_SERVER_XNET_MIGRATION_POLL_SECONDS" default:"5"`
+		MigrationMaxAttempts    int    `env:"STARHUB_SERVER_XNET_MIGRATION_MAX_ATTEMPTS" default:"5"`
+		MigrationStreamMaxMsgs  int64  `env:"STARHUB_SERVER_XNET_MIGRATION_STREAM_MAX_MSGS" default:"1000"`
+		MigrationStreamMaxBytes int64  `env:"STARHUB_SERVER_XNET_MIGRATION_STREAM_MAX_BYTES" default:"1073741824"`
 	}
 
 	StorageGateway struct {
@@ -1089,6 +1286,9 @@ func loadConfig() (*Config, error) {
 	if len(cfg.UniqueServiceName) < 1 {
 		cfg.UniqueServiceName = genServiceName()
 	}
+
+	cfg.S3.Endpoint = NormalizeS3Endpoint(cfg.S3.Endpoint, cfg.S3.EnableDualstack, cfg.S3.Region)
+	cfg.S3.InternalEndpoint = NormalizeS3Endpoint(cfg.S3.InternalEndpoint, cfg.S3.EnableDualstack, cfg.S3.Region)
 
 	loc, err := time.LoadLocation(cfg.TimeZone)
 	if err != nil {

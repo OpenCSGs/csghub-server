@@ -13,12 +13,12 @@ import (
 
 const (
 	// OrganizationDeletionQueue is the dedicated queue and job kind for
-	// organization SSO and ReBAC cleanup.
+	// organization SSO and retained authorization-record cleanup.
 	OrganizationDeletionQueue = "organization_deletion"
 	// OrganizationDeletionJobTimeout bounds one external cleanup attempt.
-	OrganizationDeletionJobTimeout = 10 * time.Minute
+	OrganizationDeletionJobTimeout = 15 * time.Minute
 	// OrganizationDeletionJobMaxAttempts keeps cleanup retryable through
-	// extended SSO, ReBAC, or database outages.
+	// extended SSO or database outages.
 	OrganizationDeletionJobMaxAttempts = 12
 )
 

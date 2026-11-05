@@ -33,7 +33,7 @@ func (h *OpenAIHandlerImpl) newResponsesTokenCounter(modelTarget *resolvedModelT
 	return token.NewResponsesTokenCounter(tokenizer)
 }
 
-func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counter token.ResponsesTokenCounter, preUsage *token.Usage, nsUUID string, modelTarget *resolvedModelTarget, apikey string, recorder *responsespkg.LLMLogRecorder, traceInput responsesTracePostProcessInput, admissionLease *types.AdmissionLease) {
+func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counter token.ResponsesTokenCounter, preUsage *token.Usage, nsUUID string, modelTarget *resolvedModelTarget, recorder *responsespkg.LLMLogRecorder, traceInput responsesTracePostProcessInput, admissionLease *types.AdmissionLease) {
 	if modelTarget == nil || modelTarget.Model == nil {
 		return
 	}
@@ -95,7 +95,7 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 		if tokenUsage != nil && isSuccessfulStatus(traceInput.StatusCode) {
 			recordCtx, cancel := context.WithTimeout(baseCtx, time.Second)
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.openaiComponent.RecordUsageFromTokenUsage(recordCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenUsage, apikey, tokenID); err != nil {
+			if err := h.openaiComponent.RecordUsageFromTokenUsage(recordCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenUsage, tokenID); err != nil {
 				slog.ErrorContext(baseCtx, "failed to record responses usage",
 					slog.String("step", "record_usage"),
 					slog.String("model", modelTarget.ModelName),

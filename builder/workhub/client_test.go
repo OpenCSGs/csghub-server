@@ -35,6 +35,23 @@ func TestNewWorkClientRetainsDiscardedJobs(t *testing.T) {
 	require.Equal(t, time.Duration(-1), config.DiscardedJobRetentionPeriod)
 }
 
+// TestNewWorkClientRescueAndLeaseConfig preserves opt-in leases with one rescue threshold.
+func TestNewWorkClientRescueAndLeaseConfig(t *testing.T) {
+	for _, leased := range []bool{false, true} {
+		t.Run(fmt.Sprintf("leased=%t", leased), func(t *testing.T) {
+			cfg := &river.Config{RescueStuckJobsAfter: 2 * time.Hour}
+			if leased {
+				cfg.JobLease = &river.JobLeaseConfig{}
+			}
+			client, err := NewWorkClient(context.Background(), "postgresql://user:password@localhost/database", cfg)
+			require.NoError(t, err)
+			t.Cleanup(client.(*workClient).pool.Close)
+			require.Equal(t, 10*time.Minute, cfg.RescueStuckJobsAfter)
+			require.Equal(t, leased, cfg.JobLease != nil)
+		})
+	}
+}
+
 // TestLinearJitterRetryPolicy verifies retries use five-minute linear steps with ten-percent jitter.
 func TestLinearJitterRetryPolicy(t *testing.T) {
 	policy := &linearJitterRetryPolicy{}

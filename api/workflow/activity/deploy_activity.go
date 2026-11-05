@@ -821,6 +821,63 @@ func (a *DeployActivity) setGitEnv(ctx context.Context, envMap map[string]string
 
 var booleanValues = []string{"false", "0", "", "disable"}
 
+const (
+	tensorParallelArg   = "tensor-parallel-size"
+	pipelineParallelArg = "pipeline-parallel-size"
+	dataParallelArg     = "data-parallel-size"
+)
+
+// alignMultiNodeParallelism rewrites TP/PP/DP to GPUs-per-node/nodes/1 when a
+// multi-node vLLM deploy's TP*PP*DP does not match its total GPU count.
+// Template defaults (TP=1, PP=1) are always rendered into ENGINE_ARGS, so
+// multi-node.sh never gets to derive them from GPU_NUM and LWS_GROUP_SIZE.
+func alignMultiNodeParallelism(logger log.Logger, argValues map[string]string, templates []types.EngineArg, deployInfo *database.Deploy) {
+	if argValues == nil || deployInfo.PD != nil || !slices.ContainsFunc(templates, func(arg types.EngineArg) bool {
+		return arg.Name == pipelineParallelArg
+	}) {
+		return
+	}
+	var hardware types.HardWare
+	if err := json.Unmarshal([]byte(deployInfo.Hardware), &hardware); err != nil || hardware.Replicas <= 1 {
+		return
+	}
+	gpuPerNode, err := common.GetXPUNumber(hardware)
+	if err != nil || gpuPerNode < 1 {
+		return
+	}
+
+	worldSize := parallelArgValue(argValues, templates, tensorParallelArg) *
+		parallelArgValue(argValues, templates, pipelineParallelArg) *
+		parallelArgValue(argValues, templates, dataParallelArg)
+	totalGPU := gpuPerNode * hardware.Replicas
+	if worldSize == totalGPU {
+		return
+	}
+
+	argValues[tensorParallelArg] = strconv.Itoa(gpuPerNode)
+	argValues[pipelineParallelArg] = strconv.Itoa(hardware.Replicas)
+	argValues[dataParallelArg] = "1"
+	logger.Warn("multi-node parallel topology does not match total GPUs, corrected",
+		"deploy_id", deployInfo.ID, "world_size", worldSize, "total_gpu", totalGPU,
+		"tensor_parallel_size", gpuPerNode, "pipeline_parallel_size", hardware.Replicas)
+}
+
+func parallelArgValue(argValues map[string]string, templates []types.EngineArg, name string) int {
+	value, ok := argValues[name]
+	if !ok {
+		idx := slices.IndexFunc(templates, func(arg types.EngineArg) bool { return arg.Name == name })
+		if idx < 0 {
+			return 1
+		}
+		value = templates[idx].Value
+	}
+	size, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || size < 1 {
+		return 1
+	}
+	return size
+}
+
 // setEngineArgs composes the ENGINE_ARGS env for a deploy. repoPath
 // ("namespace/name") feeds the eagle3 draft registry lookup.
 func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, envMap map[string]string, deployInfo *database.Deploy, rc runtimeConfig, repoPath string) specDecodeState {
@@ -834,6 +891,7 @@ func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, e
 	if err != nil {
 		logger.Error("Deploy engine args is invalid json data", "deploy", *deployInfo, "error", err)
 	} else {
+		alignMultiNodeParallelism(logger, argValuesMap, rc.EngineArgsTemplates, deployInfo)
 		for _, arg := range rc.EngineArgsTemplates {
 			if arg.Virtual {
 				continue

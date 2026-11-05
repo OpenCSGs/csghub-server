@@ -8,7 +8,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 )
 
-// UpdateRef atomically updates one repository reference in Gitaly.
+// UpdateRef atomically updates one repository reference in Gitaly and preserves stream errors for cancellation classification.
 func (c *Client) UpdateRef(ctx context.Context, req gitserver.UpdateRefReq) error {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -35,11 +35,11 @@ func (c *Client) UpdateRef(ctx context.Context, req gitserver.UpdateRefReq) erro
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("UpdateReferences send: %v", err)
+		return fmt.Errorf("UpdateReferences send: %w", err)
 	}
 	_, err = client.CloseAndRecv()
 	if err != nil {
-		return fmt.Errorf("UpdateReferences recv: %v", err)
+		return fmt.Errorf("UpdateReferences recv: %w", err)
 	}
 
 	return nil

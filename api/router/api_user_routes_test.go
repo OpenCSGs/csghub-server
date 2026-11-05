@@ -12,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // needAdminMock returns a test version of NeedAdmin middleware that does not
@@ -35,6 +36,11 @@ func needAdminMock() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// platformAdminMock applies the same test identities to route-specific administrator grants.
+func platformAdminMock(...types.AdminPermission) gin.HandlerFunc {
+	return needAdminMock()
 }
 
 // setTestUser is a middleware that reads the X-Test-User header and sets it as
@@ -69,14 +75,13 @@ func newUserRoutesTestRouter(t *testing.T) *gin.Engine {
 	mc := middleware.MiddlewareCollection{}
 	mc.Auth.NeedLogin = middleware.MustLogin()
 	mc.Auth.NeedAdmin = needAdminMock()
+	mc.Auth.PlatformAdmin = platformAdminMock
 
 	router := gin.New()
 	router.Use(setTestUser)
 
 	apiGroup := router.Group("/api/v1")
-	adminGroup := apiGroup.Group("/admin")
-	adminGroup.Use(needAdminMock())
-	createUserRoutes(apiGroup, adminGroup, mc, proxyHandler, &handler.UserHandler{})
+	createUserRoutes(apiGroup, mc, proxyHandler, &handler.UserHandler{})
 
 	return router
 }
@@ -116,7 +121,7 @@ func TestUserRoutes_NormalUser_DeleteUser_Returns403(t *testing.T) {
 	router.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusForbidden, resp.Code,
-		"normal user DELETE /user/:username should return 403 (NeedAdmin)")
+		"normal user DELETE /user/:username should return 403 (PlatformAdmin)")
 }
 
 func TestUserRoutes_Admin_DeleteUser_PassesThrough(t *testing.T) {
@@ -291,6 +296,7 @@ func newOrgRoutesTestRouter(t *testing.T) *gin.Engine {
 	mc := middleware.MiddlewareCollection{}
 	mc.Auth.NeedLogin = middleware.MustLogin()
 	mc.Auth.NeedAdmin = needAdminMock()
+	mc.Auth.PlatformAdmin = platformAdminMock
 
 	router := gin.New()
 	router.Use(setTestUser)
@@ -407,14 +413,13 @@ func newGetUsersTestRouter(t *testing.T) *gin.Engine {
 
 	mc := middleware.MiddlewareCollection{}
 	mc.Auth.NeedLogin = middleware.MustLogin()
+	mc.Auth.PlatformAdmin = platformAdminMock
 
 	router := gin.New()
 	router.Use(setTestUser)
 
 	apiGroup := router.Group("/api/v1")
-	adminGroup := apiGroup.Group("/admin")
-	adminGroup.Use(needAdminMock())
-	createUserRoutes(apiGroup, adminGroup, mc, proxyHandler, &handler.UserHandler{})
+	createUserRoutes(apiGroup, mc, proxyHandler, &handler.UserHandler{})
 
 	return router
 }

@@ -15,9 +15,14 @@ import (
 var LocalizerMap map[string]*i18n.Localizer
 var Matcher language.Matcher
 
+// SupportedLanguages preserves the loaded resource order used by Matcher indexes.
+// It is populated during startup and must remain unchanged while requests are served.
+var SupportedLanguages []language.Tag
+
 //go:embed *
 var i18nConfigFiles embed.FS
 
+// InitLocalizersFromEmbedFile loads language resources and their matcher during service startup.
 func InitLocalizersFromEmbedFile() {
 	bundle := i18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
@@ -51,7 +56,8 @@ func InitLocalizersFromEmbedFile() {
 		}
 		supportedLang = append(supportedLang, tag)
 	}
-	Matcher = language.NewMatcher(supportedLang)
+	SupportedLanguages = supportedLang
+	Matcher = language.NewMatcher(SupportedLanguages)
 }
 
 // readAndMergeLanguageFiles

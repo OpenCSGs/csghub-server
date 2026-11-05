@@ -280,3 +280,66 @@ func TestModel_SkipBalance(t *testing.T) {
 		})
 	}
 }
+
+// TestModelAccessPolicySerialization locks the whitelist badge contract: the
+// source llm config's access policy rides on both response shapes, and a
+// public (empty after omitempty) policy stays off the wire.
+func TestModelAccessPolicySerialization(t *testing.T) {
+	t.Run("internal response carries whitelist policy", func(t *testing.T) {
+		model := &Model{
+			BaseModel: BaseModel{
+				ID:           "wl-model",
+				Object:       "model",
+				AccessPolicy: "whitelist",
+			},
+			InternalModelInfo: InternalModelInfo{CSGHubModelID: "org/repo"},
+		}
+		model.ForInternalUse()
+		data, err := json.Marshal(model)
+		require.NoError(t, err)
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(data, &out))
+		require.Equal(t, "whitelist", out["access_policy"])
+	})
+
+	t.Run("external response carries whitelist policy", func(t *testing.T) {
+		model := &Model{
+			BaseModel: BaseModel{
+				ID:           "wl-external",
+				Object:       "model",
+				AccessPolicy: "whitelist",
+			},
+		}
+		model.ForExternalResponse()
+		data, err := json.Marshal(model)
+		require.NoError(t, err)
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(data, &out))
+		require.Equal(t, "whitelist", out["access_policy"])
+	})
+
+	t.Run("public policy omitted", func(t *testing.T) {
+		model := &Model{BaseModel: BaseModel{ID: "public-model", Object: "model"}}
+		model.ForExternalResponse()
+		data, err := json.Marshal(model)
+		require.NoError(t, err)
+		require.NotContains(t, string(data), "access_policy")
+	})
+
+	t.Run("round trip preserves policy", func(t *testing.T) {
+		model := &Model{
+			BaseModel: BaseModel{
+				ID:           "wl-model",
+				Object:       "model",
+				AccessPolicy: "whitelist",
+			},
+			InternalModelInfo: InternalModelInfo{CSGHubModelID: "org/repo", SvcType: 3},
+		}
+		model.ForInternalUse()
+		data, err := json.Marshal(model)
+		require.NoError(t, err)
+		var parsed Model
+		require.NoError(t, json.Unmarshal(data, &parsed))
+		require.Equal(t, "whitelist", parsed.AccessPolicy)
+	})
+}

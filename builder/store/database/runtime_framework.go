@@ -154,6 +154,7 @@ func (rf *runtimeFrameworksStoreImpl) ListByArchsNameAndType(ctx context.Context
 			return q.Where("model_format = ?", format).Where("type = ?", deployType)
 		}).
 		Where("architecture_name in (?) or model_name=?", bun.In(archs), name).
+		DistinctOn("runtime_framework.id").
 		OrderExpr("runtime_framework.id DESC").
 		Exec(ctx, &result)
 
@@ -163,7 +164,21 @@ func (rf *runtimeFrameworksStoreImpl) ListByArchsNameAndType(ctx context.Context
 	for _, ra := range ras {
 		result = append(result, *ra.RuntimeFramework)
 	}
-	return result, nil
+	// Deduplicate by ID. The OR condition (architecture_name IN ... OR model_name = ...)
+	// can match multiple RuntimeArchitecture rows per RuntimeFramework when a framework
+	// declares both supported_archs and supported_models, producing duplicate
+	// RuntimeFramework entries. Keep the first occurrence (highest ID, since results
+	// are ordered by runtime_framework.id DESC).
+	seen := make(map[int64]bool, len(result))
+	unique := make([]RuntimeFramework, 0, len(result))
+	for _, f := range result {
+		if seen[f.ID] {
+			continue
+		}
+		seen[f.ID] = true
+		unique = append(unique, f)
+	}
+	return unique, nil
 }
 
 // FindByNameAndComputeType

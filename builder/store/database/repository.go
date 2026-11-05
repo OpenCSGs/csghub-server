@@ -15,11 +15,13 @@ import (
 	"time"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -34,6 +36,14 @@ var RepositorySourceAndPrefixMapping = map[types.RepositorySource]string{
 	types.OpenCSGSource:     types.OpenCSGPrefix,
 	types.LocalSource:       "",
 }
+
+type XnetMigrationIntent string
+
+const (
+	XnetMigrationInactive XnetMigrationIntent = "inactive"
+	XnetMigrationActive   XnetMigrationIntent = "active"
+	XnetMigrationPaused   XnetMigrationIntent = "paused"
+)
 
 var (
 	redisClient cache.RedisClient
@@ -117,6 +127,8 @@ func applySpaceStatusFilter(q *bun.SelectQuery, status string) {
 }
 
 type repoStoreImpl struct {
+	// rebacTupleJobClient records permission changes on this Store's business transaction.
+	rebacTupleJobClient         RebacTupleJobClient
 	config                      *config.Config
 	db                          *DB
 	DbDriver                    string
@@ -128,7 +140,8 @@ type repoStoreImpl struct {
 type RepoStore interface {
 	// CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error)
 	CreateRepo(ctx context.Context, input Repository) (*Repository, error)
-	UpdateRepo(ctx context.Context, input Repository) (*Repository, error)
+	// UpdateRepo preserves model visibility unless explicitly set and rechecks any requested public-setting guard under the row lock.
+	UpdateRepo(ctx context.Context, input Repository, options ...types.RepositoryUpdateOptions) (*Repository, error)
 	DeleteRepo(ctx context.Context, input Repository) error
 	Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error)
 	FindById(ctx context.Context, id int64) (*Repository, error)
@@ -175,6 +188,8 @@ type RepoStore interface {
 	FindWithMirror(ctx context.Context, repoType types.RepositoryType, owner, repoName string) (*Repository, error)
 	RefreshLFSObjectsSize(ctx context.Context, id int64) error
 	FindMirrorFinishedPrivateModelRepo(ctx context.Context) ([]*Repository, error)
+	// PublishPendingModelRepo consumes a publication request after rechecking the current mirror task under locks.
+	PublishPendingModelRepo(ctx context.Context, repoID int64) error
 	BatchUpdate(ctx context.Context, repos []*Repository) error
 	FindByRepoTypeAndPaths(ctx context.Context, repoType types.RepositoryType, path []string) ([]Repository, error)
 	FindUnhashedRepos(ctx context.Context, batchSize int, lastID int64) ([]Repository, error)
@@ -192,12 +207,15 @@ type RepoDescriptionStore interface {
 
 var _ RepoDescriptionStore = (*repoStoreImpl)(nil)
 
+// UpdateRepoSensitiveCheckStatus hides failed repositories without changing their publication intent.
 func (s *repoStoreImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error {
-	_, err := s.db.Operator.Core.NewUpdate().
+	update := s.db.Operator.Core.NewUpdate().
 		Model(&Repository{}).
-		Set("sensitive_check_status = ?", status).
-		Where("id = ?", repoID).
-		Exec(ctx)
+		Set("sensitive_check_status = ?", status)
+	if status == types.SensitiveCheckFail {
+		update.Set("private = ?", true)
+	}
+	_, err := update.Where("id = ?", repoID).Exec(ctx)
 	if err != nil {
 		return err
 	}
@@ -240,8 +258,14 @@ func NewRepoStoreWithDB(db *DB) RepoStore {
 // NewRepoStoreWithDBAndDeletionJobClient creates a repository Store with
 // transactional repository deletion jobs.
 func NewRepoStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) RepoStore {
+	return NewRepoStoreWithDBAndJobClients(db, jobClient, nil)
+}
+
+// NewRepoStoreWithDBAndJobClients injects repository deletion and permission job producers.
+func NewRepoStoreWithDBAndJobClients(db *DB, deletionJobs RepositoryDeletionJobClient, tupleJobs RebacTupleJobClient) RepoStore {
 	store := newRepoStoreInstance(db).(*repoStoreImpl)
-	store.repositoryDeletionJobClient = jobClient
+	store.repositoryDeletionJobClient = deletionJobs
+	store.rebacTupleJobClient = tupleJobs
 	return store
 }
 
@@ -256,16 +280,28 @@ func NewRepoStoreWithCache(config *config.Config, db *DB, cache cache.RedisClien
 	}
 }
 
+// NewRepoStoreWithCacheAndRebacTupleJobClient injects cache and transactional permission dependencies.
+func NewRepoStoreWithCacheAndRebacTupleJobClient(cfg *config.Config, db *DB, cache cache.RedisClient, tupleJobs RebacTupleJobClient) RepoStore {
+	store := NewRepoStoreWithCache(cfg, db, cache).(*repoStoreImpl)
+	store.rebacTupleJobClient = tupleJobs
+	return store
+}
+
 type Repository struct {
-	ID          int64  `bun:",pk,autoincrement" json:"id"`
-	UserID      int64  `bun:",notnull" json:"user_id"`
-	User        User   `bun:"rel:belongs-to,join:user_id=id" json:"user"`
-	Path        string `bun:",notnull" json:"path"`
-	GitPath     string `bun:",notnull" json:"git_path"`
-	Name        string `bun:",notnull" json:"name"`
-	Nickname    string `bun:",notnull" json:"nickname"`
-	Description string `bun:",nullzero" json:"description"`
-	Private     bool   `bun:",notnull" json:"private"`
+	// TupleNamespacePath supplies the real owner during creation and explicitly
+	// requests transactional tuple synchronization on ownership/inheritance updates.
+	TupleNamespacePath string `bun:"-" json:"-"`
+	ID                 int64  `bun:",pk,autoincrement" json:"id"`
+	UserID             int64  `bun:",notnull" json:"user_id"`
+	User               User   `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	Path               string `bun:",notnull" json:"path"`
+	GitPath            string `bun:",notnull" json:"git_path"`
+	Name               string `bun:",notnull" json:"name"`
+	Nickname           string `bun:",notnull" json:"nickname"`
+	Description        string `bun:",nullzero" json:"description"`
+	Private            bool   `bun:",notnull" json:"private"`
+	// PendingPublish records the model's persisted pending-publication state.
+	PendingPublish bool `bun:",notnull,default:false" json:"pending_publish"`
 	// Depreated
 	Labels               string                     `bun:",nullzero" json:"labels"`
 	License              string                     `bun:",nullzero" json:"license"`
@@ -298,10 +334,11 @@ type Repository struct {
 	Migrated             bool                       `bun:"," json:"migrated"`
 	Hashed               bool                       `bun:"," json:"hashed"`
 	// OrgInheritBlocked disables inherited permissions from the repository organization.
-	OrgInheritBlocked          bool               `bun:",notnull,default:false" json:"org_inherit_blocked"`
-	XnetEnabled                bool               `bun:"," json:"xnet_enabled"`
-	CurrentXnetMigrationTaskID int64              `bun:"," json:"current_xnet_migration_task_id"`
-	CurrentXnetMigrationTask   *XnetMigrationTask `bun:"rel:has-one,join:current_xnet_migration_task_id=id" json:"current_xnet_migration_task"`
+	OrgInheritBlocked          bool                `bun:",notnull,default:false" json:"org_inherit_blocked"`
+	XnetEnabled                bool                `bun:"," json:"xnet_enabled"`
+	CurrentXnetMigrationTaskID int64               `bun:"," json:"current_xnet_migration_task_id"`
+	CurrentXnetMigrationTask   *XnetMigrationTask  `bun:"rel:has-one,join:current_xnet_migration_task_id=id" json:"current_xnet_migration_task"`
+	XnetMigrationIntent        XnetMigrationIntent `bun:",notnull,default:'inactive',skipupdate" json:"-"`
 
 	// updated_at timestamp will be updated only if files changed
 	times
@@ -335,7 +372,8 @@ func findRepositoryIDsByNamespaces(ctx context.Context, db bun.IDB, namespaces [
 	return repositoryIDs, nil
 }
 
-func deleteRepositoriesByIDs(ctx context.Context, tx bun.Tx, repositoryIDs []int64, jobClient RepositoryDeletionJobClient) ([]DeletedRepository, error) {
+// deleteRepositoriesByIDs snapshots permission removals without taking sequence locks.
+func deleteRepositoriesByIDs(ctx context.Context, tx bun.Tx, repositoryIDs []int64, jobClient RepositoryDeletionJobClient, events *[]types.RebacTuple) ([]DeletedRepository, error) {
 	if len(repositoryIDs) == 0 {
 		return nil, nil
 	}
@@ -367,6 +405,12 @@ func deleteRepositoriesByIDs(ctx context.Context, tx bun.Tx, repositoryIDs []int
 	if err != nil {
 		return nil, err
 	}
+
+	event, err := repositoryDeletionTupleTx(ctx, tx, repositories, ownersByPath)
+	if err != nil {
+		return nil, err
+	}
+	*events = append(*events, event)
 
 	selectedIDs := make([]int64, 0, len(repositories))
 	deleted := make([]DeletedRepository, 0, len(repositories))
@@ -408,6 +452,46 @@ func deleteRepositoriesByIDs(ctx context.Context, tx bun.Tx, repositoryIDs []int
 		}
 	}
 	return deleted, nil
+}
+
+// repositoryDeletionTupleTx captures owner and direct grants under repository locks.
+// Authorization rows retain their original cleanup lifecycle in the deletion worker.
+func repositoryDeletionTupleTx(ctx context.Context, tx bun.Tx, repositories []Repository, owners map[string]repositoryOwner) (types.RebacTuple, error) {
+	var ids []int64
+	var relationships []rebac.Relationship
+	for _, repository := range repositories {
+		// Deletion already resolves nested namespace paths using the last separator.
+		path := repository.Path[:strings.LastIndex(repository.Path, "/")]
+		owner, ok := owners[path]
+		if !ok {
+			return types.RebacTuple{}, fmt.Errorf("load repository namespace %q: %w", path, sql.ErrNoRows)
+		}
+		r := rebac.Relationship{Object: rebac.RepositoryObject(repository.ID)}
+		switch owner.Type {
+		case UserNamespace:
+			r.Subject = rebac.UserSubject(owner.UUID)
+			r.Relation = rebac.RelationOwner
+		case OrgNamespace:
+			r.Subject = rebac.NewSubject(rebac.ObjectTypeOrganization, owner.UUID)
+			r.Relation = rebac.RelationOrganization
+		default:
+			return types.RebacTuple{}, fmt.Errorf("unsupported repository owner type %q", owner.Type)
+		}
+		relationships = append(relationships, repositoryOwnerDeletes(r)...)
+		ids = append(ids, repository.ID)
+	}
+	var grants []RepositoryAuthorization
+	if err := tx.NewSelect().Model(&grants).Where("repository_id IN (?)", bun.In(ids)).Order("id ASC").Scan(ctx); err != nil {
+		return types.RebacTuple{}, err
+	}
+	for _, grant := range grants {
+		r, err := authorizationTuple(grant)
+		if err != nil {
+			return types.RebacTuple{}, err
+		}
+		relationships = append(relationships, r)
+	}
+	return types.NewRebacTuple("repository.delete", types.TupleOperation{Delete: true, Relationships: relationships}), nil
 }
 
 type repositoryOwner struct {
@@ -649,7 +733,7 @@ func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repo
 		if err := assertAffectedOneRow(res, err); err != nil {
 			return fmt.Errorf("insert repository: %w", err)
 		}
-		return nil
+		return enqueueRepositoryTupleTx(ctx, tx, s.rebacTupleJobClient, nil, &input)
 	})
 	if err != nil {
 		err = errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
@@ -659,13 +743,18 @@ func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repo
 	return &input, nil
 }
 
+// withLockedRepositoryNamespace holds the namespace lock through the repository write and tuple enqueue.
 func (s *repoStoreImpl) withLockedRepositoryNamespace(
 	ctx context.Context,
 	repository Repository,
 	write func(context.Context, bun.Tx) error,
 ) error {
 	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := lockRepositoryNamespaceForWrite(ctx, tx, repository); err != nil {
+		lockTarget := repository
+		if repository.TupleNamespacePath != "" {
+			lockTarget.Path = repository.TupleNamespacePath + "/" + repository.Name
+		}
+		if err := lockRepositoryNamespaceForWrite(ctx, tx, lockTarget); err != nil {
 			return err
 		}
 		return write(ctx, tx)
@@ -704,7 +793,25 @@ func lockRepositoryNamespaceForWrite(ctx context.Context, tx bun.Tx, repository 
 	return nil
 }
 
-func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repository, error) {
+// UpdateRepo serializes settings changes and preserves publication intent across unrelated edits.
+// An explicit private setting cancels publication even when the repository is already private.
+// Options carry desired visibility, deferred request intent, and any required sensitive-check guard;
+// input.Private may still hide an incomplete model. Permission changes enqueue
+// their tuple events in the same transaction; unchanged inheritance alone is a no-op.
+func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository, options ...types.RepositoryUpdateOptions) (*Repository, error) {
+	if len(options) > 1 {
+		return nil, errors.New("only one repository update options value is allowed")
+	}
+	var settings types.RepositoryUpdateOptions
+	if len(options) == 1 {
+		settings = options[0]
+	}
+	if settings.RequireSensitiveCheckPass && (settings.Private == nil || *settings.Private) {
+		return nil, errors.New("sensitive-check guard requires an explicit public setting")
+	}
+	if settings.DeferPublication && (settings.Private == nil || *settings.Private) {
+		return nil, errors.New("deferred publication requires an explicit public setting")
+	}
 	err := s.db.RunInTx(ctx, func(ctx context.Context, tx Operator) error {
 		// Read the current path before taking locks so namespace locks can be acquired
 		// before the repository row lock, matching organization deletion's lock order.
@@ -728,6 +835,25 @@ func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repo
 			return fmt.Errorf("repository path changed concurrently from %q to %q", existing.Path, locked.Path)
 		}
 		existing = locked
+		// Serialize manual public validation with moderation's status/private update.
+		if settings.RequireSensitiveCheckPass && existing.SensitiveCheckStatus != types.SensitiveCheckPass {
+			return errorx.SensitiveCheckNotPassed(
+				fmt.Errorf("sensitive check status: %s", existing.SensitiveCheckStatus),
+				errorx.Ctx().Set("repo_path", existing.Path).Set("sensitive_check_status", existing.SensitiveCheckStatus.String()),
+			)
+		}
+		if err := applyModelVisibilityUpdate(ctx, tx.Core, &input, existing, settings); err != nil {
+			return err
+		}
+		// Inheritance requests keep the path and owner unchanged; path changes and
+		// transfers still run below. Explicit visibility requests must not be skipped.
+		// Compare the locked state rather than the caller's snapshot.
+		inheritanceUnchanged := input.TupleNamespacePath != "" && input.Path == existing.Path &&
+			input.UserID == existing.UserID && input.OrgInheritBlocked == existing.OrgInheritBlocked
+		if settings.Private == nil && inheritanceUnchanged {
+			input = existing
+			return nil
+		}
 
 		// If path changed and new path is not empty, migrate sync version records
 		if existing.Path != input.Path && input.Path != "" {
@@ -742,7 +868,12 @@ func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repo
 		// atomically with the classification derived from it.
 		updateQuery := tx.Core.NewUpdate().
 			Model(&input).
-			ExcludeColumn("compliance_status", "commercial_permission")
+			ExcludeColumn("compliance_status", "commercial_permission", "xnet_migration_intent")
+		if input.TupleNamespacePath == "" {
+			// Only explicit permission updates may write the inheritance setting.
+			updateQuery.ExcludeColumn("org_inherit_blocked")
+			input.OrgInheritBlocked = existing.OrgInheritBlocked
+		}
 		if types.SupportsLicenseCompliance(input.RepositoryType) {
 			updateQuery.ExcludeColumn("license")
 		}
@@ -755,9 +886,15 @@ func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repo
 		if types.SupportsLicenseCompliance(input.RepositoryType) {
 			input.License = existing.License
 		}
+		if input.TupleNamespacePath != "" && !inheritanceUnchanged {
+			return enqueueRepositoryTupleTx(ctx, bunTx, s.rebacTupleJobClient, &existing, &input)
+		}
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, errorx.ErrSensitiveCheckNotPassed) {
+			return nil, err
+		}
 		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
 	}
 	return &input, nil
@@ -822,8 +959,12 @@ func (s *repoStoreImpl) migrateSyncVersion(ctx context.Context, tx Operator, old
 
 func (s *repoStoreImpl) DeleteRepo(ctx context.Context, input Repository) error {
 	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{input.ID}, s.repositoryDeletionJobClient)
-		return err
+		var events []types.RebacTuple
+		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{input.ID}, s.repositoryDeletionJobClient, &events)
+		if err != nil {
+			return err
+		}
+		return enqueueRebacTuple(ctx, tx, s.rebacTupleJobClient, events...)
 	})
 	return errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
 }
@@ -850,7 +991,7 @@ func (s *repoStoreImpl) FindWithMirror(ctx context.Context, repoType types.Repos
 		NewSelect().
 		Model(repo).
 		Relation("Mirror").
-		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", owner, repoName)).
+		Where("repository.repository_type = ? AND LOWER(repository.path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", owner, repoName)).
 		Limit(1).
 		Scan(ctx)
 	err = errorx.HandleDBError(err,
@@ -1041,6 +1182,8 @@ func (s *repoStoreImpl) UpdateRepoCloneDownloads(ctx context.Context, repo *Repo
 	return
 }
 
+// UpdateDownloads refreshes only the aggregate count so a stale download snapshot
+// cannot overwrite visibility or restore a cancelled publication request.
 func (s *repoStoreImpl) UpdateDownloads(ctx context.Context, repo *Repository) error {
 	var downloadCount int64
 	err := s.db.Operator.Core.NewSelect().
@@ -1057,6 +1200,7 @@ func (s *repoStoreImpl) UpdateDownloads(ctx context.Context, repo *Repository) e
 	repo.DownloadCount = downloadCount
 	_, err = s.db.Operator.Core.NewUpdate().
 		Model(repo).
+		Column("download_count").
 		WherePK().
 		Exec(ctx)
 	return errorx.HandleDBError(err, errorx.Ctx().
@@ -2298,27 +2442,33 @@ func (s *repoStoreImpl) DeleteAllTags(ctx context.Context, repoID int64) error {
 	return nil
 }
 
-// UpdateOrCreateRepo updates or creates a repository by its case-insensitive path.
+// UpdateOrCreateRepo refreshes upstream metadata by case-insensitive path while
+// preserving visibility on every existing repository. New repositories retain
+// the incoming visibility; models also preserve local synchronization and review state.
 func (s *repoStoreImpl) UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	input.UpdatedAt = time.Now()
 	err := s.withLockedRepositoryNamespace(ctx, input, func(ctx context.Context, tx bun.Tx) error {
 		if err := prepareRepositoryComplianceForUpsert(ctx, tx, &input); err != nil {
 			return err
 		}
-		_, err := tx.NewUpdate().
-			Model(&input).
+		// Upstream metadata cannot change local visibility or publication intent.
+		update := tx.NewUpdate().Model(&input).ExcludeColumn("private", "pending_publish")
+		if input.RepositoryType == types.ModelRepo {
+			update.ExcludeColumn("sync_status", "sensitive_check_status")
+		}
+		_, err := update.
 			Where("LOWER(path) = LOWER(?) and repository_type = ?", input.Path, input.RepositoryType).
 			Returning("*").
 			Exec(ctx, &input)
 		if err == nil {
-			return nil
+			return enqueueRepositoryTupleTx(ctx, tx, s.rebacTupleJobClient, nil, &input)
 		}
 
 		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
 		if err := assertAffectedOneRow(res, err); err != nil {
 			return fmt.Errorf("insert repository: %w", err)
 		}
-		return nil
+		return enqueueRepositoryTupleTx(ctx, tx, s.rebacTupleJobClient, nil, &input)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update or create repository in tx failed,error:%w", err)
@@ -2352,6 +2502,8 @@ func prepareRepositoryComplianceForUpsert(ctx context.Context, tx bun.Tx, input 
 	return nil
 }
 
+// UpdateLicenseByTag refreshes the license without writing stale repository settings.
+// Models and datasets also update their license compliance classification.
 func (s *repoStoreImpl) UpdateLicenseByTag(ctx context.Context, repoID int64) error {
 	repo, err := s.FindById(ctx, repoID)
 	if err != nil {
@@ -2373,8 +2525,11 @@ func (s *repoStoreImpl) UpdateLicenseByTag(ctx context.Context, repoID int64) er
 		if license == "" {
 			return nil
 		}
-		repo.License = license
-		_, err = s.UpdateRepo(ctx, *repo)
+		_, err = s.db.Core.NewUpdate().
+			Model((*Repository)(nil)).
+			Set("license = ?", license).
+			Where("id = ?", repoID).
+			Exec(ctx)
 		return err
 	}
 	if types.NormalizeRepositoryLicense(repo.License) == types.NormalizeRepositoryLicense(license) {
@@ -2632,12 +2787,15 @@ func (s *repoStoreImpl) RefreshLFSObjectsSize(ctx context.Context, repoID int64)
 	return err
 }
 
+// FindMirrorFinishedPrivateModelRepo lists pending publications for the current successful task.
+// PublishPendingModelRepo must recheck each candidate under locks before changing visibility.
 func (s *repoStoreImpl) FindMirrorFinishedPrivateModelRepo(ctx context.Context) ([]*Repository, error) {
 	var res []*Repository
 	err := s.db.Operator.Core.NewSelect().
 		Model(&res).
 		Join("JOIN mirrors ON mirrors.repository_id = repository.id").
-		Join("JOIN mirror_tasks ON mirror_tasks.mirror_id = mirrors.id").
+		Join("JOIN mirror_tasks ON mirror_tasks.id = mirrors.current_task_id AND mirror_tasks.mirror_id = mirrors.id").
+		Where("repository.pending_publish = ?", true).
 		Where(
 			"repository.repository_type = ? and mirror_tasks.status = ? and repository.sensitive_check_status in (?) and repository.private = true",
 			types.ModelRepo, types.MirrorLfsSyncFinished, bun.In([]types.SensitiveCheckStatus{types.SensitiveCheckPass, types.SensitiveCheckSkip})).
@@ -2658,7 +2816,7 @@ func (s *repoStoreImpl) FindByRepoTypeAndPaths(ctx context.Context, repoType typ
 	err := s.db.Operator.Core.NewSelect().
 		Model(&res).
 		Relation("Mirror").
-		Where("repository_type = ? and path in (?)", repoType, bun.In(paths)).
+		Where("repository.repository_type = ? and repository.path in (?)", repoType, bun.In(paths)).
 		Order("created_at DESC").
 		Scan(ctx)
 	return res, err
@@ -2708,4 +2866,170 @@ func (s *repoStoreImpl) GetRepositoriesWithoutStatistics(ctx context.Context, li
 	}
 
 	return repos, nil
+}
+
+// applyModelVisibilityUpdate preserves current visibility for metadata-only writes.
+// Explicit settings use the locked row and separate request intent from persisted state.
+func applyModelVisibilityUpdate(ctx context.Context, db bun.IDB, input *Repository, existing Repository, settings types.RepositoryUpdateOptions) error {
+	// Preserve a caller's deferred public request if synchronization finishes while it waits for the lock.
+	deferredRequest := settings.DeferPublication
+	private := settings.Private
+	input.PendingPublish = existing.PendingPublish
+	if existing.RepositoryType != types.ModelRepo {
+		return nil
+	}
+	input.Private = existing.Private
+	input.SyncStatus = existing.SyncStatus
+	input.SensitiveCheckStatus = existing.SensitiveCheckStatus
+	if private == nil {
+		return nil
+	}
+	input.Private = *private
+	input.PendingPublish = false
+	if *private {
+		return nil
+	}
+	// Recheck detachment under the repository lock before accepting normal public settings.
+	// Pending first-time internal mirrors still remain hidden before their initial binding.
+	if existing.SyncStatus == types.SyncStatusCanceled || existing.SyncStatus == types.SyncStatusFailed {
+		bound, err := db.NewSelect().Model((*Mirror)(nil)).Where("repository_id = ?", existing.ID).Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check terminated model mirror binding: %w", err)
+		}
+		if !bound {
+			// A previously deferred request has not passed the normal public-setting checks.
+			// Retry through the component after detachment instead of silently bypassing them.
+			if deferredRequest {
+				return errors.New("model mirror was removed while publication was deferred; retry repository settings")
+			}
+			return nil
+		}
+	}
+	unfinished, err := hasUnfinishedModelMirror(ctx, db, existing.ID)
+	if err != nil {
+		return fmt.Errorf("check current model synchronization: %w", err)
+	}
+	// Internal mirrors may create the repository before binding their first task.
+	unfinished = unfinished || deferredRequest || (existing.SyncStatus != "" && existing.SyncStatus != types.SyncStatusCompleted)
+	input.Private = unfinished
+	input.PendingPublish = unfinished
+	return nil
+}
+
+// hasUnfinishedModelMirror checks the current task rather than historical successes.
+// Missing current tasks remain hidden until synchronization can finish successfully.
+func hasUnfinishedModelMirror(ctx context.Context, db bun.IDB, repoID int64) (bool, error) {
+	return db.NewSelect().Model((*Mirror)(nil)).
+		Join("LEFT JOIN mirror_tasks AS task ON task.id = mirror.current_task_id AND task.mirror_id = mirror.id").
+		Where("mirror.repository_id = ?", repoID).
+		Where("task.id IS NULL OR task.status != ?", types.MirrorLfsSyncFinished).
+		Exists(ctx)
+}
+
+// PublishPendingModelRepo publishes only the current successful synchronization.
+// Mirror, repository, and task locks match synchronization's lock order. A user
+// setting private while this activity waits cancels publication before it writes.
+func (s *repoStoreImpl) PublishPendingModelRepo(ctx context.Context, repoID int64) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var mirror Mirror
+		err := tx.NewSelect().Model(&mirror).Where("repository_id = ?", repoID).Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("find publication mirror: %w", err)
+		}
+		if mirror.CurrentTaskID == 0 {
+			return nil
+		}
+		task, err := lockMirrorTaskAggregateTx(ctx, tx, mirror.CurrentTaskID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("lock publication mirror: %w", err)
+		}
+		repo := task.Mirror.Repository
+		if repo.ID != repoID || !repo.DeletedAt.IsZero() || repo.RepositoryType != types.ModelRepo ||
+			!repo.PendingPublish || !repo.Private || task.Mirror.CurrentTaskID != task.ID ||
+			task.Status != types.MirrorLfsSyncFinished {
+			return nil
+		}
+		if repo.SensitiveCheckStatus != types.SensitiveCheckPass && repo.SensitiveCheckStatus != types.SensitiveCheckSkip {
+			return nil
+		}
+		_, err = tx.NewUpdate().Model(repo).
+			Set("private = ?", false).
+			Set("pending_publish = ?", false).
+			WherePK().Exec(ctx)
+		return err
+	})
+}
+
+// repositoryOwnerTx resolves tuple identity on the same connection as the mutation.
+func repositoryOwnerTx(ctx context.Context, tx bun.Tx, repo Repository) (rebac.Relationship, error) {
+	path, _ := repo.NamespaceAndName()
+	if repo.TupleNamespacePath != "" {
+		path = repo.TupleNamespacePath
+	}
+	var namespace Namespace
+	if err := tx.NewSelect().Model(&namespace).Relation("User").
+		Where("LOWER(namespace.path) = LOWER(?)", path).
+		OrderExpr("(namespace.path = ?) DESC", path).OrderExpr("namespace.id ASC").Limit(1).Scan(ctx); err != nil {
+		return rebac.Relationship{}, err
+	}
+	r := rebac.Relationship{Object: rebac.RepositoryObject(repo.ID)}
+	switch namespace.NamespaceType {
+	case UserNamespace:
+		r.Subject = rebac.UserSubject(namespace.User.UUID)
+		r.Relation = rebac.RelationOwner
+	case OrgNamespace:
+		var org Organization
+		if err := tx.NewSelect().Model(&org).Where("namespace_id = ?", namespace.ID).Scan(ctx); err != nil {
+			return r, err
+		}
+		r.Subject = rebac.NewSubject(rebac.ObjectTypeOrganization, org.UUID.String())
+		r.Relation = rebac.RelationOrganization
+		if repo.OrgInheritBlocked {
+			r.Relation = rebac.RelationOrganizationDirect
+		}
+	default:
+		return r, fmt.Errorf("unsupported repository namespace type %q", namespace.NamespaceType)
+	}
+	return r, nil
+}
+
+// repositoryOwnerDeletes includes both organization inheritance variants.
+func repositoryOwnerDeletes(r rebac.Relationship) []rebac.Relationship {
+	if r.Relation != rebac.RelationOrganization && r.Relation != rebac.RelationOrganizationDirect {
+		return []rebac.Relationship{r}
+	}
+	r.Relation = rebac.RelationOrganization
+	direct := r
+	direct.Relation = rebac.RelationOrganizationDirect
+	return []rebac.Relationship{r, direct}
+}
+
+// enqueueRepositoryTupleTx saves a creation, transfer, inheritance change, or deletion.
+// A missing previous namespace is accepted for the temporary path used at creation.
+func enqueueRepositoryTupleTx(ctx context.Context, tx bun.Tx, tupleJobs RebacTupleJobClient, previous, next *Repository) error {
+	var ops []types.TupleOperation
+	if previous != nil {
+		r, err := repositoryOwnerTx(ctx, tx, *previous)
+		_, temporaryPathErr := uuid.Parse(strings.Replace(previous.Path, "/", "-", 1))
+		if err != nil && !(next != nil && temporaryPathErr == nil && errors.Is(err, sql.ErrNoRows)) {
+			return err
+		}
+		if err == nil {
+			ops = append(ops, types.TupleOperation{Delete: true, Relationships: repositoryOwnerDeletes(r)})
+		}
+	}
+	if next != nil {
+		r, err := repositoryOwnerTx(ctx, tx, *next)
+		if err != nil {
+			return err
+		}
+		ops = append(ops, types.TupleOperation{Relationships: []rebac.Relationship{r}})
+	}
+	return enqueueRebacTuple(ctx, tx, tupleJobs, types.NewRebacTuple("repository.namespace", ops...))
 }

@@ -1,0 +1,11 @@
+{
+    "error.LLM-ERR-0": {
+        "other": "未找到該 LLM 配置"
+    },
+    "error.LLM-ERR-1": {
+        "other": "未找到要授權的用戶或組織"
+    },
+    "error.LLM-ERR-2": {
+        "other": "該用戶或組織已被授權訪問此模型"
+    }
+}

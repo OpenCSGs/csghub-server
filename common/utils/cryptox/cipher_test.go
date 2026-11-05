@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -497,4 +499,28 @@ func newTestCipher(t *testing.T, infoPrefix string) *Cipher {
 		t.Fatal("cipher random reader must be initialized")
 	}
 	return cipher
+}
+
+// TestIdentityLookupHash verifies domain separation and stable keyed indexes.
+func TestIdentityLookupHash(t *testing.T) {
+	c, err := NewCipher(Config{MasterKey: testMasterKey, Salt: testSalt, InfoPrefix: "identity/"})
+	require.NoError(t, err)
+	h, err := c.LookupHash("11010519491231002X", "id-number")
+	require.NoError(t, err)
+	require.Len(t, h, 64)
+	again, err := c.LookupHash("11010519491231002X", "id-number")
+	require.NoError(t, err)
+	require.Equal(t, h, again)
+	other, err := c.LookupHash("11010519491231002X", "other-purpose")
+	require.NoError(t, err)
+	require.NotEqual(t, h, other)
+	ciphertext, err := c.EncryptString("11010519491231002X", "alice")
+	require.NoError(t, err)
+	_, err = c.DecryptString(ciphertext, "bob")
+	require.Error(t, err)
+	rotated, err := NewCipher(Config{MasterKey: []byte("abcdef0123456789abcdef0123456789ab"), Salt: testSalt, InfoPrefix: "identity/"})
+	require.NoError(t, err)
+	rh, err := rotated.LookupHash("11010519491231002X", "id-number")
+	require.NoError(t, err)
+	require.NotEqual(t, h, rh)
 }

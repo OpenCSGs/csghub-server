@@ -11,13 +11,13 @@ import (
 	"opencsg.com/csghub-server/builder/analytics"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/builder/temporal"
+	"opencsg.com/csghub-server/builder/workhub"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/user/router"
@@ -77,36 +77,15 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("unable to create workflow client, error:%w", err)
 		}
 
-		ssoClient, err := rpc.NewSSOClient(cfg)
+		userWorkClients, err := newUserWorkClients(cmd.Context(), cfg)
 		if err != nil {
-			return fmt.Errorf("create sso client: %w", err)
+			return err
 		}
-		authorizer, err := factory.NewAuthorizer()
+		stopWorkers, err := startUserWorkClients(cmd.Context(), userWorkClients)
 		if err != nil {
-			return fmt.Errorf("create rebac authorizer: %w", err)
+			return err
 		}
-		orgWorkClient, err := component.NewOrganizationDeletionWorkClient(
-			cmd.Context(),
-			cfg.Database.DSN,
-			ssoClient,
-			authorizer,
-			database.NewRepositoryAuthorizationStore(),
-			4, // magic number
-		)
-		if err != nil {
-			return fmt.Errorf("create organization deletion work client: %w", err)
-		}
-		if err := orgWorkClient.Start(cmd.Context()); err != nil {
-			return fmt.Errorf("start organization deletion work client: %w", err)
-		}
-		slog.Info("organization deletion worker started", slog.String("queue", workhub.OrganizationDeletionQueue))
-		defer func() {
-			stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := orgWorkClient.Stop(stopCtx); err != nil {
-				slog.Error("failed to stop organization deletion work client", slog.Any("error", err))
-			}
-		}()
+		defer stopWorkers()
 
 		r, err := router.NewRouter(cfg)
 		if err != nil {
@@ -132,4 +111,52 @@ func serverExample() string {
 # for development
 csghub-server user launch
 `
+}
+
+// newUserWorkClients creates separate leased organization and tuple consumers.
+func newUserWorkClients(ctx context.Context, cfg *config.Config) ([]workhub.WorkClient, error) {
+	ssoClient, err := rpc.NewSSOClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create sso client: %w", err)
+	}
+	authorizer, err := factory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("create rebac authorizer: %w", err)
+	}
+	organizationWorker := component.NewOrganizationDeletionWorker(ssoClient, database.NewRepositoryAuthorizationStore())
+	organizationClient, err := component.NewOrganizationDeletionWorkClient(ctx, cfg.Database.DSN, organizationWorker)
+	if err != nil {
+		return nil, fmt.Errorf("create organization deletion work client: %w", err)
+	}
+	clients := []workhub.WorkClient{organizationClient}
+	tupleClient, err := component.NewRebacTupleWorkClient(ctx, cfg.Database.DSN, component.NewRebacTupleWorker(authorizer))
+	if err != nil {
+		stopUserWorkClients(clients)
+		return nil, fmt.Errorf("create ReBAC tuple work client: %w", err)
+	}
+	return append(clients, tupleClient), nil
+}
+
+// stopUserWorkClients gives each client an independent shutdown budget.
+func stopUserWorkClients(clients []workhub.WorkClient) {
+	for _, client := range clients {
+		stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := client.Stop(stopCtx); err != nil {
+			slog.Error("failed to stop user work client", slog.Any("error", err))
+		}
+		cancel()
+	}
+}
+
+// startUserWorkClients starts both consumers before HTTP and releases all clients on failure.
+func startUserWorkClients(ctx context.Context, clients []workhub.WorkClient) (func(), error) {
+	stopWorkers := func() { stopUserWorkClients(clients) }
+	for _, client := range clients {
+		if err := client.Start(ctx); err != nil {
+			stopWorkers()
+			return nil, fmt.Errorf("start user work client: %w", err)
+		}
+	}
+	slog.Info("user workers started", slog.Any("queues", []string{workhub.OrganizationDeletionQueue, workhub.RebacTupleQueue}))
+	return stopWorkers, nil
 }

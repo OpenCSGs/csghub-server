@@ -33,6 +33,18 @@ type ResolveOptions struct {
 	// format. Empty when the caller does not do protocol-aware resolution
 	// (e.g. multimodal tasks).
 	ClientProtocol commontypes.ApiFormat
+	// Caller identifies who is calling, for model access whitelist
+	// enforcement during model resolution.
+	Caller *commontypes.GatewayWhitelistCaller
+}
+
+// AutoModelSelector backs the virtual model that stands for automatic
+// model selection.  AutoModelID returns "" when the feature is not
+// configured, in which case the Planner never consults the selector and
+// the virtual model ID is just an unknown model like any other.
+type AutoModelSelector interface {
+	AutoModelID() string
+	ResolveAutoModel(ctx context.Context, req types.AutoRouteRequest) (*types.AutoRouteDecision, error)
 }
 
 // BalanceChecker verifies that the tenant has sufficient balance.

@@ -191,6 +191,97 @@ func TestMessagesToChatMessages(t *testing.T) {
 		assert.Equal(t, "system", msgs[0]["role"])
 		assert.Equal(t, "Be concise", msgs[0]["content"])
 	})
+	t.Run("tool result and user text in one message keeps tool adjacency", func(t *testing.T) {
+		// Claude Code sends tool_result blocks and the user's new text in one
+		// user message when the user types while a tool runs.  The converted
+		// sequence must keep the tool response directly after the assistant
+		// tool_calls message and before the user text.
+		req := &types.AnthropicMessagesRequest{
+			Messages: []types.AnthropicMessage{
+				{Role: "user", Content: json.RawMessage(`"List files"`)},
+				{
+					Role:    "assistant",
+					Content: json.RawMessage(`[{"type":"tool_use","id":"tool_1","name":"ls","input":{"path":"."}}]`),
+				},
+				{
+					Role:    "user",
+					Content: json.RawMessage(`[{"type":"tool_result","tool_use_id":"tool_1","content":"main.go"},{"type":"text","text":"Now summarize."}]`),
+				},
+			},
+		}
+		msgs, err := messagesToChatMessages(req, true)
+		require.NoError(t, err)
+		require.Len(t, msgs, 4)
+
+		roles := chatMessageRoles(msgs)
+		assert.Equal(t, []string{"user", "assistant", "tool", "user"}, roles)
+		assert.Equal(t, "tool_1", msgs[2]["tool_call_id"])
+		assert.Equal(t, "Now summarize.", msgs[3]["content"])
+	})
+
+	t.Run("non-tool message between tool_calls and result is deferred", func(t *testing.T) {
+		req := &types.AnthropicMessagesRequest{
+			Messages: []types.AnthropicMessage{
+				{Role: "user", Content: json.RawMessage(`"List files"`)},
+				{
+					Role:    "assistant",
+					Content: json.RawMessage(`[{"type":"tool_use","id":"tool_1","name":"ls","input":{"path":"."}}]`),
+				},
+				{Role: "system", Content: json.RawMessage(`"A reminder arrived mid-turn."`)},
+				{
+					Role:    "user",
+					Content: json.RawMessage(`[{"type":"tool_result","tool_use_id":"tool_1","content":"main.go"}]`),
+				},
+				{Role: "user", Content: json.RawMessage(`"Now summarize."`)},
+			},
+		}
+		msgs, err := messagesToChatMessages(req, true)
+		require.NoError(t, err)
+		require.Len(t, msgs, 5)
+
+		roles := chatMessageRoles(msgs)
+		assert.Equal(t, []string{"user", "assistant", "tool", "system", "user"}, roles)
+		assert.Equal(t, "A reminder arrived mid-turn.", msgs[3]["content"])
+	})
+
+	t.Run("parallel tool results keep adjacency", func(t *testing.T) {
+		req := &types.AnthropicMessagesRequest{
+			Messages: []types.AnthropicMessage{
+				{
+					Role: "assistant",
+					Content: json.RawMessage(`[
+						{"type":"tool_use","id":"tool_1","name":"ls","input":{"path":"."}},
+						{"type":"tool_use","id":"tool_2","name":"cat","input":{"file":"main.go"}}
+					]`),
+				},
+				{
+					Role: "user",
+					Content: json.RawMessage(`[
+						{"type":"tool_result","tool_use_id":"tool_1","content":"main.go"},
+						{"type":"tool_result","tool_use_id":"tool_2","content":"package main"}
+					]`),
+				},
+			},
+		}
+		msgs, err := messagesToChatMessages(req, true)
+		require.NoError(t, err)
+		require.Len(t, msgs, 3)
+
+		roles := chatMessageRoles(msgs)
+		assert.Equal(t, []string{"assistant", "tool", "tool"}, roles)
+		assert.Equal(t, "tool_1", msgs[1]["tool_call_id"])
+		assert.Equal(t, "tool_2", msgs[2]["tool_call_id"])
+	})
+}
+
+// chatMessageRoles extracts the role sequence from converted chat messages.
+func chatMessageRoles(msgs []map[string]any) []string {
+	roles := make([]string, 0, len(msgs))
+	for _, msg := range msgs {
+		role, _ := msg["role"].(string)
+		roles = append(roles, role)
+	}
+	return roles
 }
 
 func TestMessagesToolsToChatTools(t *testing.T) {
@@ -511,6 +602,20 @@ func TestMessagesToResponsesRequest(t *testing.T) {
 		var reasoning map[string]any
 		require.NoError(t, json.Unmarshal(respReq.Reasoning, &reasoning))
 		assert.Equal(t, "medium", reasoning["effort"])
+	})
+
+	t.Run("metadata user is not forwarded", func(t *testing.T) {
+		req := &types.AnthropicMessagesRequest{
+			Model:     "claude-3",
+			MaxTokens: 1024,
+			Messages: []types.AnthropicMessage{
+				{Role: "user", Content: json.RawMessage(`"Hello"`)},
+			},
+			Metadata: &types.AnthropicMetadata{UserID: "claude-code-user"},
+		}
+		respReq, err := messagesToResponsesRequest(req, "claude-3")
+		require.NoError(t, err)
+		assert.Empty(t, respReq.User, "metadata.user_id must not be forwarded as the upstream user field")
 	})
 
 	t.Run("tool use and result in messages", func(t *testing.T) {

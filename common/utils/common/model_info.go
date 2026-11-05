@@ -24,9 +24,12 @@ type TensorSummary struct {
 // file List contains the whole path of the file
 // https://hub.opencsg.com/csg/Qwen/Qwen2-1.5B-Instruct/resolve/main/model-00001-of-0002.safetensors
 // https://hub.opencsg.com/csg/Qwen/Qwen2-1.5B-Instruct/resolve/main/model-00001-of-0002.safetensors
-func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
+func GetModelInfo(fileList []string, minContext int, config *types.ModelConfig) (*types.ModelInfo, error) {
 
 	modelInfo := &types.ModelInfo{}
+	correction := modelParameterCorrection(config)
+	canCorrect := correction != nil
+	tensors := make(map[string]safetensorInfo)
 	var totalParams int64
 	var totalMemoryBytes int64
 	var modelSize int64
@@ -40,7 +43,16 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 		modelInfo.ParamsValid = true
 		delete(header, "__metadata__")
 
-		for _, value := range header {
+		for name, value := range header {
+			if canCorrect {
+				tensor, ok := parseSafetensorInfo(value)
+				_, duplicate := tensors[name]
+				if !ok || duplicate {
+					canCorrect = false
+				} else {
+					tensors[name] = tensor
+				}
+			}
 			tensorData, ok := value.(map[string]interface{})
 			if !ok {
 				continue
@@ -66,6 +78,12 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 
 		modelInfo.TotalParams = totalParams
 		modelInfo.ParamsBillions = float32(math.Round(float64(totalParams)/1e9*100) / 100)
+	}
+	if canCorrect {
+		if corrected, ok := correction(totalParams, tensors); ok {
+			modelInfo.TotalParams = corrected
+			modelInfo.ParamsBillions = float32(math.Round(float64(corrected)/1e9*100) / 100)
+		}
 	}
 	modelInfo.ModelWeightsGB = float32(modelSize / (1024 * 1024 * 1024))
 	modelInfo.MiniGPUMemoryGB = max(float32(totalMemoryBytes/(1024*1024*1024)), 0)

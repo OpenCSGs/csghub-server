@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -33,6 +34,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/mirror/hook"
 )
 
@@ -665,6 +667,87 @@ func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFileRejectsNonPosit
 	require.EqualError(suite.T(), err, "LFS multipart part size must be positive: 0")
 }
 
+// TestLfsPartSizeCapsTotalPartsAtMaxPartNum verifies the partSize derivation
+// keeps totalParts within the 1000-part listing cap. Floor division previously
+// produced 1001 parts for files just over the threshold, so the post-upload
+// part-count check could never match and the upload stalled at 99%.
+func TestLfsPartSizeCapsTotalPartsAtMaxPartNum(t *testing.T) {
+	// 100 GiB with the default 100 MiB PartSize crosses the 1000-part threshold.
+	const gib int64 = 1024 * 1024 * 1024
+	objectSize := int64(100 * gib)
+
+	partSize := common.LfsPartSize(100, objectSize)
+	totalParts := int(math.Ceil(float64(objectSize) / float64(partSize)))
+
+	require.LessOrEqual(t, totalParts, maxPartNum, "totalParts must not exceed the S3/MinIO listing cap")
+	require.Equal(t, maxPartNum, totalParts, "ceiling division should land exactly on the cap, not cap+1")
+	// Every non-terminal part must respect S3's 5 MiB minimum.
+	require.GreaterOrEqual(t, partSize, int64(5*1024*1024))
+}
+
+// TestLfsPartSizeUsesConfiguredSizeBelowThreshold verifies small objects keep
+// the configured partSize and never hit the recompute branch.
+func TestLfsPartSizeUsesConfiguredSizeBelowThreshold(t *testing.T) {
+	partSize := common.LfsPartSize(100, 50*1024*1024)
+
+	require.Equal(t, int64(100*1024*1024), partSize)
+}
+
+// TestLfsPartSizeFloorsAtFiveMiB verifies a small configured PartSize that would
+// recompute below S3's minimum is clamped to 5 MiB.
+func TestLfsPartSizeFloorsAtFiveMiB(t *testing.T) {
+	// 2 GiB with a 1 MiB PartSize triggers the recompute: ceil(2GiB/1000) < 5MiB.
+	partSize := common.LfsPartSize(1, 2*1024*1024*1024)
+
+	require.Equal(t, int64(5*1024*1024), partSize)
+}
+
+// TestListAllObjectPartsAggregatesPaginatedParts verifies the helper follows
+// IsTruncated/NextPartNumberMarker to collect parts beyond one S3 page.
+func TestListAllObjectPartsAggregatesPaginatedParts(t *testing.T) {
+	worker, mocks := newTestLfsSyncWorker(t, "")
+	ctx := context.Background()
+	page1 := minio.ListObjectPartsResult{
+		IsTruncated:          true,
+		NextPartNumberMarker: 2,
+		ObjectParts: []minio.ObjectPart{
+			{PartNumber: 1, Size: 4},
+			{PartNumber: 2, Size: 4},
+		},
+	}
+	page2 := minio.ListObjectPartsResult{
+		ObjectParts: []minio.ObjectPart{{PartNumber: 3, Size: 2}},
+	}
+	// The two calls differ by the part-number marker, so each expectation
+	// matches its own page unambiguously.
+	mocks.ossCore.EXPECT().ListObjectParts(ctx, "test-bucket", "object", "upload", 0, 0).Return(page1, nil).Once()
+	mocks.ossCore.EXPECT().ListObjectParts(ctx, "test-bucket", "object", "upload", 2, 0).Return(page2, nil).Once()
+
+	result, err := worker.listAllObjectParts(ctx, "object", "upload")
+
+	require.NoError(t, err)
+	require.Len(t, result.ObjectParts, 3)
+	require.Equal(t, []int{1, 2, 3}, []int{
+		result.ObjectParts[0].PartNumber,
+		result.ObjectParts[1].PartNumber,
+		result.ObjectParts[2].PartNumber,
+	})
+}
+
+// TestListAllObjectPartsReturnsSinglePage verifies a non-truncated response
+// makes exactly one ListObjectParts call.
+func TestListAllObjectPartsReturnsSinglePage(t *testing.T) {
+	worker, mocks := newTestLfsSyncWorker(t, "")
+	ctx := context.Background()
+	single := minio.ListObjectPartsResult{ObjectParts: []minio.ObjectPart{{PartNumber: 1, Size: 4}}}
+	mocks.ossCore.EXPECT().ListObjectParts(ctx, "test-bucket", "object", "upload", 0, 0).Return(single, nil)
+
+	result, err := worker.listAllObjectParts(ctx, "object", "upload")
+
+	require.NoError(t, err)
+	require.Len(t, result.ObjectParts, 1)
+}
+
 func (suite *LfsSyncWorkerTestSuite) TestSendMessage() {
 	repo := createTestRepository()
 	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
@@ -1017,7 +1100,7 @@ func TestLfsSyncWorker_MultipartResumeUsesPersistedPartBytes(t *testing.T) {
 	}}}
 	mocks.ossCore.EXPECT().ListObjectParts(ctx, "test-bucket", "object", "upload", 0, 0).
 		Return(uploadedParts, nil).Once()
-	mocks.syncCache.EXPECT().CacheLfsSyncFileProgress(ctx, int64(1), "oid", "5", 33).
+	mocks.syncCache.EXPECT().CacheLfsSyncFileProgress(ctx, int64(1), "oid", "4", 33).
 		Return(nil).Once()
 
 	err := worker.multipartUploadWithRetry(

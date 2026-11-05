@@ -173,7 +173,7 @@ func (c *aiGatewayUpstreamSyncComponentImpl) SyncRunningDeploy(ctx context.Conte
 		SourceID:    info.DeployID,
 		Metadata: &commontypes.UpstreamMetadata{
 			InternalModelInfo: c.buildInternalModelInfo(info, hostOverride),
-			Protocol:          protocolForRuntimeFramework(info.RuntimeFramework),
+			Protocol:          engineForcedProtocol(info),
 		},
 	}
 
@@ -239,12 +239,12 @@ func (c *aiGatewayUpstreamSyncComponentImpl) mergeSyncOwnedMetadata(existing *co
 		responsesChatAdapter = existing.ResponsesChatAdapter
 		protocol = existing.Protocol
 	}
-	// Override protocol for engines that speak a fixed protocol (e.g. laya
-	// only supports systemone). This intentionally breaks the "preserve
-	// admin-configured protocol" semantics for these engines: the endpoint
-	// physically cannot serve any other protocol, so any admin override is
-	// reverted on every re-sync.
-	if p := protocolForRuntimeFramework(info.RuntimeFramework); p != "" {
+	// Override protocol for engines that speak a fixed protocol: laya only
+	// serves systemone, and llama.cpp serves it for typed-decisions models.
+	// This intentionally breaks the "preserve admin-configured protocol"
+	// semantics for these engines: the endpoint physically cannot serve any
+	// other protocol, so any admin override is reverted on every re-sync.
+	if p := engineForcedProtocol(info); p != "" {
 		protocol = p
 	}
 	return &commontypes.UpstreamMetadata{
@@ -381,6 +381,7 @@ func (c *aiGatewayUpstreamSyncComponentImpl) buildInternalModelInfo(info *common
 		RuntimeFramework: info.RuntimeFramework,
 		EngineArgs:       info.EngineArgs,
 		Task:             info.Task,
+		Tasks:            commontypes.InternalModelSyncTasks(info.Task),
 		SourceDeployID:   info.DeployID,
 		CreatedAt:        info.CreatedAt,
 		Host:             hostOverride,
@@ -388,11 +389,20 @@ func (c *aiGatewayUpstreamSyncComponentImpl) buildInternalModelInfo(info *common
 	}
 }
 
-// protocolForRuntimeFramework returns the fixed upstream protocol for
-// engines that speak a protocol other than the default chat. Returns empty
-// string for engines that should use the default (chat or admin-configured).
-func protocolForRuntimeFramework(framework string) string {
-	if framework == "laya" {
+// engineForcedProtocol returns the protocol a deploy's engine is locked to, or
+// the empty string when the engine keeps the default chat protocol (or the
+// admin-configured one).
+func engineForcedProtocol(info *commontypes.DeployUpstreamInfo) string {
+	if !commontypes.EngineServesSystemOne(info.RuntimeFramework) {
+		return ""
+	}
+	// The laya image only implements the SystemOne API, whatever the task.
+	if strings.EqualFold(info.RuntimeFramework, string(commontypes.Laya)) {
+		return string(aigatewaytypes.ProtocolSystemOne)
+	}
+	// llama.cpp builds serve /v1/systemone only for decision models; chat GGUF
+	// models on the same engine must stay on the default protocol.
+	if info.Task == string(commontypes.TypedDecisions) {
 		return string(aigatewaytypes.ProtocolSystemOne)
 	}
 	return ""

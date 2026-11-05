@@ -34,6 +34,8 @@ var initVersionWorker = func(cfg *config.Config, temporalClient temporal.Client)
 	return nil
 }
 
+var registerEditionModerationWorker = func(*config.Config, temporal.Client) {}
+
 var cmdLaunch = &cobra.Command{
 	Use:     "launch",
 	Short:   "Launch temporal worker server",
@@ -100,6 +102,7 @@ var cmdLaunch = &cobra.Command{
 			slog.Info("register moderation temporal workflow")
 			moderationworkflow.RegisterWorker(cfg, temporalClient)
 		}
+		registerEditionModerationWorker(cfg, temporalClient)
 
 		slog.Info("register notification temporal workflow")
 		notificationworkflow.RegisterWorker(cfg, temporalClient)

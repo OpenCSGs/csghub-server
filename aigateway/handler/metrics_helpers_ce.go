@@ -36,6 +36,9 @@ type RecordMetricsParams struct {
 func SetMetricsModelTarget(p SetMetricsModelParams) {
 }
 
+func SetMetricsRequestModel(c *gin.Context, requestModel string) {
+}
+
 func SetMetricsTTFT(c *gin.Context, ttftMs int64) {
 }
 

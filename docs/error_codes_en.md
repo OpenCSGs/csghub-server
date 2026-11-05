@@ -426,6 +426,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `noTargetTransferPermission`
 - **Description:** The user does not have write permission on the target namespace and cannot transfer the repository to it.
 
+---
+
+### `AUTH-ERR-16`
+
+- **Error Code:** `AUTH-ERR-16`
+- **Error Name:** `userEmailNotVerified`
+- **Description:** The email address is not set. Please set your email address before making this request.
+
 ## Collection Errors
 
 ### `COLL-ERR-0`

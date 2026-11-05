@@ -1,6 +1,9 @@
 package component
 
 import (
+	"context"
+	"errors"
+
 	"github.com/google/wire"
 	mock_accounting "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
 	mock_dataviewer_client "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/dataviewer"
@@ -157,6 +160,7 @@ func ProvideTestConfig() *config.Config {
 			AccessKeySecret  string `env:"STARHUB_SERVER_S3_ACCESS_KEY_SECRET"`
 			Region           string `env:"STARHUB_SERVER_S3_REGION"`
 			Endpoint         string `env:"STARHUB_SERVER_S3_ENDPOINT" default:"localhost:9000"`
+			EnableDualstack  bool   `env:"STARHUB_SERVER_S3_ENABLE_DUALSTACK" default:"true"`
 			InternalEndpoint string `env:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT"`
 			Bucket           string `env:"STARHUB_SERVER_S3_BUCKET" default:"opencsg-test"`
 			EnableSSL        bool   `env:"STARHUB_SERVER_S3_ENABLE_SSL" default:"false"`
@@ -347,7 +351,7 @@ func NewTestRuntimeArchitectureComponent(stores *tests.MockStores, repoComponent
 var RuntimeArchComponentSet = wire.NewSet(NewTestRuntimeArchitectureComponent)
 
 func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, _ gitserver.GitServer, _ s3.Client, authorizer rebac.Authorizer) *mirrorComponentImpl {
-	return &mirrorComponentImpl{
+	component := &mirrorComponentImpl{
 		repoComp:                    repoComponent,
 		accessTokenStore:            stores.AccessToken,
 		modelStore:                  stores.Model,
@@ -367,6 +371,10 @@ func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, rep
 		mirrorNamespaceMappingStore: stores.MirrorNamespaceMapping,
 		mirrorMetadataClientFactory: multisync.FromOpenCSG,
 	}
+	component.createRepoForAuthorizedUser = func(context.Context, authorizedRepoCreateRequest) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error) {
+		return nil, nil, nil, errors.New("authorized repository creator must be injected by the test")
+	}
+	return component
 }
 
 var MirrorComponentSet = wire.NewSet(NewTestMirrorComponent)

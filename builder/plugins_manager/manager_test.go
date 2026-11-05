@@ -42,3 +42,19 @@ func TestManagerGetValidatesDefinition(t *testing.T) {
 	}
 	require.NoError(t, manager.Close())
 }
+
+func TestDefinitionKeyChangesWithVersionAndConfiguration(t *testing.T) {
+	base := Definition{Name: "scanner", Version: "1", Command: []string{"/plugins/scanner"}, Env: []string{"TOKEN=old"}}
+	key, err := definitionKey(base)
+	require.NoError(t, err)
+	for _, changed := range []Definition{
+		{Name: "scanner", Version: "2", Command: base.Command, Env: base.Env},
+		{Name: "scanner", Version: "1", Command: []string{"/plugins/scanner-v2"}, Env: base.Env},
+		{Name: "scanner", Version: "1", Command: base.Command, Env: []string{"TOKEN=new"}},
+	} {
+		other, err := definitionKey(changed)
+		require.NoError(t, err)
+		require.NotEqual(t, key, other)
+	}
+	require.NotContains(t, key, "old")
+}

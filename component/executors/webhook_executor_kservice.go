@@ -160,9 +160,22 @@ func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *ty
 		}
 	}
 
-	err = k.deployTaskStore.UpdateDeploy(ctx, deploy)
+	// CAS on the status observed when the record was loaded. Another writer
+	// (deployer delete, reconcile, a newer webhook event) may have advanced the
+	// row while this event was in flight. Losing the race means this event is
+	// stale: dropping it keeps Deleted(27) an absorb state (a late Stopped
+	// event can no longer overwrite it) and prevents status regressions. The
+	// column-scoped write also never clobbers fields owned by other flows.
+	applied, err := k.deployTaskStore.UpdateDeployStatusCAS(ctx, deploy, oldStatus)
 	if err != nil {
 		return fmt.Errorf("failed to update deploy %s status %d in webhook error: %w", event.ServiceName, event.Status, err)
+	}
+	if !applied {
+		slog.Warn("skip stale webhook event: deploy status changed since it was read",
+			slog.Any("event", event),
+			slog.Int("read_status", oldStatus),
+		)
+		return nil
 	}
 
 	if (event.Status == common.Running || event.Status == common.Sleeping) && oldStatus != common.Running && oldStatus != common.Sleeping {

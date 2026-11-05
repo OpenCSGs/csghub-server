@@ -24,6 +24,7 @@ const (
 	needOldToken
 	noSourceTransferPermission
 	noTargetTransferPermission
+	userEmailNotVerified
 )
 
 var (
@@ -232,6 +233,18 @@ var (
 	//
 	// zh-HK: 用戶沒有權限將倉庫轉移到此命名空間
 	ErrNoTargetTransferPermission = CustomError{prefix: errAuthPrefix, code: noTargetTransferPermission}
+	// user email address is not set
+	//
+	// Description: The email address is not set. Please set your email address before making this request.
+	//
+	// Description_ZH: 邮箱地址未设置。请在进行此请求之前设置您的邮箱地址。
+	//
+	// en-US: Email address not set
+	//
+	// zh-CN: 邮箱地址未设置
+	//
+	// zh-HK: 郵箱地址未設置
+	ErrUserEmailNotVerified error = CustomError{prefix: errAuthPrefix, code: userEmailNotVerified}
 )
 
 /*

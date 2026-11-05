@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/driver/pgdriver"
 	"opencsg.com/csghub-server/common/errorx"
 )
 
@@ -36,9 +37,23 @@ func NewAgentCatalogStoreWithDB(db *DB) AgentCatalogStore {
 
 func (s *agentCatalogStoreImpl) CreateLogicalAgent(ctx context.Context, instance *AgentInstance) (*AgentInstance, error) {
 	if _, err := s.db.Core.NewInsert().Model(instance).Exec(ctx); err != nil {
+		// Classify the owner/kind/name uniqueness violation here so callers get an
+		// identifiable agent-domain error instead of matching on index names.
+		if agentInstanceNameConflict(err) {
+			return nil, errorx.InstanceNameAlreadyExists(err, errorx.Ctx().Set("instance_name", instance.Name))
+		}
 		return nil, errorx.HandleDBError(err, map[string]any{"operation": "create_logical_instance"})
 	}
 	return instance, nil
+}
+
+// agentInstanceNameConflict reports whether err is a violation of the live
+// owner/kind/name uniqueness guarantee for agent instances.
+func agentInstanceNameConflict(err error) bool {
+	var pgErr pgdriver.Error
+	return errors.As(err, &pgErr) &&
+		pgErr.Field('C') == "23505" &&
+		pgErr.Field('n') == "agent_instances_live_owner_kind_name"
 }
 
 func (s *agentCatalogStoreImpl) UpdateLogical(ctx context.Context, input UpdateLogicalAgentInput) (*AgentInstance, error) {

@@ -41,10 +41,28 @@ func (e *openaiComponentImpl) userPreference(ctx context.Context, req *types.Use
 	return req.Models, nil
 }
 
+// pinnedUserUUID reports whose pinned preferences drive the gateway listing.
+// CE has no pinned-model support: ordering and flags stay untouched.
+func (e *extendOpenai) pinnedUserUUID(_ string) string {
+	return ""
+}
+
+// pinnedOrderingAvailable probes whether the pinned preferences can be read.
+// CE never enables pinned ordering.
+func (e *extendOpenai) pinnedOrderingAvailable(_ context.Context, _ string) bool {
+	return false
+}
+
+// priceConfiguredFilterEnabled reports that CE listings do not hide unpriced
+// models — CE carries no accounting prices at all.
+func (e *extendOpenai) priceConfiguredFilterEnabled() bool {
+	return false
+}
+
 func (e *extendOpenai) CheckBalance(ctx context.Context, userUUID string) error {
 	return nil
 }
 
-func (e *extendOpenai) enrichModelsWithPrice(_ context.Context, models []types.Model) []types.Model {
-	return models
+func (e *extendOpenai) enrichModelsWithPrice(_ context.Context, models []types.Model) ([]types.Model, error) {
+	return models, nil
 }

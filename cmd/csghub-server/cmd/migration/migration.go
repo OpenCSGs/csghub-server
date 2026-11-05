@@ -55,6 +55,12 @@ var Cmd = &cobra.Command{
 				return
 			}
 		}
+		// Creating a migration only writes a source file. It must not depend on
+		// a running database or Redis instance.
+		if cmd.Name() == "create_go" || cmd.Name() == "create_sql" {
+			migrator = migrate.NewMigrator(nil, migrations.Migrations)
+			return nil
+		}
 
 		config, err := config.LoadConfig()
 		if err != nil {

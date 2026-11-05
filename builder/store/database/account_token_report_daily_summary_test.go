@@ -95,6 +95,109 @@ func TestAccountTokenReportDailySummaryStore_UpsertAndReport(t *testing.T) {
 	require.Len(t, filtered, 2)
 }
 
+func TestAccountTokenReportDailySummaryStore_ExcludesTokenPlanStatements(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountTokenReportDailySummaryStoreWithDB(db)
+
+	day := time.Date(2026, 9, 4, 0, 0, 0, 0, time.UTC)
+
+	// Three serverless statements for the same report grain on the same day:
+	// one never resolved a token plan, two did (one serverless, one multimodal).
+	// All three carry real usage and a negative value: the rollup must ignore
+	// the rows whose token_plan_period_id is set, regardless of how much of the
+	// fee the plan absorbed or charged.
+	seed := []database.AccountStatement{
+		{
+			EventUUID:         uuid.New(),
+			UserUUID:          "user-tp",
+			TokenID:           21,
+			ResourceID:        "thirdparty://deepseek-r1",
+			Provider:          "硅基流动",
+			UpstreamID:        1,
+			Scene:             types.SceneModelServerless,
+			Value:             -42050,
+			CostAmount:        28500,
+			PromptToken:       30000000,
+			PromptCachedToken: 10000000,
+			CompletionToken:   12000000,
+			CreatedAt:         day.Add(1 * time.Hour),
+			// TokenPlanPeriodID defaults to 0 -> stored as NULL: pure pay-as-you-go.
+		},
+		{
+			EventUUID:         uuid.New(),
+			UserUUID:          "user-tp",
+			TokenID:           21,
+			ResourceID:        "thirdparty://deepseek-r1",
+			Provider:          "硅基流动",
+			UpstreamID:        1,
+			Scene:             types.SceneModelServerless,
+			Value:             -10000, // partial-coverage overage: still excluded
+			CostAmount:        5000,
+			PromptToken:       15200000,
+			CompletionToken:   6500000,
+			CreatedAt:         day.Add(2 * time.Hour),
+			TokenPlanPeriodID: 42,
+		},
+		{
+			EventUUID:         uuid.New(),
+			UserUUID:          "user-tp",
+			TokenID:           22,
+			ResourceID:        "thirdparty://qwen-image",
+			Provider:          "阿里云百炼",
+			UpstreamID:        4,
+			Scene:             types.SceneMultiModalServerless,
+			Value:             0, // fully covered: still excluded
+			CostAmount:        100,
+			PromptToken:       0,
+			CompletionToken:   0,
+			CreatedAt:         day.Add(3 * time.Hour),
+			TokenPlanPeriodID: 99,
+		},
+	}
+	for _, s := range seed {
+		_, err := db.Core.NewInsert().Model(&s).Exec(ctx)
+		require.Nil(t, err)
+	}
+
+	rows, err := store.UpsertSummary(ctx, day)
+	require.Nil(t, err)
+	// Only the single pay-as-you-go row lands in the rollup; the two
+	// token-plan rows are excluded by the WHERE token_plan_period_id IS NULL
+	// clause in tokenReportSummaryUpsertSQL.
+	require.Equal(t, int64(1), rows)
+
+	report, total, err := store.ListReport(ctx, types.TokenReportReq{
+		StartTime: "2026-09-04",
+		EndTime:   "2026-09-05",
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, report, 1)
+	require.Equal(t, "user-tp", report[0].NsUUID)
+	require.Equal(t, int64(21), report[0].TokenID)
+	require.InDelta(t, -42050, report[0].RevenueAmount, 1e-6)
+	require.InDelta(t, 30000000, report[0].PromptToken, 1e-6)
+
+	totals, err := store.SumReport(ctx, types.TokenReportReq{
+		StartTime: "2026-09-04",
+		EndTime:   "2026-09-05",
+	})
+	require.Nil(t, err)
+	require.Equal(t, int64(1), totals.CallCount)
+	require.InDelta(t, -42050, totals.RevenueAmount, 1e-6)
+	require.InDelta(t, 28500, totals.CostAmount, 1e-6)
+
+	// Re-running the rollup for the same day remains a no-op for counts: the
+	// two excluded statements still never land in the rollup, so the upsert
+	// keeps overwriting the same single row.
+	rows, err = store.UpsertSummary(ctx, day)
+	require.Nil(t, err)
+	require.Equal(t, int64(1), rows)
+}
+
 func TestAccountTokenReportDailySummaryStore_CheckpointTx(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

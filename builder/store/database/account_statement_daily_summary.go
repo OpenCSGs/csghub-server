@@ -177,6 +177,13 @@ func (s *accountStatementDailySummaryStoreImpl) ListByUserAndSku(ctx context.Con
 		baseQuery = baseQuery.Where("scene = ?", req.Scene)
 	}
 
+	// The consumption report (compute resource operations report) shows compute
+	// resource consumption only; API consumption (serverless token scenes) is
+	// excluded because it is surfaced by the token report (model API operations
+	// report) instead.
+	baseQuery = baseQuery.Where("scene NOT IN (?, ?)",
+		utils.APIConsumptionSceneValues()[0], utils.APIConsumptionSceneValues()[1])
+
 	if req.InstanceName != "" {
 		baseQuery = baseQuery.Where("customer_id = ?", req.InstanceName)
 	}

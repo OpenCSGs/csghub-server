@@ -48,7 +48,13 @@ type MultiSyncComponent interface {
 	SyncAsClient(ctx context.Context, sc multisync.Client) error
 }
 
+// NewMultiSyncComponent injects permission producers into synchronized user and repository Stores.
 func NewMultiSyncComponent(config *config.Config) (MultiSyncComponent, error) {
+	tupleJobs, err := newRebacTupleJobClient()
+	if err != nil {
+		return nil, err
+	}
+
 	git, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server: %w", err)
@@ -59,11 +65,11 @@ func NewMultiSyncComponent(config *config.Config) (MultiSyncComponent, error) {
 	}
 	return &multiSyncComponentImpl{
 		multiSyncStore:   database.NewMultiSyncStore(),
-		repoStore:        database.NewRepoStore(),
+		repoStore:        database.NewRepoStoreWithDBAndJobClients(database.GetDB(), nil, tupleJobs),
 		modelStore:       database.NewModelStore(),
 		datasetStore:     database.NewDatasetStore(),
 		namespaceStore:   database.NewNamespaceStore(),
-		userStore:        database.NewUserStore(),
+		userStore:        database.NewUserStoreWithDBAndJobClients(database.GetDB(), nil, tupleJobs),
 		recomStore:       database.NewRecomStore(),
 		syncVersionStore: database.NewSyncVersionStore(),
 		tagStore:         database.NewTagStore(),
@@ -357,9 +363,6 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 	if err != nil {
 		return fmt.Errorf("fail to create database repo, error: %w", err)
 	}
-	if err := c.ensureLocalRepositoryOwner(ctx, user, namespace, newDBRepo.ID); err != nil {
-		return err
-	}
 
 	if len(m.Tags) > 0 {
 		var repoTags []database.RepositoryTag
@@ -502,9 +505,6 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
 		return fmt.Errorf("fail to create or update database repo, error: %w", err)
-	}
-	if err := c.ensureLocalRepositoryOwner(ctx, user, namespace, newDBRepo.ID); err != nil {
-		return err
 	}
 
 	if len(m.Tags) > 0 {
@@ -677,9 +677,6 @@ func (c *multiSyncComponentImpl) createLocalCode(ctx context.Context, m *types.C
 	if err != nil {
 		return fmt.Errorf("fail to create database repo, error: %w", err)
 	}
-	if err := c.ensureLocalRepositoryOwner(ctx, user, namespace, newDBRepo.ID); err != nil {
-		return err
-	}
 
 	if len(m.Tags) > 0 {
 		var repoTags []database.RepositoryTag
@@ -820,9 +817,6 @@ func (c *multiSyncComponentImpl) createLocalPrompt(ctx context.Context, m *types
 	if err != nil {
 		return fmt.Errorf("fail to create database repo, error: %w", err)
 	}
-	if err := c.ensureLocalRepositoryOwner(ctx, user, namespace, newDBRepo.ID); err != nil {
-		return err
-	}
 
 	if len(m.Tags) > 0 {
 		var repoTags []database.RepositoryTag
@@ -962,9 +956,6 @@ func (c *multiSyncComponentImpl) createLocalMCPServer(ctx context.Context, m *ty
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
 		return fmt.Errorf("fail to create database repo, error: %w", err)
-	}
-	if err := c.ensureLocalRepositoryOwner(ctx, user, namespace, newDBRepo.ID); err != nil {
-		return err
 	}
 
 	if len(m.Tags) > 0 {
@@ -1114,9 +1105,6 @@ func (c *multiSyncComponentImpl) createLocalSkill(ctx context.Context, m *types.
 	if err != nil {
 		return fmt.Errorf("fail to create database repo, error: %w", err)
 	}
-	if err := c.ensureLocalRepositoryOwner(ctx, user, namespace, newDBRepo.ID); err != nil {
-		return err
-	}
 
 	if len(m.Tags) > 0 {
 		var repoTags []database.RepositoryTag
@@ -1200,18 +1188,6 @@ func (c *multiSyncComponentImpl) createLocalSkill(ctx context.Context, m *types.
 	return nil
 }
 
-// ensureLocalRepositoryOwner reconciles the owner tuple for a repository imported into a synthetic user namespace.
-func (c *multiSyncComponentImpl) ensureLocalRepositoryOwner(ctx context.Context, user database.User, namespace string, repositoryID int64) error {
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, nil, database.Namespace{
-		Path:          namespace,
-		NamespaceType: database.UserNamespace,
-		User:          user,
-	}, repositoryID, false); err != nil {
-		return fmt.Errorf("failed to synchronize multi-sync repository owner relationship: %w", err)
-	}
-	return nil
-}
-
 func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.CreateUserRequest) (database.User, error) {
 	namespace := &database.Namespace{
 		Path:          req.Username,
@@ -1229,12 +1205,6 @@ func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.Creat
 	if err != nil {
 		newError := fmt.Errorf("failed to create user,error:%w", err)
 		return database.User{}, newError
-	}
-	if err := ensureNamespaceRelationship(ctx, c.rebac, *namespace, user.UUID); err != nil {
-		return database.User{}, fmt.Errorf("synchronize multi-sync user namespace to ReBAC: %w", err)
-	}
-	if err := ensureUserObjectOwnerRelationship(ctx, c.rebac, user.UUID); err != nil {
-		return database.User{}, fmt.Errorf("synchronize multi-sync user object to ReBAC: %w", err)
 	}
 
 	return *user, err

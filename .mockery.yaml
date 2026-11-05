@@ -11,6 +11,7 @@ packages:
   opencsg.com/csghub-server/component:
     config:
       all: true
+      disable-func-mocks: true
     interfaces:
       RepoComponent:
         config:
@@ -259,6 +260,9 @@ packages:
     interfaces:
       DatasetViewerComponent:
   opencsg.com/csghub-server/aigateway/component:
+    config:
+      all: true
+  opencsg.com/csghub-server/aigateway/component/pii:
     config:
       all: true
   opencsg.com/csghub-server/aigateway/component/upstream:

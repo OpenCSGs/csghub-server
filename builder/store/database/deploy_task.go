@@ -95,6 +95,33 @@ type deployTaskStoreImpl struct {
 type DeployTaskStore interface {
 	CreateDeploy(ctx context.Context, deploy *Deploy) error
 	UpdateDeploy(ctx context.Context, deploy *Deploy) error
+	// UpdateDeployStatusCAS writes only the webhook-managed status columns of
+	// the deploy, and only when the row still carries expectedStatus — the
+	// status the caller observed when it loaded and validated the record. It
+	// returns false when another writer changed the row in between: the
+	// caller's update is stale and must be dropped instead of clobbering the
+	// newer state. This keeps terminal states (e.g. Deleted) absorb-only.
+	UpdateDeployStatusCAS(ctx context.Context, deploy *Deploy, expectedStatus int) (bool, error)
+	// UpdateDeployStatus writes only the status and status_update_at columns,
+	// unconditionally by primary key. Use it for authoritative terminal
+	// transitions (e.g. marking a deploy Deleted after its workload is
+	// confirmed gone) where a full-row write from a stale in-memory copy would
+	// clobber concurrent webhook field updates.
+	UpdateDeployStatus(ctx context.Context, deployID int64, status int) error
+	// UpdateDeploySpec writes only the deploy-spec columns a config update
+	// owns (image_id, env, container_port, timeout, cluster_id, hardware,
+	// sku), unconditionally by primary key. It never touches the status
+	// columns, so it can neither regress a concurrently written terminal
+	// status nor clobber webhook status fields from a stale snapshot.
+	UpdateDeploySpec(ctx context.Context, deploy *Deploy) error
+	// UpdateDeployColumnsIfNotDeleted writes the given deploy columns (plus
+	// updated_at, and status_update_at when "status" is included) but only
+	// while the row has not been deleted. It returns false when the row is
+	// Deleted: the caller must treat its operation as cancelled instead of
+	// resurrecting the terminal row — e.g. a sandbox created on the runner
+	// while a concurrent delete finalized the deploy must be cleaned up, not
+	// persisted.
+	UpdateDeployColumnsIfNotDeleted(ctx context.Context, deploy *Deploy, columns ...string) (bool, error)
 	GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*Deploy, error)
 	GetLatestDeploysBySpaceIDs(ctx context.Context, spaceIDs []int64) (map[int64]*Deploy, error)
 	CreateDeployTask(ctx context.Context, deployTask *DeployTask) error
@@ -105,6 +132,10 @@ type DeployTaskStore interface {
 	GetNewTaskAfter(ctx context.Context, currentDeployTaskID int64) (*DeployTask, error)
 	// GetNewTaskFirst returns the first task which has  not end
 	GetNewTaskFirst(ctx context.Context) (*DeployTask, error)
+	// UpdateInTx updates a deploy and its tasks in one transaction. The deploy
+	// write carries a status != Deleted predicate: a Deleted row is never
+	// updated, so failure/status events landing after a concurrent delete are
+	// dropped instead of resurrecting the terminal row.
 	UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error
 	// ListDeploy returns deploys of the repo visible to the user: the ones the
 	// user created plus the ones owned by a namespace the user belongs to
@@ -186,6 +217,75 @@ func (s *deployTaskStoreImpl) UpdateDeploy(ctx context.Context, deploy *Deploy) 
 	_, err := s.db.Core.NewUpdate().Model(deploy).WherePK().Exec(ctx)
 	err = errorx.HandleDBError(err, nil)
 	return err
+}
+
+func (s *deployTaskStoreImpl) UpdateDeployStatusCAS(ctx context.Context, deploy *Deploy, expectedStatus int) (bool, error) {
+	// updated_at is in the column list so the row keeps advancing its
+	// modification time (clients that watch updated_at instead of
+	// status_update_at must not see it frozen). The BeforeAppendModel hook
+	// does not run for Column()-restricted updates, so the value is set
+	// explicitly here.
+	deploy.UpdatedAt = time.Now()
+	res, err := s.db.Core.NewUpdate().Model(deploy).
+		Column("status", "status_update_at", "message", "reason",
+			"endpoint", "cluster_node", "queue_name", "instances", "updated_at").
+		WherePK().
+		Where("status = ?", expectedStatus).
+		Exec(ctx)
+	if err != nil {
+		return false, errorx.HandleDBError(err, nil)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, errorx.HandleDBError(err, nil)
+	}
+	return affected == 1, nil
+}
+
+func (s *deployTaskStoreImpl) UpdateDeployStatus(ctx context.Context, deployID int64, status int) error {
+	_, err := s.db.Core.NewUpdate().Model((*Deploy)(nil)).
+		Set("status = ?", status).
+		Set("status_update_at = ?", time.Now()).
+		Set("updated_at = ?", time.Now()).
+		Where("id = ?", deployID).
+		Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *deployTaskStoreImpl) UpdateDeploySpec(ctx context.Context, deploy *Deploy) error {
+	// Explicit like the other column-scoped writers: the BeforeAppendModel
+	// hook does not run for Column()-restricted updates.
+	deploy.UpdatedAt = time.Now()
+	_, err := s.db.Core.NewUpdate().Model(deploy).
+		Column("image_id", "env", "container_port", "timeout",
+			"cluster_id", "hardware", "sku", "updated_at").
+		WherePK().
+		Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *deployTaskStoreImpl) UpdateDeployColumnsIfNotDeleted(ctx context.Context, deploy *Deploy, columns ...string) (bool, error) {
+	cols := make([]string, 0, len(columns)+2)
+	cols = append(cols, columns...)
+	cols = append(cols, "updated_at")
+	deploy.UpdatedAt = time.Now()
+	if slices.Contains(columns, "status") {
+		cols = append(cols, "status_update_at")
+		deploy.StatusUpdateAt = time.Now()
+	}
+	res, err := s.db.Core.NewUpdate().Model(deploy).
+		Column(cols...).
+		WherePK().
+		Where("status != ?", common.Deleted).
+		Exec(ctx)
+	if err != nil {
+		return false, errorx.HandleDBError(err, nil)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, errorx.HandleDBError(err, nil)
+	}
+	return affected == 1, nil
 }
 
 func (s *deployTaskStoreImpl) GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*Deploy, error) {
@@ -287,7 +387,11 @@ func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, dep
 			}
 			_, err := tx.NewUpdate().Model(deploy).
 				Column(deployColumns...).
-				WherePK().Exec(ctx)
+				WherePK().
+				// A Deleted deploy must stay terminal: status writes landing
+				// after a concurrent delete are dropped, not applied.
+				Where("status != ?", common.Deleted).
+				Exec(ctx)
 			err = errorx.HandleDBError(err, nil)
 			if err != nil {
 				return fmt.Errorf("failed to update deploy,%w", err)

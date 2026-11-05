@@ -408,26 +408,6 @@ func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestExecuteChatWithFallback_ReplaysFailureWithoutFallbackTargets(t *testing.T) {
-	tester, c, _ := setupTest(t)
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
-	downstream := newTestCommonResponseWriter()
-	primary := newChatRetryResponseWriter(downstream)
-	primary.WriteHeader(http.StatusServiceUnavailable)
-	_, err := primary.Write([]byte("primary unavailable"))
-	require.NoError(t, err)
-	modelTarget := &resolvedModelTarget{
-		Model: &types.Model{BaseModel: types.BaseModel{ID: "test-model"}},
-	}
-
-	final, err := tester.handler.executeChatWithFallback(c, &chatContext{}, modelTarget, nil, primary, "testuser", "test-model", nil)
-
-	require.NoError(t, err)
-	require.Same(t, primary, final)
-	require.Equal(t, http.StatusServiceUnavailable, downstream.statusCode)
-	require.Equal(t, "primary unavailable", downstream.body.String())
-}
-
 func TestRetryChatWithFallback_ReplaysLastRetryableFallbackResponse(t *testing.T) {
 	tester, c, _ := setupTest(t)
 	tester.mocks.openAIComp.ExpectedCalls = nil
@@ -623,8 +603,8 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
-		RecordUsageFromTokenUsage(mock.Anything, "user-1", modelTarget.Model, "provider-fallback-model", mock.Anything, "api-key", mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
+		RecordUsageFromTokenUsage(mock.Anything, "user-1", modelTarget.Model, "provider-fallback-model", mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, _ int64) error {
 			wg.Done()
 			return nil
 		}).
@@ -632,7 +612,6 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 
 	tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
 		NSUUID:          "user-1",
-		ApiKey:          "api-key",
 		Model:           modelTarget.Model,
 		TargetModelName: modelTarget.ModelName,
 		TokenCounter:    tokenCounter,
@@ -668,8 +647,8 @@ func TestRunChatPostProcessAsync_RecordsTraceUsageBeforeAccounting(t *testing.T)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
-		RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
+		RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, _ int64) error {
 			wg.Done()
 			return nil
 		}).
@@ -677,7 +656,6 @@ func TestRunChatPostProcessAsync_RecordsTraceUsageBeforeAccounting(t *testing.T)
 
 	tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
 		NSUUID:          "user-1",
-		ApiKey:          "api-key",
 		Model:           model,
 		TargetModelName: "target-model",
 		TokenCounter:    tokenCounter,
@@ -715,13 +693,12 @@ func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T)
 		recorder := &testGenerationRecorderWithMutex{}
 		firstWriteAt := time.Now()
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, mock.Anything).
 			Return(nil).
 			Once()
 
 		tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
 			NSUUID:          "user-1",
-			ApiKey:          "api-key",
 			Model:           model,
 			TargetModelName: "target-model",
 			TokenCounter:    tokenCounter,
@@ -774,15 +751,14 @@ func TestRunChatPostProcessAsync_SkipsBillingOnErrorStatus(t *testing.T) {
 
 		var billingCalled atomic.Bool
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
-			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, mock.Anything).
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, int64) {
 				billingCalled.Store(true)
 			}).
 			Maybe()
 
 		tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
 			NSUUID:          "user-1",
-			ApiKey:          "api-key",
 			Model:           model,
 			TargetModelName: "target-model",
 			TokenCounter:    tokenCounter,
@@ -815,15 +791,14 @@ func TestRunChatPostProcessAsync_SkipsBillingOnRedirectStatus(t *testing.T) {
 
 		var billingCalled atomic.Bool
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
-			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, mock.Anything).
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, int64) {
 				billingCalled.Store(true)
 			}).
 			Maybe()
 
 		tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
 			NSUUID:          "user-1",
-			ApiKey:          "api-key",
 			Model:           model,
 			TargetModelName: "target-model",
 			TokenCounter:    tokenCounter,

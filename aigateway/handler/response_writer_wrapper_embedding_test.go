@@ -239,6 +239,30 @@ func TestResponseWriterWrapperEmbedding_CaptureUsageAfterChunkedWrites(t *testin
 	assert.Equal(t, data, w.Body.Bytes())
 }
 
+func TestResponseWriterWrapperEmbedding_NoUsageLeavesTokenizerFallback(t *testing.T) {
+	w := httptest.NewRecorder()
+	counter := mocktoken.NewMockEmbeddingTokenCounter(t)
+	wrapper := NewResponseWriterWrapperEmbedding(w, counter)
+
+	// Response without a usage block (e.g. TEI-style upstreams): the counter
+	// must not be seeded with a zero usage, so Usage() falls back to the
+	// tokenizer. The mock has no Embedding expectation on purpose — an
+	// unexpected call fails the test.
+	data := []byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2],"index":0}],"model":"text-embedding-ada-002"}`)
+	counter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 2, TotalTokens: 2}, nil).Once()
+
+	n, err := wrapper.Write(data)
+	assert.NoError(t, err)
+	assert.Equal(t, len(data), n)
+
+	wrapper.CaptureEmbeddingUsage()
+
+	assert.Equal(t, data, w.Body.Bytes())
+	usage, err := wrapper.tokenCounter.Usage(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), usage.TotalTokens)
+}
+
 func TestResponseWriterWrapperEmbedding_SkipsUsageCaptureWhenTruncated(t *testing.T) {
 	w := httptest.NewRecorder()
 	counter := mocktoken.NewMockEmbeddingTokenCounter(t)

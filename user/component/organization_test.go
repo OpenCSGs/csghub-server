@@ -3,12 +3,15 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
@@ -28,7 +31,7 @@ func TestOrganizationDeletionWorkerReturnsCleanupFailureForRiverRetry(t *testing
 	ctx := context.Background()
 	sso := mockrpc.NewMockSSOInterface(t)
 	sso.EXPECT().DeleteUser(ctx, "organization-uuid").Return(errors.New("SSO unavailable")).Once()
-	worker := NewOrganizationDeletionWorker(sso, mockrebac.NewMockAuthorizer(t), nil)
+	worker := NewOrganizationDeletionWorker(sso, nil)
 
 	err := worker.Work(ctx, &river.Job[workhub.OrganizationDeletionArgs]{Args: workhub.OrganizationDeletionArgs{
 		OrganizationUUIDs: []string{"organization-uuid"},
@@ -40,9 +43,31 @@ func TestOrganizationDeletionWorkerReturnsCleanupFailureForRiverRetry(t *testing
 // TestOrganizationDeletionWorkerRejectsEmptySnapshot verifies malformed jobs
 // are retried or discarded by River instead of being silently completed.
 func TestOrganizationDeletionWorkerRejectsEmptySnapshot(t *testing.T) {
-	worker := NewOrganizationDeletionWorker(nil, mockrebac.NewMockAuthorizer(t), nil)
+	worker := NewOrganizationDeletionWorker(nil, nil)
 	err := worker.Work(context.Background(), &river.Job[workhub.OrganizationDeletionArgs]{})
 	require.ErrorContains(t, err, "requires organization UUIDs")
+}
+
+// TestOrganizationDeletionWorkerNextRetry keeps twelve attempts with River's native backoff.
+// Persisted errors determine the delay independently of the execution attempt count.
+func TestOrganizationDeletionWorkerNextRetry(t *testing.T) {
+	worker := NewOrganizationDeletionWorker(nil, nil)
+	require.Equal(t, 12, workhub.OrganizationDeletionJobMaxAttempts)
+	for _, errorCount := range []int{0, 1, 2, 5, 10} {
+		t.Run(fmt.Sprintf("errors=%d", errorCount), func(t *testing.T) {
+			job := &river.Job[workhub.OrganizationDeletionArgs]{JobRow: &rivertype.JobRow{
+				Attempt: 42,
+				Errors:  make([]rivertype.AttemptError, errorCount),
+			}}
+			n := time.Duration(errorCount + 1)
+			baseDelay := n * n * n * n * time.Second
+			before := time.Now()
+			next := worker.NextRetry(job)
+			after := time.Now()
+			require.False(t, next.Before(before.Add(baseDelay-baseDelay/10)))
+			require.False(t, next.After(after.Add(baseDelay+baseDelay/10)))
+		})
+	}
 }
 
 // TestOrganizationComponent_DeleteAlreadyMissing is idempotent when the database row was already removed.
@@ -86,8 +111,6 @@ func TestOrganizationComponent_Create(t *testing.T) {
 
 	mockTagStore := mockdb.NewMockTagStore(t)
 	mockAuthorizer := mockrebac.NewMockAuthorizer(t)
-	expectNamespaceReBACWrite(mockAuthorizer, rebac.RelationOrganization, 1)
-	expectAnyOrganizationAdminReBACReconciliation(mockAuthorizer, "user-uuid")
 
 	// GetOrganizationTags is called to return tags in the response
 	mockOrgStore.EXPECT().GetOrganizationTags(mock.Anything, mock.Anything).Return([]database.Tag{}, nil).Once()
@@ -204,8 +227,6 @@ func TestOrganizationComponent_Create_UsesAtomicStore(t *testing.T) {
 	mockOrgStore.EXPECT().CreateWithRelations(mock.Anything, mock.Anything, mock.Anything, req.TagIDs).Return(nil).Once()
 	mockOrgStore.EXPECT().GetOrganizationTags(mock.Anything, mock.Anything).Return([]database.Tag{}, nil).Once()
 	mockAuthorizer := mockrebac.NewMockAuthorizer(t)
-	expectNamespaceReBACWrite(mockAuthorizer, rebac.RelationOrganization, 1)
-	expectAnyOrganizationAdminReBACReconciliation(mockAuthorizer, "user-uuid")
 
 	c := &organizationComponentImpl{
 		userStore: mockUserStore,
@@ -218,35 +239,6 @@ func TestOrganizationComponent_Create_UsesAtomicStore(t *testing.T) {
 	org, err := c.Create(context.Background(), req)
 	require.NoError(t, err)
 	require.Equal(t, req.Name, org.Name)
-}
-
-// expectAnyOrganizationAdminReBACReconciliation verifies the generated organization administrator tuple.
-func expectAnyOrganizationAdminReBACReconciliation(authorizer *mockrebac.MockAuthorizer, userUUID string) {
-	authorizer.EXPECT().BatchCheck(mock.Anything, mock.MatchedBy(func(request rebac.BatchCheckRequest) bool {
-		if len(request.Checks) != len(organizationMemberRelations) {
-			return false
-		}
-		for _, item := range request.Checks {
-			if item.Check.Subject != rebac.UserSubject(userUUID) ||
-				item.Check.Object.Type != rebac.ObjectTypeOrganization ||
-				item.Check.Consistency != rebac.ConsistencyHigher {
-				return false
-			}
-		}
-		return true
-	})).RunAndReturn(func(_ context.Context, request rebac.BatchCheckRequest) (rebac.BatchCheckResult, error) {
-		results := make(map[string]rebac.BatchCheckOutcome, len(request.Checks))
-		for _, item := range request.Checks {
-			results[item.CorrelationID] = rebac.BatchCheckOutcome{Decision: rebac.Decision{Allowed: false}}
-		}
-		return rebac.BatchCheckResult{Results: results}, nil
-	}).Once()
-	authorizer.EXPECT().Write(mock.Anything, mock.MatchedBy(func(relationships []rebac.Relationship) bool {
-		return len(relationships) == 1 &&
-			relationships[0].Subject == rebac.UserSubject(userUUID) &&
-			relationships[0].Relation == rebac.RelationAdmin &&
-			relationships[0].Object.Type == rebac.ObjectTypeOrganization
-	})).Return(nil).Once()
 }
 
 // TestOrganizationComponent_Create_DatabaseFailureCompensatesSSO verifies a failed database write cleans up SSO once.
@@ -312,7 +304,6 @@ func TestOrganizationComponent_DeleteDefersSSOFailure(t *testing.T) {
 		Consistency: rebac.ConsistencyHigher,
 	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	mockSSO := mockrpc.NewMockSSOInterface(t)
-	expectOrganizationReBACCleanup(t, mockAuthorizer, cleanup)
 	mockSSO.EXPECT().DeleteUser(mock.Anything, organizationUUID.String()).Return(errors.New("SSO unavailable")).Once()
 
 	c := &organizationComponentImpl{
@@ -321,8 +312,11 @@ func TestOrganizationComponent_DeleteDefersSSOFailure(t *testing.T) {
 		rebac: mockAuthorizer, sso: mockSSO,
 	}
 	require.NoError(t, c.Delete(ctx, req))
+	mockAuthorizer.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
+	mockAuthorizer.AssertNotCalled(t, "BatchCheck", mock.Anything, mock.Anything)
 }
 
+// TestOrganizationComponent_Delete_LeavesRepositoryCleanupToWorker defers every tuple deletion.
 func TestOrganizationComponent_Delete_LeavesRepositoryCleanupToWorker(t *testing.T) {
 	ctx := context.Background()
 	organizationUUID := uuid.New()
@@ -350,7 +344,6 @@ func TestOrganizationComponent_Delete_LeavesRepositoryCleanupToWorker(t *testing
 	}, nil).Once()
 	mockAuthorizer := mockrebac.NewMockAuthorizer(t)
 	mockAuthorizer.EXPECT().Check(ctx, mock.Anything).Return(rebac.Decision{Allowed: true}, nil).Once()
-	expectOrganizationReBACCleanup(t, mockAuthorizer, cleanup)
 	mockSSO := mockrpc.NewMockSSOInterface(t)
 	mockSSO.EXPECT().DeleteUser(mock.Anything, organizationUUID.String()).Return(nil).Once()
 
@@ -359,6 +352,8 @@ func TestOrganizationComponent_Delete_LeavesRepositoryCleanupToWorker(t *testing
 		memberStore: mockMemberStore, rebac: mockAuthorizer, sso: mockSSO,
 	}
 	require.NoError(t, c.Delete(ctx, req))
+	mockAuthorizer.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
+	mockAuthorizer.AssertNotCalled(t, "BatchCheck", mock.Anything, mock.Anything)
 }
 
 // TestOrganizationComponent_DeleteRejectsHierarchyOrganization verifies the legacy endpoint cannot delete a hierarchy tree.
@@ -913,7 +908,7 @@ func deletionTestAuthorizer(t *testing.T, failCleanup *bool) *mockrebac.MockAuth
 			result.Results[check.CorrelationID] = rebac.BatchCheckOutcome{Decision: rebac.Decision{Allowed: false}}
 		}
 		return result, nil
-	})
+	}).Maybe()
 	return authorizer
 }
 
@@ -934,7 +929,7 @@ func TestOrganizationComponent_DeleteDefersFailedCleanup(t *testing.T) {
 			require.NoError(t, err)
 			_, err = db.Core.NewInsert().Model(outsider).Exec(ctx)
 			require.NoError(t, err)
-			store := database.NewOrgStore(false, nil)
+			store := database.NewOrgStoreWithJobClients(false, nil, nil, tests.NewFixtureRebacTupleJobClient(database.GetDB()))
 			org := &database.Organization{Name: "retry-org", UUID: uuid.New(), UserID: actor.ID}
 			ns := &database.Namespace{Path: org.Name, UUID: org.UUID.String()}
 			require.NoError(t, store.CreateWithRelations(ctx, org, ns, nil))
@@ -949,6 +944,8 @@ func TestOrganizationComponent_DeleteDefersFailedCleanup(t *testing.T) {
 			component := &organizationComponentImpl{orgStore: store, nsStore: database.NewNamespaceStoreWithDB(db), userStore: database.NewUserStoreWithDB(db), rebac: authorizer, sso: sso}
 			req := &types.DeleteOrgReq{Name: org.Name, CurrentUser: actor.Username}
 			require.NoError(t, component.Delete(ctx, req))
+			authorizer.AssertNotCalled(t, "BatchCheck", mock.Anything, mock.Anything)
+			authorizer.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
 			retained, err := store.FindForDeletion(ctx, database.OrganizationDeletionLookup{Path: org.Name})
 			require.NoError(t, err)
 			require.False(t, retained.DeletedAt.IsZero())
@@ -958,4 +955,161 @@ func TestOrganizationComponent_DeleteDefersFailedCleanup(t *testing.T) {
 			require.NoError(t, component.Delete(ctx, req))
 		})
 	}
+}
+
+// TestOrganizationComponent_Choices enforces one minimal projection for lists and voucher details.
+func TestOrganizationComponent_Choices(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	org := database.Organization{Name: "org", Nickname: "Organization", UUID: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Logo: "logo.png",
+		Description: "private description", Homepage: "https://example.com", Verified: true, IsHierarchical: true,
+		Namespace: &database.Namespace{Path: "org", NamespaceType: database.OrgNamespace, UUID: "org-ns"},
+	}
+	want := `{"path":"org","name":"Organization","uuid":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","logo":"logo.png","namespace":{"Path":"org","Type":"organization","UUID":"org-ns"}}`
+	t.Run("search filters and projection", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		req := types.OrganizationChoiceListRequest{Search: "org", Per: 10, Page: 2, OrgType: "school", VerifyStatus: "verified", Tag: "industry"}
+		store.EXPECT().Search(ctx, req.Search, req.Per, req.Page, req.OrgType, req.VerifyStatus, req.Tag).Return([]database.Organization{org}, 11, nil).Once()
+		choices, total, err := (&organizationComponentImpl{orgStore: store}).OrganizationChoices(ctx, req)
+		require.NoError(t, err)
+		require.Equal(t, 11, total)
+		require.Len(t, choices, 1)
+		require.True(t, choices[0].IsHierarchical)
+		encoded, err := json.Marshal(choices[0])
+		require.NoError(t, err)
+		require.JSONEq(t, want, string(encoded))
+	})
+	t.Run("recipient detail", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		store.EXPECT().FindByPath(ctx, "org").Return(org, nil).Once()
+		choice, err := (&organizationComponentImpl{orgStore: store}).OrganizationChoice(ctx, "org")
+		require.NoError(t, err)
+		require.True(t, choice.IsHierarchical)
+		encoded, err := json.Marshal(choice)
+		require.NoError(t, err)
+		require.JSONEq(t, want, string(encoded))
+	})
+	t.Run("empty list", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		store.EXPECT().Search(ctx, "", 10, 1, "", "", "").Return(nil, 0, nil).Once()
+		choices, total, err := (&organizationComponentImpl{orgStore: store}).OrganizationChoices(ctx, types.OrganizationChoiceListRequest{Per: 10, Page: 1})
+		require.NoError(t, err)
+		require.Zero(t, total)
+		require.NotNil(t, choices)
+		require.Empty(t, choices)
+	})
+	t.Run("detail without namespace", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		withoutNamespace := org
+		withoutNamespace.Namespace = nil
+		store.EXPECT().FindByPath(ctx, "org").Return(withoutNamespace, nil).Once()
+		choice, err := (&organizationComponentImpl{orgStore: store}).OrganizationChoice(ctx, "org")
+		require.NoError(t, err)
+		require.Nil(t, choice.Namespace)
+	})
+	t.Run("errors propagate", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		storeErr := errors.New("store unavailable")
+		store.EXPECT().Search(ctx, "", 10, 1, "", "", "").Return(nil, 0, storeErr).Once()
+		store.EXPECT().FindByPath(ctx, "missing").Return(database.Organization{}, storeErr).Once()
+		c := &organizationComponentImpl{orgStore: store}
+		_, _, err := c.OrganizationChoices(ctx, types.OrganizationChoiceListRequest{Per: 10, Page: 1})
+		require.ErrorIs(t, err, storeErr)
+		_, err = c.OrganizationChoice(ctx, "missing")
+		require.ErrorIs(t, err, storeErr)
+	})
+}
+
+// TestUserRiverQueueIsolation gives each leased client its own four-worker capacity.
+func TestUserRiverQueueIsolation(t *testing.T) {
+	organizationWorker := NewOrganizationDeletionWorker(nil, nil)
+	tupleWorker := NewRebacTupleWorker(nil)
+	cfg := newOrganizationDeletionRiverConfig(organizationWorker)
+	require.Equal(t, map[string]river.QueueConfig{
+		workhub.OrganizationDeletionQueue: {MaxWorkers: 4},
+	}, cfg.Queues)
+	require.NotNil(t, cfg.Workers)
+	require.NotNil(t, cfg.JobLease)
+	require.Equal(t, 15*time.Minute, organizationWorker.Timeout(nil))
+	cfg = newRebacTupleRiverConfig(tupleWorker)
+	require.Equal(t, map[string]river.QueueConfig{
+		workhub.RebacTupleQueue: {MaxWorkers: 4},
+	}, cfg.Queues)
+	require.NotNil(t, cfg.Workers)
+	require.NotNil(t, cfg.JobLease)
+	require.Equal(t, 30*time.Second, tupleWorker.Timeout(nil))
+	_, err := NewOrganizationDeletionWorkClient(context.Background(), "", nil)
+	require.ErrorContains(t, err, "organization deletion worker is required")
+	_, err = NewRebacTupleWorkClient(context.Background(), "", nil)
+	require.ErrorContains(t, err, "ReBAC tuple worker is required")
+}
+
+// TestUserRiverConsumesBothQueues verifies leased cleanup and leased ordered tuples
+// execute on separate production clients, including a transient tuple failure.
+func TestUserRiverConsumesBothQueues(t *testing.T) {
+	db := tests.InitTransactionTestDBWithHooks()
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	ctx := context.Background()
+	jobs, err := workhub.NewJobClient(ctx, db.BunDB)
+	require.NoError(t, err)
+	sso := mockrpc.NewMockSSOInterface(t)
+	assertLease := func(ctx context.Context, kind string, want bool) {
+		var leased bool
+		require.NoError(t, db.BunDB.NewRaw("SELECT lease_expires_at IS NOT NULL FROM river_job WHERE kind = ? AND state = 'running'", kind).Scan(ctx, &leased))
+		require.Equal(t, want, leased)
+	}
+	sso.EXPECT().DeleteUser(mock.Anything, "deleted-org").RunAndReturn(func(ctx context.Context, _ string) error {
+		assertLease(ctx, workhub.OrganizationDeletionQueue, true)
+		return nil
+	}).Once()
+	organizationWorker := NewOrganizationDeletionWorker(sso, nil)
+	relationships := []rebac.Relationship{{Subject: rebac.UserSubject("tuple-user"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(1)}}
+	authorizer := mockrebac.NewMockAuthorizer(t)
+	authorizer.EXPECT().Write(mock.Anything, relationships).RunAndReturn(func(ctx context.Context, _ []rebac.Relationship) error {
+		assertLease(ctx, workhub.RebacTupleQueue, true)
+		return nil
+	}).Once()
+	failed := authorizer.EXPECT().Delete(mock.Anything, relationships).Return(errors.New("temporary FGA failure")).Once()
+	authorizer.EXPECT().Delete(mock.Anything, relationships).Return(nil).Once().NotBefore(failed)
+	tupleWorker := NewRebacTupleWorker(authorizer)
+	_, err = jobs.Insert(ctx, workhub.OrganizationDeletionArgs{OrganizationUUIDs: []string{"deleted-org"}}, nil)
+	require.NoError(t, err)
+	for _, model := range []string{types.OpenFgaAuthorizationModelIDVer1_0, types.OpenFgaAuthorizationModelIDVer1_2} {
+		event := types.NewRebacTuple("migration.organization_namespace", types.TupleOperation{Delete: model == types.OpenFgaAuthorizationModelIDVer1_2, Relationships: relationships})
+		event.ModelID = model
+		_, err = jobs.Insert(ctx, workhub.RebacTupleArgs{SubjectKey: workhub.RebacSequenceKey(event.Operations[0].Relationships[0]), RebacTuple: event}, nil)
+		require.NoError(t, err)
+	}
+	pool, ok := db.GetPGXPool()
+	require.True(t, ok)
+	organizationClient, err := NewOrganizationDeletionWorkClient(ctx, pool.Config().ConnString(), organizationWorker)
+	require.NoError(t, err)
+	clients := []workhub.WorkClient{organizationClient}
+	t.Cleanup(func() {
+		for _, client := range clients {
+			stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			err := client.Stop(stopCtx)
+			cancel()
+			require.NoError(t, err)
+		}
+	})
+	tupleClient, err := NewRebacTupleWorkClient(ctx, pool.Config().ConnString(), tupleWorker)
+	require.NoError(t, err)
+	clients = append(clients, tupleClient)
+	for _, client := range clients {
+		require.NoError(t, client.Start(ctx))
+	}
+	require.Eventually(t, func() bool {
+		count, err := db.BunDB.NewSelect().Table("river_job").Where("state = 'completed'").Count(ctx)
+		return err == nil && count == 3
+	}, 15*time.Second, 50*time.Millisecond)
+	// Existing deletion work must not enqueue a nested tuple event.
+	count, err := db.BunDB.NewSelect().Table("river_job").Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 3, count)
+	count, err = db.BunDB.NewSelect().Table("river_job").Where("lease_expires_at IS NOT NULL").Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, count, "completed jobs must release their leases")
+	count, err = db.BunDB.NewSelect().Table("river_job").Where("kind = ? AND sequence_key IS NOT NULL", workhub.RebacTupleQueue).Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, count, "tuple leases must preserve subject sequences")
 }

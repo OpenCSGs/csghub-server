@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -13,6 +14,12 @@ import (
 	"opencsg.com/csghub-server/common/types"
 	dvCom "opencsg.com/csghub-server/dataviewer/common"
 )
+
+// workflowTestDeadlockDetectionTimeout relaxes the temporal test environment's
+// 1s deadlock detection: on a heavily loaded machine (go test ./...) the
+// workflow goroutine can be starved past the default and falsely fail with
+// [TMPRL1101] Potential deadlock detected.
+const workflowTestDeadlockDetectionTimeout = time.Minute
 
 type workflowTester struct {
 	env   *testsuite.TestWorkflowEnvironment
@@ -27,7 +34,8 @@ func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 		env: suite.NewTestWorkflowEnvironment(),
 	}
 	tester.env.SetWorkerOptions(worker.Options{
-		EnableSessionWorker: true,
+		EnableSessionWorker:      true,
+		DeadlockDetectionTimeout: workflowTestDeadlockDetectionTimeout,
 	})
 
 	mockact := mock_activity.NewMockDataViewerActivity(t)

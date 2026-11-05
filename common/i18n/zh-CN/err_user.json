@@ -61,5 +61,32 @@
     },
     "error.USER-ERR-9": {
         "other": "验证码不能为空"
+    },
+    "error.USER-ERR-22": {
+        "other": "姓名或身份证号码格式不正确"
+    },
+    "error.USER-ERR-23": {
+        "other": "认证记录不存在"
+    },
+    "error.USER-ERR-24": {
+        "other": "已完成认证，或认证记录已更新，请刷新后重试"
+    },
+    "error.USER-ERR-25": {
+        "other": "请求过于频繁，请稍后重试"
+    },
+    "error.USER-ERR-26": {
+        "other": "实名认证服务暂不可用"
+    },
+    "error.USER-ERR-27": {
+        "other": "认证信息不被接受或流程已失效，请检查后重试"
+    },
+    "error.USER-ERR-28": {
+        "other": "认证初始化已超时，请重新发起"
+    },
+    "error.USER-ERR-29": {
+        "other": "认证结果待确认，请稍后重试"
+    },
+    "error.USER-ERR-30": {
+        "other": "认证未通过或已超时，请重新发起"
     }
 }

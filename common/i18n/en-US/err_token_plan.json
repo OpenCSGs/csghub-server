@@ -10,5 +10,8 @@
     },
     "error.TOKENPLAN-ERR-3": {
         "other": "Token plan latest period is not paid"
+    },
+    "error.TOKENPLAN-ERR-4": {
+        "other": "Token plan name already exists: {{.plan_name}}"
     }
 }

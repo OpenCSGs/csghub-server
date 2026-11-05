@@ -102,13 +102,13 @@ func (s *promptStoreImpl) FindByPath(ctx context.Context, namespace string, repo
 		Model(resPrompt).
 		Relation("Repository.User").
 		Relation("Repository.Statistics").
-		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
+		Where("LOWER(repository.path) = LOWER(?)", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Scan(ctx)
 	if err != nil {
 		err = errorx.HandleDBError(err,
 			errorx.Ctx().Set("path", fmt.Sprintf("%s/%s", namespace, repoPath)),
 		)
-		return nil, fmt.Errorf("failed to find prompt: %w", err)
+		return nil, fmt.Errorf("failed to find prompt: %w", resourceLookupError(err, namespace, repoPath))
 	}
 	err = s.db.Operator.Core.NewSelect().
 		Model(resPrompt.Repository).

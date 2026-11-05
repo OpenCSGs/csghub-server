@@ -110,7 +110,7 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	if req.OwnerNamespace == "" {
 		req.OwnerNamespace = operatorUsername
 	}
-	user, err := c.userStore.FindByUsername(ctx, operatorUsername)
+	user, err := c.userStore.FindByUsername(ctx, operatorUsername, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user %s, error:%w", req.Username, err)
 	}

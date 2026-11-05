@@ -252,6 +252,7 @@ func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
 	return r.(*repoComponentImpl), nil
 }
 
+// CreateRepo validates the caller and namespace before creating repository records and Git data.
 func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error) {
 	var commitFilesReq *gitserver.CommitFilesReq
 	// Name validation
@@ -261,13 +262,13 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		return nil, nil, commitFilesReq, errorx.ErrRepoNameInvalid
 	}
 
-	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
+	_, err = c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		slog.ErrorContext(ctx, "namespace does not exist", slog.Any("error", err))
 		return nil, nil, commitFilesReq, errorx.ErrNamespaceNotFound
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username, types.UserWithAdminPermissions)
 	if err != nil {
 		slog.ErrorContext(ctx, "user does not exist", slog.Any("error", err))
 		return nil, nil, commitFilesReq, errorx.ErrUserNotFound
@@ -287,6 +288,37 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 			return nil, nil, commitFilesReq, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
 		}
 	}
+	return c.createRepoWithResolvedUser(ctx, req, user)
+}
+
+// createRepoForAuthorizedUser executes repository creation authorized at the
+// batch-mirror ingress boundary. Current role and organization membership are
+// intentionally not re-evaluated, but the persisted user must still exist.
+func (c *repoComponentImpl) createRepoForAuthorizedUser(ctx context.Context, input authorizedRepoCreateRequest) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error) {
+	req := input.Repo
+	valid, err := common.IsValidName(req.Name)
+	if !valid {
+		slog.ErrorContext(ctx, "repo name is invalid", slog.Any("error", err))
+		return nil, nil, nil, errorx.ErrRepoNameInvalid
+	}
+	_, err = c.namespaceStore.FindByPath(ctx, req.Namespace)
+	if err != nil {
+		return nil, nil, nil, errorx.ErrNamespaceNotFound
+	}
+	user, err := c.userStore.FindByID(ctx, input.UserID)
+	if err != nil {
+		return nil, nil, nil, errorx.ErrUserNotFound
+	}
+	if user.Email == "" {
+		return nil, nil, nil, errorx.ErrUserEmailEmpty
+	}
+	req.Username = user.Username
+	return c.createRepoWithResolvedUser(ctx, req, user)
+}
+
+// createRepoWithResolvedUser keeps pending publications hidden and delegates transactional tuple enqueueing to its Store.
+func (c *repoComponentImpl) createRepoWithResolvedUser(ctx context.Context, req types.CreateRepoReq, user database.User) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error) {
+	var commitFilesReq *gitserver.CommitFilesReq
 	if req.DefaultBranch == "" {
 		req.DefaultBranch = types.MainBranch
 	}
@@ -303,6 +335,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		Nickname:             req.Nickname,
 		Description:          req.Description,
 		Private:              req.Private,
+		PendingPublish:       req.PendingPublish,
 		License:              req.License,
 		ComplianceStatus:     complianceStatus,
 		CommercialPermission: commercialPermission,
@@ -311,13 +344,14 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		StarCount:            req.StarCount,
 		User:                 user,
 	}
+	if dbRepo.PendingPublish {
+		dbRepo.Private = true
+		dbRepo.SyncStatus = types.SyncStatusPending
+	}
+	dbRepo.TupleNamespacePath = req.Namespace
 	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
 	if err != nil {
 		return nil, nil, commitFilesReq, fmt.Errorf("fail to create database repo, error: %w", err)
-	}
-
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, namespace, newDBRepo.ID, newDBRepo.OrgInheritBlocked); err != nil {
-		return nil, nil, commitFilesReq, fmt.Errorf("failed to synchronize repository namespace relationship: %w", err)
 	}
 
 	err = c.recomStore.UpsertScore(ctx, []*database.RecomRepoScore{
@@ -340,7 +374,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		DefaultBranch: req.DefaultBranch,
 		// Readme:        "Please introduce your space.",
 		Readme:   req.Readme,
-		Private:  req.Private,
+		Private:  newDBRepo.Private,
 		RepoType: req.RepoType,
 	}
 	gitRepo, err := c.git.CreateRepo(ctx, gitRepoReq)
@@ -376,7 +410,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	return gitRepo, newDBRepo, commitFilesReq, nil
 }
 
-// UpdateRepo applies repository settings after edition-specific visibility authorization and applicable repository write checks.
+// UpdateRepo applies repository settings using administrator authorization or edition-specific visibility and repository write checks.
 func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error) {
 	repo, err := c.repoStore.Find(ctx, req.Namespace, string(req.RepoType), req.Name)
 	if err != nil {
@@ -384,25 +418,39 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 	}
 	originalRepo := *repo
 	complianceUpdateRequested := req.ComplianceStatus != nil
+	// A public setting during synchronization records intent without exposing incomplete content.
+	deferPublication := req.Private != nil && !*req.Private && repo.RepositoryType == types.ModelRepo &&
+		repo.SyncStatus != "" && repo.SyncStatus != types.SyncStatusCompleted
+	// A terminated synchronization no longer delays an explicit public setting after its mirror is removed.
+	if deferPublication && (repo.SyncStatus == types.SyncStatusCanceled || repo.SyncStatus == types.SyncStatusFailed) {
+		mirror, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("check terminated model mirror binding: %w", err)
+		}
+		deferPublication = err == nil && mirror != nil && mirror.ID != 0
+	}
 
 	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
 
-	if req.Private != nil {
+	// Authorized administrator requests retain the existing administrator update rules.
+	isAdmin := types.IsAdminAuthorized(ctx) || user.CanAdmin()
+	if req.Private != nil && !isAdmin {
 		if err := c.authorizeVisibilityChange(user, req.RepoType); err != nil {
 			return nil, err
 		}
 	}
 
+	var requireSensitiveCheck bool
 	// Admin users have full permissions.
-	if user.CanAdmin() {
+	if isAdmin {
 		if req.ComplianceStatus != nil {
 			if !types.SupportsLicenseCompliance(req.RepoType) {
 				return nil, errorx.BadRequest(errors.New("license compliance can only be updated for models and datasets"), nil)
@@ -413,7 +461,7 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 			repo.ComplianceStatus = *req.ComplianceStatus
 		}
 		if req.Private != nil {
-			repo.Private = *req.Private
+			repo.Private = *req.Private || deferPublication
 		}
 		if req.XnetEnabled != nil {
 			repo.XnetEnabled = *req.XnetEnabled
@@ -434,15 +482,16 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 		}
 
 		if req.Private != nil {
-			if !*req.Private {
-				if err := c.allowPublic(repo); err != nil {
+			if !*req.Private && !deferPublication {
+				// Reuse the public policy's persistence guard to validate the latest status under lock.
+				requireSensitiveCheck, err = c.allowPublic(repo)
+				if err != nil {
 					return nil, err
 				}
 			}
-			repo.Private = *req.Private
+			repo.Private = *req.Private || deferPublication
 		}
 	}
-
 	if req.Nickname != nil {
 		repo.Nickname = *req.Nickname
 	}
@@ -464,7 +513,7 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 		repo.Description != originalRepo.Description ||
 		repo.Private != originalRepo.Private ||
 		repo.DefaultBranch != originalRepo.DefaultBranch
-	repositoryUpdateRequired := !complianceUpdateRequested || gitRepoChanged || repo.XnetEnabled != originalRepo.XnetEnabled
+	repositoryUpdateRequired := !complianceUpdateRequested || req.Private != nil || gitRepoChanged || repo.XnetEnabled != originalRepo.XnetEnabled
 
 	if repositoryUpdateRequired {
 		gitRepoReq := gitserver.UpdateRepoReq{
@@ -485,7 +534,15 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 
 	resRepo := repo
 	if repositoryUpdateRequired {
-		resRepo, err = c.repoStore.UpdateRepo(ctx, *repo)
+		var updateOptions []types.RepositoryUpdateOptions
+		if req.Private != nil && (repo.RepositoryType == types.ModelRepo || requireSensitiveCheck) {
+			updateOptions = append(updateOptions, types.RepositoryUpdateOptions{
+				Private:                   req.Private,
+				DeferPublication:          deferPublication,
+				RequireSensitiveCheckPass: requireSensitiveCheck,
+			})
+		}
+		resRepo, err = c.repoStore.UpdateRepo(ctx, *repo, updateOptions...)
 		if err != nil {
 			slog.Error("fail to update repo in database", slog.Any("req", req), slog.String("error", err.Error()))
 			return nil, fmt.Errorf("fail to update repo in database, error: %w", err)
@@ -546,7 +603,7 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		return nil, errors.New("namespace does not exist")
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, errors.New("user does not exist")
 	}
@@ -599,12 +656,12 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 	}
 
 	// 3. Create target repository in database
-	targetNamespace, err := c.namespaceStore.FindByPath(ctx, req.TargetNamespace)
+	_, err = c.namespaceStore.FindByPath(ctx, req.TargetNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("target namespace does not exist, error: %w", err)
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, error: %w", err)
 	}
@@ -638,13 +695,10 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 		User:                 user,
 	}
 
+	dbRepo.TupleNamespacePath = req.TargetNamespace
 	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database repo, error: %w", err)
-	}
-
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, newDBRepo.ID, newDBRepo.OrgInheritBlocked); err != nil {
-		return nil, fmt.Errorf("failed to synchronize fork repository namespace relationship: %w", err)
 	}
 
 	err = c.recomStore.UpsertScore(ctx, []*database.RecomRepoScore{
@@ -764,7 +818,7 @@ func (c *repoComponentImpl) loadRepositoryReadScope(ctx context.Context, current
 	return loadRepositoryReadScope(ctx, currentUser, c.userSvcClient, c.rebac, c.repositoryAccessCache, c.config)
 }
 
-// loadRepositoryReadScope resolves a user's list-query scope using the shared ReBAC and cache rules.
+// loadRepositoryReadScope grants administrator requests full scope and otherwise applies existing user permissions.
 // The per-user snapshot is intentionally TTL-only, so short-lived permission staleness is allowed.
 func loadRepositoryReadScope(ctx context.Context, currentUser string, userSvcClient rpc.UserSvcClient, authorizer rebac.Authorizer, accessCache storecache.RedisClient, cfg *config.Config) (database.RepositoryAccessScope, error) {
 	if currentUser == "" {
@@ -778,7 +832,7 @@ func loadRepositoryReadScope(ctx context.Context, currentUser string, userSvcCli
 	if user == nil {
 		return database.RepositoryAccessScope{}, fmt.Errorf("user %q not found", currentUser)
 	}
-	if (&database.User{RoleMask: strings.Join(user.Roles, ",")}).CanAdmin() {
+	if types.IsAdminAuthorized(ctx) || user.IsSuperAdmin() {
 		return database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil), nil
 	}
 	if user.UUID == "" {
@@ -2251,18 +2305,19 @@ func (c *repoComponentImpl) AllowAdminAccess(ctx context.Context, repoType types
 	return c.CheckUserRepoPermission(ctx, username, repo, rebac.RepositoryCanAdmin)
 }
 
+// GetUserRepoPermission grants authorized administrator requests full repository permissions and otherwise checks the user.
 func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error) {
 	if userName == "" {
 		// Anonymous users can only read public repositories.
 		return &types.UserRepoPermission{CanRead: !repo.Private}, nil
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, userName)
+	user, err := c.userStore.FindByUsername(ctx, userName, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("find user %q for repository permission: %w", userName, err)
 	}
-	// Platform administrators retain their global bypass until platform roles are migrated to ReBAC.
-	if user.CanAdmin() {
+	// Request authorization and existing global grants bypass resource authorization.
+	if types.IsAdminAuthorized(ctx) || user.CanAdmin() {
 		return &types.UserRepoPermission{CanRead: true, CanWrite: true, CanAdmin: true}, nil
 	}
 	readCorrelationID := rebac.BatchCheckCorrelationID(0)
@@ -2330,7 +2385,7 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 	}, nil
 }
 
-// CheckUserRepoPermission checks one effective repository permission.
+// CheckUserRepoPermission checks one effective repository permission, honoring request authorization and existing global grants.
 func (c *repoComponentImpl) CheckUserRepoPermission(ctx context.Context, userName string, repo *database.Repository, permission rebac.Permission) (bool, error) {
 	switch permission {
 	case rebac.RepositoryCanRead, rebac.RepositoryCanWrite, rebac.RepositoryCanAdmin:
@@ -2342,12 +2397,12 @@ func (c *repoComponentImpl) CheckUserRepoPermission(ctx context.Context, userNam
 		return permission == rebac.RepositoryCanRead && !repo.Private, nil
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, userName)
+	user, err := c.userStore.FindByUsername(ctx, userName, types.UserWithAdminPermissions)
 	if err != nil {
 		return false, fmt.Errorf("find user %q for repository permission: %w", userName, err)
 	}
-	// Platform administrators retain their global bypass until platform roles are migrated to ReBAC.
-	if user.CanAdmin() {
+	// Request authorization and existing global grants bypass resource authorization.
+	if types.IsAdminAuthorized(ctx) || user.CanAdmin() {
 		return true, nil
 	}
 
@@ -2369,7 +2424,7 @@ func (c *repoComponentImpl) CheckUserRepoPermission(ctx context.Context, userNam
 	return decision.Allowed, nil
 }
 
-// CheckCurrentUserPermission resolves a namespace path and checks its effective ReBAC permission.
+// CheckCurrentUserPermission accepts local administrator authorization or checks namespace access through ReBAC.
 func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, permission rebac.Permission) (bool, error) {
 	switch permission {
 	case rebac.NamespaceCanRead, rebac.NamespaceCanWrite, rebac.NamespaceCanAdmin:
@@ -2377,12 +2432,12 @@ func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, user
 		return false, fmt.Errorf("unsupported namespace permission %q", permission)
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, userName)
+	user, err := c.userStore.FindByUsername(ctx, userName, types.UserWithAdminPermissions)
 	if err != nil {
 		return false, fmt.Errorf("find user %q: %w", userName, err)
 	}
 
-	if user.CanAdmin() {
+	if types.IsAdminAuthorized(ctx) || user.CanAdmin() {
 		return true, nil
 	}
 
@@ -3299,11 +3354,11 @@ func (c *repoComponentImpl) ChangePath(ctx context.Context, req types.ChangePath
 		// }
 		return errorx.BadRequest(errors.New("repository not suported to change path"), errorx.Ctx())
 	}
-	sourceNamespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
+	_, err = c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return fmt.Errorf("failed to find source namespace, error: %w", err)
 	}
-	targetNamespace, err := c.namespaceStore.FindByPath(ctx, newNamespace)
+	_, err = c.namespaceStore.FindByPath(ctx, newNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to find target namespace, error: %w", err)
 	}
@@ -3311,15 +3366,10 @@ func (c *repoComponentImpl) ChangePath(ctx context.Context, req types.ChangePath
 	repo.Path = req.NewPath
 	repo.GitPath = fmt.Sprintf("%ss_%s/%s", req.RepoType, newNamespace, newName)
 	repo.Hashed = true
+	repo.TupleNamespacePath = newNamespace
 	_, err = c.repoStore.UpdateRepo(ctx, *repo)
 	if err != nil {
 		return fmt.Errorf("failed to update repo, error: %w", err)
-	}
-	if err := deleteRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, sourceNamespace, repo.ID); err != nil {
-		return fmt.Errorf("failed to delete source repository namespace relationship: %w", err)
-	}
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, repo.ID, repo.OrgInheritBlocked); err != nil {
-		return fmt.Errorf("failed to create target repository namespace relationship: %w", err)
 	}
 
 	return nil
@@ -3372,7 +3422,7 @@ func (c *repoComponentImpl) TransferOwnership(ctx context.Context, req types.Tra
 	if err := c.checkChangePathDependencies(ctx, repo); err != nil {
 		return err
 	}
-	sourceNamespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
+	_, err = c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return fmt.Errorf("failed to find source namespace, error: %w", err)
 	}
@@ -3386,15 +3436,10 @@ func (c *repoComponentImpl) TransferOwnership(ctx context.Context, req types.Tra
 	repo.GitPath = fmt.Sprintf("%ss_%s/%s", req.RepoType, req.NewNamespace, req.Name)
 	repo.Hashed = true
 	repo.UserID = targetNamespace.UserID
+	repo.TupleNamespacePath = req.NewNamespace
 	_, err = c.repoStore.UpdateRepo(ctx, *repo)
 	if err != nil {
 		return fmt.Errorf("failed to update repo, error: %w", err)
-	}
-	if err := deleteRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, sourceNamespace, repo.ID); err != nil {
-		return fmt.Errorf("failed to delete source repository namespace relationship: %w", err)
-	}
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, repo.ID, repo.OrgInheritBlocked); err != nil {
-		return fmt.Errorf("failed to create target repository namespace relationship: %w", err)
 	}
 
 	return nil
@@ -3697,6 +3742,7 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 
 // batchReadableRepositories checks exactly the requested repositories in one ReBAC batch.
 // Public repositories remain readable by the effective repository permission rule.
+// Local administrator authorization and legacy super administrators can read every requested repository.
 func (c *repoComponentImpl) batchReadableRepositories(ctx context.Context, repos []*database.Repository, currentUser string) ([]*database.Repository, error) {
 	if len(repos) == 0 {
 		return nil, nil
@@ -3718,7 +3764,7 @@ func (c *repoComponentImpl) batchReadableRepositories(ctx context.Context, repos
 	if user == nil {
 		return nil, fmt.Errorf("user %q not found", currentUser)
 	}
-	if (&database.User{RoleMask: strings.Join(user.Roles, ",")}).CanAdmin() {
+	if types.IsAdminAuthorized(ctx) || user.IsSuperAdmin() {
 		return repos, nil
 	}
 	if user.UUID == "" {
