@@ -23,7 +23,7 @@ func TestGitalyGetRepoBranchesPreservesSlashInBranchName(t *testing.T) {
 		&MockGrpcStreamClient[*gitalypb.FindAllBranchesResponse]{
 			data: []*gitalypb.FindAllBranchesResponse{{
 				Branches: []*gitalypb.FindAllBranchesResponse_Branch{{
-					Name:   []byte("feature/foo"),
+					Name:   []byte("refs/heads/feature/foo"),
 					Target: &gitalypb.GitCommit{Id: "commit-id"},
 				}},
 			}},
@@ -51,7 +51,7 @@ func TestGitalyGetRepoBranchByNamePreservesSlashInBranchName(t *testing.T) {
 	tester.mocks.refClient.EXPECT().FindBranch(mock.Anything, mock.Anything).Return(
 		&gitalypb.FindBranchResponse{
 			Branch: &gitalypb.Branch{
-				Name:         []byte("feature/foo"),
+				Name:         []byte("refs/heads/feature/foo"),
 				TargetCommit: &gitalypb.GitCommit{Id: "commit-id"},
 			},
 		}, nil,
@@ -67,4 +67,23 @@ func TestGitalyGetRepoBranchByNamePreservesSlashInBranchName(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, branch)
 	require.Equal(t, "feature/foo", branch.Name)
+}
+
+func TestRefName(t *testing.T) {
+	tests := []struct {
+		name string
+		ref  []byte
+		want string
+	}{
+		{name: "branch", ref: []byte("refs/heads/feature/foo"), want: "feature/foo"},
+		{name: "remote", ref: []byte("refs/remotes/origin/feature/foo"), want: "origin/feature/foo"},
+		{name: "tag", ref: []byte("refs/tags/v1.0"), want: "v1.0"},
+		{name: "without ref prefix", ref: []byte("feature/foo"), want: "feature/foo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, refName(tt.ref))
+		})
+	}
 }

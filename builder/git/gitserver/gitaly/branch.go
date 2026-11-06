@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -45,7 +46,7 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 		if resp != nil {
 			for _, branch := range resp.Branches {
 				branches = append(branches, types.Branch{
-					Name:    string(branch.Name),
+					Name:    refName(branch.Name),
 					Message: string(branch.Target.Subject),
 					Commit: types.RepoBranchCommit{
 						ID: branch.Target.Id,
@@ -88,13 +89,27 @@ func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranc
 		return nil, nil
 	}
 
-	branch.Name = string(resp.Branch.Name)
+	branch.Name = refName(resp.Branch.Name)
 	branch.Message = string(resp.Branch.TargetCommit.Subject)
 	branch.Commit = types.RepoBranchCommit{
 		ID: resp.Branch.TargetCommit.Id,
 	}
 
 	return &branch, nil
+}
+
+func refName(ref []byte, refTypes ...string) string {
+	name := string(ref)
+	if len(refTypes) == 0 {
+		refTypes = []string{"heads", "remotes", "tags"}
+	}
+	for _, refType := range refTypes {
+		prefix := "refs/" + refType + "/"
+		if strings.HasPrefix(name, prefix) {
+			return strings.TrimPrefix(name, prefix)
+		}
+	}
+	return name
 }
 
 func (c *Client) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranchReq) error {
