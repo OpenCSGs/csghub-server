@@ -523,7 +523,7 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 	}
 
 	// Handle reasoning content — emit as thinking blocks.
-	if reasoning, ok := delta["reasoning_content"].(string); ok && reasoning != "" {
+	if reasoning := chatStreamDeltaReasoning(delta); reasoning != "" {
 		if !w.thinkingStarted {
 			w.thinkingStarted = true
 			w.thinkingBlockIdx = w.nextBlockIdx
@@ -639,9 +639,7 @@ func buildChunkFromChatStreamData(id string, choices []struct {
 		if content, ok := ch.Delta["content"].(string); ok {
 			delta.Content = content
 		}
-		if reasoning, ok := ch.Delta["reasoning_content"].(string); ok {
-			delta.ReasoningContent = reasoning
-		}
+		delta.ReasoningContent = chatStreamDeltaReasoning(ch.Delta)
 		if toolCalls, ok := ch.Delta["tool_calls"].([]any); ok {
 			for _, tc := range toolCalls {
 				tcMap, ok := tc.(map[string]any)
@@ -715,4 +713,15 @@ func extraBodyReasoningEffort(req *types.AnthropicMessagesRequest) string {
 		return ""
 	}
 	return extraBody.ReasoningEffort
+}
+
+// chatStreamDeltaReasoning returns the reasoning text of a Chat stream delta.
+// Upstreams spell it reasoning_content (DeepSeek) or reasoning (vLLM,
+// OpenRouter); reasoning_content wins when both are present.
+func chatStreamDeltaReasoning(delta map[string]any) string {
+	if s, ok := delta["reasoning_content"].(string); ok && s != "" {
+		return s
+	}
+	s, _ := delta["reasoning"].(string)
+	return s
 }
