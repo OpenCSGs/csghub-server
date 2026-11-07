@@ -422,3 +422,23 @@ func TestNonStreamResponseWriter_BlockedResponseStripsToolCalls(t *testing.T) {
 	assert.Equal(t, "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.", out.Choices[0].Message.Content)
 	assert.Empty(t, out.Choices[0].Message.ToolCalls, "a gated response must not carry executable tool calls")
 }
+
+func TestNonStreamResponseWriter_EmptyChoicesSplitAcrossWrites(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, RequestCtx: context.Background()})
+
+	body := []byte(`{"id":"chatcmpl-1","object":"chat.completion","choices":[],"usage":{"prompt_tokens":1,"completion_tokens":0,"total_tokens":1}}`)
+	half := len(body) / 2
+
+	n, err := nsw.Write(body[:half])
+	require.NoError(t, err)
+	require.Equal(t, half, n)
+
+	n, err = nsw.Write(body[half:])
+	require.NoError(t, err)
+	require.Equal(t, len(body)-half, n)
+
+	assert.Equal(t, string(body), w.Body.String())
+}
