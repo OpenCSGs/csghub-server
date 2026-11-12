@@ -209,6 +209,13 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 					w.finishReasoningItem()
 					w.finishTextItem()
 					w.finishRefusalItem()
+					// Some upstreams end a tool-calling turn with "stop";
+					// finishToolCallItems is a no-op for calls already done.
+					// Truncated turns (length/content_filter) stay unfinished
+					// so their arguments are not reported as complete.
+					if responsesIncompleteReason(choice.FinishReason) == "" {
+						w.finishToolCallItems()
+					}
 				}
 			}
 		}
