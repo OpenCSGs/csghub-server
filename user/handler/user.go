@@ -218,6 +218,11 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 
 	if err != nil {
 		if isServerErr {
+			if errors.Is(err, errorx.ErrNotFound) {
+				slog.ErrorContext(ctx.Request.Context(), "Operator or user not found", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
+				httpbase.NotFoundError(ctx, fmt.Errorf("user cannot be deleted: %w", err))
+				return
+			}
 			slog.ErrorContext(ctx.Request.Context(), "Check operator and user failed", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
 			httpbase.ServerError(ctx, fmt.Errorf("user cannot be deleted: %w", err))
 			return

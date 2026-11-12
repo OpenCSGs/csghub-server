@@ -289,6 +289,11 @@ func (h *OrganizationHandler) ListUserOrgs(ctx *gin.Context) {
 	}
 	orgs, total, err := h.c.ListUserOrgs(ctx, req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			slog.ErrorContext(ctx.Request.Context(), "User not found when getting organizations", slog.String("username", req.Username), slog.Any("error", err))
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return

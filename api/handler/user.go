@@ -106,6 +106,7 @@ func parseUserRepoFilter(ctx *gin.Context, owner, currentUser string) (*types.Re
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/datasets [get]
 func (h *UserHandler) Datasets(ctx *gin.Context) {
@@ -129,6 +130,10 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 	req.PageSize = per
 	ds, total, err := h.user.Datasets(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to gat user datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -153,6 +158,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/models [get]
 func (h *UserHandler) Models(ctx *gin.Context) {
@@ -176,6 +182,10 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 	req.PageSize = per
 	ms, total, err := h.user.Models(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to gat user models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -200,6 +210,7 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 // @Produce      json
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Code,total=int} "OK"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Router       /user/{username}/codes [get]
@@ -224,6 +235,10 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 	req.PageSize = per
 	ms, total, err := h.user.Codes(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to gat user codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -249,6 +264,7 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Space,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/spaces [get]
 func (h *UserHandler) Spaces(ctx *gin.Context) {
@@ -264,6 +280,10 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Filter, err = parseUserRepoFilter(ctx, req.Owner, req.CurrentUser)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Bad user spaces filter request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -273,6 +293,10 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 	ms, total, err := h.user.Spaces(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to gat user space", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -296,6 +320,7 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 // @Param        repo_id path string true "repo id"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/{repoid} [put]
 func (h *UserHandler) LikesAdd(ctx *gin.Context) {
@@ -311,6 +336,10 @@ func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 	req.RepoID = repo_id
 	err = h.user.AddLikes(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -326,6 +355,7 @@ func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Collection,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/collections [get]
 func (h *UserHandler) LikesCollections(ctx *gin.Context) {
@@ -343,6 +373,10 @@ func (h *UserHandler) LikesCollections(ctx *gin.Context) {
 	req.PageSize = per
 	ms, total, err := h.user.LikesCollection(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user collections", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -365,12 +399,17 @@ func (h *UserHandler) LikesCollections(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Collection,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/collections [get]
 func (h *UserHandler) UserCollections(ctx *gin.Context) {
 	var req types.UserCollectionReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format of page and per", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -383,6 +422,10 @@ func (h *UserHandler) UserCollections(ctx *gin.Context) {
 	ms, total, err := h.user.Collections(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user collections", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -405,6 +448,7 @@ func (h *UserHandler) UserCollections(ctx *gin.Context) {
 // @Param        id path string true "collection id"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/collections/{id} [put]
 func (h *UserHandler) LikeCollection(ctx *gin.Context) {
@@ -419,6 +463,10 @@ func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 	req.CollectionID = collectionID
 	err = h.user.LikeCollection(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -435,6 +483,7 @@ func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 // @Param        id path string true "collection id"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/collections/{id} [delete]
 func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
@@ -449,6 +498,10 @@ func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 	req.CollectionID = collection_id
 	err = h.user.UnLikeCollection(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -466,6 +519,7 @@ func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 // @Param        repo_id path string true "repo id"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/{repoid} [delete]
 func (h *UserHandler) LikesDelete(ctx *gin.Context) {
@@ -482,6 +536,10 @@ func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 	// slog.Info("user.likes.delete.req=%v", req)
 	err = h.user.DeleteLikes(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -497,6 +555,7 @@ func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Space,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/spaces [get]
 func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
@@ -516,6 +575,10 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 
 	ms, total, err := h.user.LikesSpaces(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to gat user space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -960,6 +1023,7 @@ func (h *UserHandler) GetUserResource(ctx *gin.Context) {
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/prompts [get]
 func (h *UserHandler) Prompts(ctx *gin.Context) {
@@ -978,6 +1042,10 @@ func (h *UserHandler) Prompts(ctx *gin.Context) {
 	ds, total, err := h.user.Prompts(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user prompts", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1043,6 +1111,7 @@ func (h *UserHandler) GetEvaluations(ctx *gin.Context) {
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.MCPServer,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/mcps [get]
 func (h *UserHandler) MCPServers(ctx *gin.Context) {
@@ -1067,6 +1136,10 @@ func (h *UserHandler) MCPServers(ctx *gin.Context) {
 	mcps, total, err := h.user.MCPServers(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user mcp servers", slog.Any("error", err), slog.Any("req", req))
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1091,6 +1164,7 @@ func (h *UserHandler) MCPServers(ctx *gin.Context) {
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Skill,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/skills [get]
 func (h *UserHandler) Skills(ctx *gin.Context) {
@@ -1115,6 +1189,10 @@ func (h *UserHandler) Skills(ctx *gin.Context) {
 	skills, total, err := h.user.Skills(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user skills", slog.Any("error", err), slog.Any("req", req))
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}

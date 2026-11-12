@@ -389,6 +389,9 @@ func (c *organizationComponentImpl) ListUserOrgs(ctx context.Context, req *types
 
 	u, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, 0, fmt.Errorf("user %s not exists, error: %w", req.Username, errorx.ErrNotFound)
+		}
 		return nil, 0, fmt.Errorf("failed to find user, error: %w", err)
 	}
 
