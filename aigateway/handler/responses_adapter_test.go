@@ -1500,6 +1500,52 @@ func TestResponsesAdapterStreamWriterEmitsToolCallItemBeforeArguments(t *testing
 	require.Contains(t, body, `"item_id":"call_1"`)
 }
 
+func TestResponsesAdapterStreamWriterToolCallsFinishedByStopReason(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.WriteHeader(200)
+
+	// Some upstreams (e.g. Gemini's OpenAI-compatible endpoint) end a tool-calling
+	// turn with finish_reason "stop" instead of "tool_calls".
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"Tokyo\"}"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	require.Contains(t, body, "event: response.function_call_arguments.done")
+	require.Contains(t, body, "event: response.output_item.done")
+	require.Equal(t, 1, strings.Count(body, "event: response.function_call_arguments.done"))
+	require.Contains(t, body, "event: response.completed")
+}
+
+func TestResponsesAdapterStreamWriterTruncatedToolCallsNotFinished(t *testing.T) {
+	for _, reason := range []string{"length", "content_filter"} {
+		t.Run(reason, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			w := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(w)
+			writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+			writer.WriteHeader(200)
+
+			_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"To"}}]}}]}` + "\n\n"))
+			require.NoError(t, err)
+			_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"` + reason + `"}]}` + "\n\n"))
+			require.NoError(t, err)
+			_, err = writer.Write([]byte("data: [DONE]\n\n"))
+			require.NoError(t, err)
+
+			body := w.Body.String()
+			require.NotContains(t, body, "event: response.function_call_arguments.done")
+			require.Contains(t, body, "event: response.incomplete")
+		})
+	}
+}
+
 func TestResponsesAdapterStreamWriterToolOnlyStreamDoesNotEmitTextItem(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
