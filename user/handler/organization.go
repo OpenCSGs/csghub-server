@@ -266,6 +266,7 @@ func (h *OrganizationHandler) OrganizationChoice(ctx *gin.Context) {
 // @Param        per query int false "page size"
 // @Param        page query int false "page number"
 // @Success      200  {object}  types.Response{data=[]types.Organization} "OK"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/organizations [get]
 // ListUserOrgs handles the deprecated user organization list endpoint.
@@ -289,6 +290,11 @@ func (h *OrganizationHandler) ListUserOrgs(ctx *gin.Context) {
 	}
 	orgs, total, err := h.c.ListUserOrgs(ctx, req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			slog.ErrorContext(ctx.Request.Context(), "User not found when getting organizations", slog.String("username", req.Username), slog.Any("error", err))
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return

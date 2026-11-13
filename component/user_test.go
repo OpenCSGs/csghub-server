@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -798,4 +799,158 @@ func TestUserComponent_LikesSkills(t *testing.T) {
 	require.Equal(t, []types.Skill{
 		{ID: 1, Name: "foo"},
 	}, data)
+}
+
+// TestUserComponent_OwnerNotFoundWrapping verifies that the user resource list
+// methods wrap errorx.ErrNotFound when the owner does not exist, while a
+// database failure during the owner lookup stays a generic (non-404) error.
+func TestUserComponent_OwnerNotFoundWrapping(t *testing.T) {
+	ctx := context.TODO()
+	pageOpts := types.PageOpts{Page: 1, PageSize: 10}
+
+	cases := []struct {
+		name string
+		call func(ctx context.Context, uc *testUserWithMocks) error
+	}{
+		{
+			name: "datasets",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.Datasets(ctx, &types.UserDatasetsReq{Owner: "owner", CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+		{
+			name: "models",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.Models(ctx, &types.UserModelsReq{Owner: "owner", CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+		{
+			name: "codes",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.Codes(ctx, &types.UserModelsReq{Owner: "owner", CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+		{
+			name: "spaces",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.Spaces(ctx, &types.UserSpacesReq{Owner: "owner", CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+		{
+			name: "collections",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.Collections(ctx, &types.UserCollectionReq{Owner: "owner", CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+		{
+			name: "prompts",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.Prompts(ctx, &types.UserPromptsReq{Owner: "owner", CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+		{
+			name: "mcpservers",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.MCPServers(ctx, &types.UserMCPsReq{Owner: "owner", CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+		{
+			name: "skills",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.Skills(ctx, &types.UserSkillsReq{Owner: "owner", CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name+"/missing owner", func(t *testing.T) {
+			uc := initializeTestUserComponent(ctx, t)
+			uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "owner").Return(false, nil)
+			err := tc.call(ctx, uc)
+			require.ErrorIs(t, err, errorx.ErrNotFound)
+		})
+		t.Run(tc.name+"/database failure", func(t *testing.T) {
+			uc := initializeTestUserComponent(ctx, t)
+			uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "owner").Return(false, fmt.Errorf("database unavailable"))
+			err := tc.call(ctx, uc)
+			require.Error(t, err)
+			require.NotErrorIs(t, err, errorx.ErrNotFound)
+		})
+	}
+}
+
+// TestUserComponent_LikesUserNotFoundWrapping verifies that the likes methods
+// translate a missing current user (ErrDatabaseNoRows from FindByUsername) into
+// errorx.ErrNotFound, while other database failures stay generic errors.
+func TestUserComponent_LikesUserNotFoundWrapping(t *testing.T) {
+	ctx := context.TODO()
+	pageOpts := types.PageOpts{Page: 1, PageSize: 10}
+
+	cases := []struct {
+		name string
+		call func(ctx context.Context, uc *testUserWithMocks) error
+	}{
+		{
+			name: "add likes",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				return uc.AddLikes(ctx, &types.UserLikesRequest{CurrentUser: "user", RepoID: 123})
+			},
+		},
+		{
+			name: "likes collection",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.LikesCollection(ctx, &types.UserSpacesReq{CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+		{
+			name: "like collection",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				return uc.LikeCollection(ctx, &types.UserLikesRequest{CurrentUser: "user", CollectionID: 123})
+			},
+		},
+		{
+			name: "unlike collection",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				return uc.UnLikeCollection(ctx, &types.UserLikesRequest{CurrentUser: "user", CollectionID: 123})
+			},
+		},
+		{
+			name: "delete likes",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				return uc.DeleteLikes(ctx, &types.UserLikesRequest{CurrentUser: "user", RepoID: 123})
+			},
+		},
+		{
+			name: "likes spaces",
+			call: func(ctx context.Context, uc *testUserWithMocks) error {
+				_, _, err := uc.LikesSpaces(ctx, &types.UserCollectionReq{CurrentUser: "user", PageOpts: pageOpts})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name+"/missing user", func(t *testing.T) {
+			uc := initializeTestUserComponent(ctx, t)
+			uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{}, errorx.ErrDatabaseNoRows)
+			err := tc.call(ctx, uc)
+			require.ErrorIs(t, err, errorx.ErrNotFound)
+		})
+		t.Run(tc.name+"/database failure", func(t *testing.T) {
+			uc := initializeTestUserComponent(ctx, t)
+			uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{}, fmt.Errorf("database unavailable"))
+			err := tc.call(ctx, uc)
+			require.Error(t, err)
+			require.NotErrorIs(t, err, errorx.ErrNotFound)
+		})
+	}
 }

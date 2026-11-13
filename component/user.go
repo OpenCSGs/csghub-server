@@ -157,7 +157,7 @@ func (c *userComponentImpl) Datasets(ctx context.Context, req *types.UserDataset
 	}
 
 	if !userExists {
-		return nil, 0, errors.New("user not exists")
+		return nil, 0, fmt.Errorf("user not exists: %w", errorx.ErrNotFound)
 	}
 
 	if req.CurrentUser != "" {
@@ -248,7 +248,7 @@ func (c *userComponentImpl) Models(ctx context.Context, req *types.UserModelsReq
 	}
 
 	if !userExists {
-		return nil, 0, errors.New("user not exists")
+		return nil, 0, fmt.Errorf("user not exists: %w", errorx.ErrNotFound)
 	}
 
 	if req.CurrentUser != "" {
@@ -339,7 +339,7 @@ func (c *userComponentImpl) Codes(ctx context.Context, req *types.UserModelsReq)
 	}
 
 	if !userExists {
-		return nil, 0, errors.New("user not exists")
+		return nil, 0, fmt.Errorf("user not exists: %w", errorx.ErrNotFound)
 	}
 
 	if req.CurrentUser != "" {
@@ -429,7 +429,7 @@ func (c *userComponentImpl) Spaces(ctx context.Context, req *types.UserSpacesReq
 	}
 
 	if !userExists {
-		return nil, 0, errors.New("user not exists")
+		return nil, 0, fmt.Errorf("user not exists: %w", errorx.ErrNotFound)
 	}
 
 	if req.CurrentUser != "" {
@@ -472,6 +472,9 @@ func (c *userComponentImpl) Spaces(ctx context.Context, req *types.UserSpacesReq
 func (c *userComponentImpl) AddLikes(ctx context.Context, req *types.UserLikesRequest) error {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return fmt.Errorf("user %s not found: %w", req.CurrentUser, errorx.ErrNotFound)
+		}
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
 		return newError
 	}
@@ -502,6 +505,9 @@ func (c *userComponentImpl) AddLikes(ctx context.Context, req *types.UserLikesRe
 func (c *userComponentImpl) LikesCollection(ctx context.Context, req *types.UserSpacesReq) ([]types.Collection, int, error) {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, 0, fmt.Errorf("user %s not found: %w", req.CurrentUser, errorx.ErrNotFound)
+		}
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
 		return nil, 0, newError
 	}
@@ -531,7 +537,7 @@ func (c *userComponentImpl) Collections(ctx context.Context, req *types.UserColl
 	}
 
 	if !userExists {
-		return nil, 0, errors.New("user not exists")
+		return nil, 0, fmt.Errorf("user not exists: %w", errorx.ErrNotFound)
 	}
 
 	if req.CurrentUser != "" {
@@ -567,6 +573,9 @@ func (c *userComponentImpl) Collections(ctx context.Context, req *types.UserColl
 func (c *userComponentImpl) LikeCollection(ctx context.Context, req *types.UserLikesRequest) error {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return fmt.Errorf("user %s not found: %w", req.CurrentUser, errorx.ErrNotFound)
+		}
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
 		return newError
 	}
@@ -587,6 +596,9 @@ func (c *userComponentImpl) LikeCollection(ctx context.Context, req *types.UserL
 func (c *userComponentImpl) UnLikeCollection(ctx context.Context, req *types.UserLikesRequest) error {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return fmt.Errorf("user %s not found: %w", req.CurrentUser, errorx.ErrNotFound)
+		}
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
 		return newError
 	}
@@ -597,6 +609,9 @@ func (c *userComponentImpl) UnLikeCollection(ctx context.Context, req *types.Use
 func (c *userComponentImpl) DeleteLikes(ctx context.Context, req *types.UserLikesRequest) error {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return fmt.Errorf("user %s not found: %w", req.CurrentUser, errorx.ErrNotFound)
+		}
 		newError := fmt.Errorf("failed to check for the presence of the user,error:%w", err)
 		return newError
 	}
@@ -607,6 +622,9 @@ func (c *userComponentImpl) DeleteLikes(ctx context.Context, req *types.UserLike
 func (c *userComponentImpl) LikesSpaces(ctx context.Context, req *types.UserCollectionReq) ([]types.Space, int, error) {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, 0, fmt.Errorf("user %s not found: %w", req.CurrentUser, errorx.ErrNotFound)
+		}
 		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
 		return nil, 0, newError
 	}
@@ -833,7 +851,7 @@ func (c *userComponentImpl) Prompts(ctx context.Context, req *types.UserPromptsR
 	}
 
 	if !userExists {
-		return nil, 0, errors.New("user not exists")
+		return nil, 0, fmt.Errorf("user not exists: %w", errorx.ErrNotFound)
 	}
 
 	if req.CurrentUser != "" {
@@ -930,7 +948,7 @@ func (c *userComponentImpl) MCPServers(ctx context.Context, req *types.UserMCPsR
 		return nil, 0, fmt.Errorf("failed to check mcp owner, error: %w", err)
 	}
 	if !ownerExists {
-		return nil, 0, errors.New("mcp owner does not exist")
+		return nil, 0, fmt.Errorf("mcp owner does not exist: %w", errorx.ErrNotFound)
 	}
 	if len(req.CurrentUser) > 0 {
 		currentUserExists, err := c.userStore.IsExist(ctx, req.CurrentUser)
@@ -1025,7 +1043,7 @@ func (c *userComponentImpl) Skills(ctx context.Context, req *types.UserSkillsReq
 		return nil, 0, fmt.Errorf("failed to check skill owner, error: %w", err)
 	}
 	if !ownerExists {
-		return nil, 0, errors.New("skill owner does not exist")
+		return nil, 0, fmt.Errorf("skill owner does not exist: %w", errorx.ErrNotFound)
 	}
 	if len(req.CurrentUser) > 0 {
 		currentUserExists, err := c.userStore.IsExist(ctx, req.CurrentUser)

@@ -82,6 +82,30 @@ func TestUserHandler_RejectsAdministratorDeletion(t *testing.T) {
 	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{Code: custom.Code(), Msg: custom.Error()})
 }
 
+// TestUserHandler_DeleteUserErrorMapping verifies that deleting a missing target
+// user returns 404 while a database lookup failure returns 500.
+func TestUserHandler_DeleteUserErrorMapping(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    error
+		status int
+	}{
+		{"missing target user", errorx.ErrNotFound, http.StatusNotFound},
+		{"database lookup failure", errors.New("database unavailable"), http.StatusInternalServerError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tester := testutil.NewGinTester()
+			userComponent := component.NewMockUserComponent(t)
+			tester.Handler((&UserHandler{c: userComponent}).Delete)
+			userComponent.EXPECT().CheckOperatorAndUser(tester.Ctx(), "u", "target").Return(true, tc.err).Once()
+			tester.WithUser().WithParam("username", "target").Execute()
+			tester.ResponseEqCode(t, tc.status)
+		})
+	}
+}
+
 func TestUserHandler_ResetUserTags_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	userUUID := "test-user-uuid"

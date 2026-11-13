@@ -207,6 +207,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      409  {object}  types.APIBadRequest "The user is the last administrator of an organization"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username} [delete]
 func (h *UserHandler) Delete(ctx *gin.Context) {
@@ -218,6 +219,11 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 
 	if err != nil {
 		if isServerErr {
+			if errors.Is(err, errorx.ErrNotFound) {
+				slog.ErrorContext(ctx.Request.Context(), "Operator or user not found", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
+				httpbase.NotFoundError(ctx, fmt.Errorf("user cannot be deleted: %w", err))
+				return
+			}
 			slog.ErrorContext(ctx.Request.Context(), "Check operator and user failed", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
 			httpbase.ServerError(ctx, fmt.Errorf("user cannot be deleted: %w", err))
 			return

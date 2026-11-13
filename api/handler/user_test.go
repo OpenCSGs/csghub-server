@@ -1,11 +1,16 @@
 package handler
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -673,4 +678,144 @@ func TestUserHandler_LikesSkills(t *testing.T) {
 		"data":  []types.Skill{{Name: "sk"}},
 		"total": 100,
 	})
+}
+
+// TestUserHandler_OwnerErrorMapping verifies the HTTP status mapping for the user
+// resource list and likes endpoints: a missing owner/current user (wrapped
+// errorx.ErrNotFound) yields 404, a database failure yields 500, and an existing
+// owner with no resources yields 200.
+func TestUserHandler_OwnerErrorMapping(t *testing.T) {
+	notFoundErr := fmt.Errorf("user not exists: %w", errorx.ErrNotFound)
+	dbErr := errors.New("database unavailable")
+
+	cases := []struct {
+		name    string
+		handler func(h *UserHandler) gin.HandlerFunc
+		setup   func(tester *UserTester, err error)
+	}{
+		{
+			name:    "datasets",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.Datasets },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().Datasets(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "models",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.Models },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().Models(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "codes",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.Codes },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().Codes(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "spaces",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.Spaces },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().Spaces(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "collections",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.UserCollections },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().Collections(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "prompts",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.Prompts },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().Prompts(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "mcpservers",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.MCPServers },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().MCPServers(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "skills",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.Skills },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().Skills(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "likes add",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.LikesAdd },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().AddLikes(mock.Anything, mock.Anything).Return(err)
+			},
+		},
+		{
+			name:    "likes collections",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.LikesCollections },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().LikesCollection(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+		{
+			name:    "like collection",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.LikeCollection },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().LikeCollection(mock.Anything, mock.Anything).Return(err)
+			},
+		},
+		{
+			name:    "unlike collection",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.UnLikeCollection },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().UnLikeCollection(mock.Anything, mock.Anything).Return(err)
+			},
+		},
+		{
+			name:    "likes delete",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.LikesDelete },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().DeleteLikes(mock.Anything, mock.Anything).Return(err)
+			},
+		},
+		{
+			name:    "likes spaces",
+			handler: func(h *UserHandler) gin.HandlerFunc { return h.LikesSpaces },
+			setup: func(tester *UserTester, err error) {
+				tester.mocks.user.EXPECT().LikesSpaces(mock.Anything, mock.Anything).Return(nil, 0, err)
+			},
+		},
+	}
+
+	statusCases := []struct {
+		name   string
+		err    error
+		status int
+	}{
+		{"missing owner", notFoundErr, http.StatusNotFound},
+		{"database failure", dbErr, http.StatusInternalServerError},
+		{"existing owner without resources", nil, http.StatusOK},
+	}
+
+	for _, tc := range cases {
+		for _, sc := range statusCases {
+			t.Run(tc.name+"/"+sc.name, func(t *testing.T) {
+				tester := NewUserTester(t).WithHandleFunc(tc.handler)
+				tc.setup(tester, sc.err)
+				tester.WithUser().
+					WithParam("username", "go").
+					WithParam("repo_id", "123").
+					WithParam("id", "123").
+					AddPagination(1, 10).
+					Execute()
+				tester.ResponseEqCode(t, sc.status)
+			})
+		}
+	}
 }

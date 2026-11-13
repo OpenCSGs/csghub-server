@@ -750,12 +750,18 @@ func (c *userComponentImpl) Get(ctx context.Context, userNameOrUUID, visitorName
 func (c *userComponentImpl) CheckOperatorAndUser(ctx context.Context, operator, username string) (bool, error) {
 	opUser, err := c.userStore.FindByUsername(ctx, operator, types.UserWithAdminPermissions)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return true, fmt.Errorf("operator %s not exists, error: %w", operator, errorx.ErrNotFound)
+		}
 		newError := fmt.Errorf("failed to find operator by name in db,error:%w", err)
 		return true, newError
 	}
 
 	user, err := c.userStore.FindByUsernameWithDeleted(ctx, username, types.UserWithAdminPermissions)
 	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return true, fmt.Errorf("user %s not exists, error: %w", username, errorx.ErrNotFound)
+		}
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return true, newError
 	}
