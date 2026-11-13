@@ -781,10 +781,7 @@ func (w *responsesAdapterStreamWriter) reasoningOutput(status string) responsesp
 }
 
 func chatDeltaReasoning(delta types.ChatCompletionChunkChoiceDelta) string {
-	if delta.ReasoningContent != "" {
-		return delta.ReasoningContent
-	}
-	return delta.Reasoning
+	return delta.ReasoningText()
 }
 
 func (w *responsesAdapterStreamWriter) orderedToolCallStates() []*responsesToolCallStreamState {
@@ -909,7 +906,7 @@ func chatChunkModerationText(chunk types.ChatCompletionChunk) string {
 	var b strings.Builder
 	for _, choice := range chunk.Choices {
 		writeModerationText(&b, choice.Delta.Content)
-		writeModerationText(&b, choice.Delta.ReasoningContent)
+		writeModerationText(&b, chatDeltaReasoning(choice.Delta))
 		writeModerationText(&b, choice.Delta.Refusal)
 		for _, call := range choice.Delta.ToolCalls {
 			writeModerationText(&b, call.Function.Name)
