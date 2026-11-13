@@ -105,7 +105,7 @@ func (nsw *nonStreamResponseWriter) nonStreamWrite(originData []byte) (int, erro
 
 	// Step 5: Handle case with empty choices array
 	if len(completion.Choices) == 0 {
-		return originLen, nsw.writeToInternal(originData)
+		return originLen, nsw.writeToInternal(nsw.buffer.Bytes())
 	}
 
 	// Step 6: Perform content moderation if service is available
