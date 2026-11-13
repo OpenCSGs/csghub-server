@@ -353,6 +353,65 @@ func TestChatResponseToMessagesResponse(t *testing.T) {
 		assert.Equal(t, "tool_use", resp.Content[0].Type)
 		assert.Equal(t, "call_1", resp.Content[0].ID)
 		assert.Equal(t, "get_weather", resp.Content[0].Name)
+		assert.JSONEq(t, `{"city":"SF"}`, string(resp.Content[0].Input))
+		assert.Equal(t, "tool_use", *resp.StopReason)
+	})
+
+	t.Run("truncated tool call arguments still serialize", func(t *testing.T) {
+		chatJSON := `{
+			"id": "chatcmpl-5",
+			"object": "chat.completion",
+			"created": 1234567890,
+			"model": "qwen3",
+			"choices": [{
+				"index": 0,
+				"message": {
+					"role": "assistant",
+					"content": "",
+					"tool_calls": [{
+						"id": "call_1",
+						"type": "function",
+						"function": {"name": "get_weather", "arguments": "{\"city\":"}
+					}]
+				},
+				"finish_reason": "length"
+			}],
+			"usage": {"prompt_tokens": 10, "completion_tokens": 100, "total_tokens": 110}
+		}`
+		resp, err := chatResponseToMessagesResponse([]byte(chatJSON), "claude-3")
+		require.NoError(t, err)
+		_, err = json.Marshal(resp)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{}`, string(resp.Content[0].Input))
+		assert.Equal(t, "max_tokens", *resp.StopReason)
+	})
+
+	t.Run("empty tool call arguments still serialize", func(t *testing.T) {
+		chatJSON := `{
+			"id": "chatcmpl-6",
+			"object": "chat.completion",
+			"created": 1234567890,
+			"model": "qwen3",
+			"choices": [{
+				"index": 0,
+				"message": {
+					"role": "assistant",
+					"content": "",
+					"tool_calls": [{
+						"id": "call_1",
+						"type": "function",
+						"function": {"name": "get_weather", "arguments": ""}
+					}]
+				},
+				"finish_reason": "tool_calls"
+			}],
+			"usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+		}`
+		resp, err := chatResponseToMessagesResponse([]byte(chatJSON), "claude-3")
+		require.NoError(t, err)
+		_, err = json.Marshal(resp)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{}`, string(resp.Content[0].Input))
 		assert.Equal(t, "tool_use", *resp.StopReason)
 	})
 

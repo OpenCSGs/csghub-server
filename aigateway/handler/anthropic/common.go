@@ -396,11 +396,20 @@ func chatResponseToMessagesResponse(data []byte, model string) (*types.Anthropic
 	// Tool calls.
 	if len(msg.ToolCalls) > 0 {
 		for _, call := range msg.ToolCalls {
+			inputArgs := json.RawMessage(call.Function.Arguments)
+			// Arguments cut off by max_tokens are not valid JSON and would
+			// make json.Marshal of the whole Messages response fail. Send an
+			// empty object instead, as responsesResponseToMessagesResponse
+			// already does. A truncated turn (finish_reason length) reports
+			// max_tokens rather than tool_use, so clients do not run the tool.
+			if len(inputArgs) == 0 || !json.Valid(inputArgs) {
+				inputArgs = json.RawMessage(`{}`)
+			}
 			contentBlocks = append(contentBlocks, types.AnthropicContentBlock{
 				Type:  "tool_use",
 				ID:    call.ID,
 				Name:  call.Function.Name,
-				Input: json.RawMessage(call.Function.Arguments),
+				Input: inputArgs,
 			})
 		}
 	}
