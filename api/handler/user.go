@@ -280,10 +280,6 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
 	req.Filter, err = parseUserRepoFilter(ctx, req.Owner, req.CurrentUser)
 	if err != nil {
-		if errors.Is(err, errorx.ErrNotFound) {
-			httpbase.NotFoundError(ctx, err)
-			return
-		}
 		slog.ErrorContext(ctx.Request.Context(), "Bad user spaces filter request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -406,10 +402,6 @@ func (h *UserHandler) UserCollections(ctx *gin.Context) {
 	var req types.UserCollectionReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		if errors.Is(err, errorx.ErrNotFound) {
-			httpbase.NotFoundError(ctx, err)
-			return
-		}
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format of page and per", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return

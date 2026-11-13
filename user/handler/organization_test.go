@@ -246,6 +246,24 @@ func TestOrganizationHandler_ListUserOrgs(t *testing.T) {
 		h.ListUserOrgs(ginc)
 		require.Equal(t, 500, response.Code)
 	})
+
+	t.Run("list user orgs with unknown username", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		response := httptest.NewRecorder()
+		ginc, _ := gin.CreateTestContext(response)
+		ginc.Request = httptest.NewRequest("GET", "/api/v1/user/user1/organizations", nil)
+		ginc.Params = gin.Params{{Key: "username", Value: "user1"}}
+
+		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+		mockOrgComp.EXPECT().ListUserOrgs(mock.Anything, &types.ListUserOrgsReq{
+			Username: "user1", Per: 50, Page: 1,
+		}).Return(nil, 0, errorx.ErrNotFound)
+		h := &OrganizationHandler{
+			c: mockOrgComp,
+		}
+		h.ListUserOrgs(ginc)
+		require.Equal(t, 404, response.Code)
+	})
 }
 
 // TestOrganizationHandler_ListCurrentUserWritableNamespaces returns writable namespaces for the authenticated user.

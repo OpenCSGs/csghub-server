@@ -266,6 +266,7 @@ func (h *OrganizationHandler) OrganizationChoice(ctx *gin.Context) {
 // @Param        per query int false "page size"
 // @Param        page query int false "page number"
 // @Success      200  {object}  types.Response{data=[]types.Organization} "OK"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/organizations [get]
 // ListUserOrgs handles the deprecated user organization list endpoint.
