@@ -701,6 +701,7 @@ func TestConvertToolChoiceForChat(t *testing.T) {
 	}{
 		{"auto", `{"type":"auto"}`, `"auto"`},
 		{"any → required", `{"type":"any"}`, `"required"`},
+		{"none", `{"type":"none"}`, `"none"`},
 		{"tool → function", `{"type":"tool","name":"get_weather"}`, `{"type":"function","function":{"name":"get_weather"}}`},
 		{"unknown defaults to auto", `{"type":"weird"}`, `"auto"`},
 	}
@@ -721,6 +722,7 @@ func TestConvertToolChoiceForResponses(t *testing.T) {
 	}{
 		{"auto", `{"type":"auto"}`, `"auto"`},
 		{"any → required", `{"type":"any"}`, `"required"`},
+		{"none", `{"type":"none"}`, `"none"`},
 		{"tool → function (flat)", `{"type":"tool","name":"get_weather"}`, `{"type":"function","name":"get_weather"}`},
 		{"unknown defaults to auto", `{"type":"weird"}`, `"auto"`},
 	}
