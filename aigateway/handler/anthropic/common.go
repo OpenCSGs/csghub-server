@@ -853,8 +853,8 @@ func jsonString(s string) string {
 
 // convertToolChoiceForResponses converts an Anthropic tool_choice value to
 // the format expected by the OpenAI Responses API.
-// Anthropic: {"type":"auto"}, {"type":"any"}, {"type":"tool","name":"..."}
-// Responses: "auto", "required", {"type":"function","name":"..."}
+// Anthropic: {"type":"auto"}, {"type":"any"}, {"type":"none"}, {"type":"tool","name":"..."}
+// Responses: "auto", "required", "none", {"type":"function","name":"..."}
 func convertToolChoiceForResponses(raw json.RawMessage) (json.RawMessage, error) {
 	var tc struct {
 		Type string `json:"type"`
@@ -868,6 +868,8 @@ func convertToolChoiceForResponses(raw json.RawMessage) (json.RawMessage, error)
 		return json.RawMessage(`"auto"`), nil
 	case "any":
 		return json.RawMessage(`"required"`), nil
+	case "none":
+		return json.RawMessage(`"none"`), nil
 	case "tool":
 		return json.RawMessage(fmt.Sprintf(`{"type":"function","name":%s}`, jsonString(tc.Name))), nil
 	default:
@@ -877,8 +879,8 @@ func convertToolChoiceForResponses(raw json.RawMessage) (json.RawMessage, error)
 
 // convertToolChoiceForChat converts an Anthropic tool_choice value to the
 // format expected by the OpenAI Chat Completions API.
-// Anthropic: {"type":"auto"}, {"type":"any"}, {"type":"tool","name":"..."}
-// Chat:      "auto", "required", {"type":"function","function":{"name":"..."}}
+// Anthropic: {"type":"auto"}, {"type":"any"}, {"type":"none"}, {"type":"tool","name":"..."}
+// Chat:      "auto", "required", "none", {"type":"function","function":{"name":"..."}}
 func convertToolChoiceForChat(raw json.RawMessage) (json.RawMessage, error) {
 	var tc struct {
 		Type string `json:"type"`
@@ -892,6 +894,8 @@ func convertToolChoiceForChat(raw json.RawMessage) (json.RawMessage, error) {
 		return json.RawMessage(`"auto"`), nil
 	case "any":
 		return json.RawMessage(`"required"`), nil
+	case "none":
+		return json.RawMessage(`"none"`), nil
 	case "tool":
 		return json.RawMessage(fmt.Sprintf(`{"type":"function","function":{"name":%s}}`, jsonString(tc.Name))), nil
 	default:
