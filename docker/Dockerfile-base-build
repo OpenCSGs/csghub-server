@@ -8,7 +8,8 @@ RUN apt-get update && \
 
 WORKDIR /go
 
-ENV GOLANG_VERSION=1.26.0
+# Keep the build toolchain aligned with the security baseline in go.mod.
+ENV GOLANG_VERSION=1.26.10
 ENV GOTOOLCHAIN=local
 ENV GOPATH=/go
 ENV PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

@@ -301,12 +301,7 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 		needOpWeight = false
 	}
 
-	qNeedMultiSync := ctx.Query("need_multi_sync")
-	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "bad need_multi_sync params", slog.Any("need_multi_sync", qNeedMultiSync), slog.Any("error", err))
-		needMultiSync = false
-	}
+	needMultiSync := queryBool(ctx, "need_multi_sync")
 
 	detail, err := h.code.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {

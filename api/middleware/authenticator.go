@@ -64,7 +64,7 @@ func AuthSession() gin.HandlerFunc {
 		session := sessions.Default(c)
 		userName := session.Get(httpbase.CurrentUserCtxVar)
 		uuid := session.Get(httpbase.CurrentUserUUIDCtxVar)
-		if userName != nil {
+		if userName != nil && httpbase.GetCurrentUser(c) == "" {
 			httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
 			httpbase.SetCurrentUser(c, userName.(string))
 			httpbase.SetCurrentUserUUID(c, uuid.(string))
@@ -96,7 +96,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 		httpbase.SetIPAddress(c, c.ClientIP())
 		result := isValidBrowserSession(c)
 		if result {
-			c.Next()
+			continueUserSession(c)
 			return
 		}
 
@@ -118,7 +118,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 
 			result = isValidJWTToken(c, config, token, redisClient)
 			if result {
-				c.Next()
+				continueUserSession(c)
 				return
 			}
 
@@ -312,20 +312,21 @@ func parseJWTToken(signKey, tokenString string) (*types.JWTClaims, error) {
 }
 
 func isValidBasicToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token string) bool {
-	var username, accessToken string
 	authInfo, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
 		slog.ErrorContext(c, "Failed to decode basic auth header", slog.Any("error", err))
 		return false
 	}
-	username = strings.Split(string(authInfo), ":")[0]
-	accessToken = strings.Split(string(authInfo), ":")[1]
+	username, accessToken, ok := strings.Cut(string(authInfo), ":")
+	if !ok || username == "" || accessToken == "" {
+		return false
+	}
 	user, err := userSvcClient.VerifyByAccessToken(c.Request.Context(), accessToken)
 	if err != nil {
 		slog.ErrorContext(c, "verify access token error", slog.Any("error", err))
 		return false
 	}
-	if user.Username == username {
+	if user != nil && user.Application != types.AccessTokenAppAIGateway && user.Username == username {
 		httpbase.SetCurrentUser(c, username)
 		httpbase.SetCurrentUserUUID(c, user.UserUUID)
 		return true

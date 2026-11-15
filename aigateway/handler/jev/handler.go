@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -256,6 +257,25 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 		case types.PlanErrQuotaExceeded:
 			// The tenant's token plan allowance for this model is spent.
 			writeError(c, http.StatusTooManyRequests, ErrTypeRateLimit, err.Error())
+			return
+		case types.PlanErrUserRateLimitExceeded:
+			// The USER's own per-user RPM/TPM limit (model-level or
+			// gateway-global) is spent for the current window. The scope is
+			// part of the code: writeError would stamp the type into the
+			// code field and lose it.
+			retryAfter := int64(1)
+			code := types.ErrCodeUserRateLimitExceeded
+			var rateLimitErr *types.UserRateLimitExceededError
+			if errors.As(err, &rateLimitErr) {
+				code = rateLimitErr.ErrorCode()
+				if rateLimitErr.RetryAfterSeconds > 0 {
+					retryAfter = rateLimitErr.RetryAfterSeconds
+				}
+			}
+			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": types.Error{
+				Code: code, Message: err.Error(), Type: ErrTypeRateLimit,
+			}})
 			return
 		case types.PlanErrQueueTimeout:
 			// The client's queue-wait tolerance expired, not the capacity

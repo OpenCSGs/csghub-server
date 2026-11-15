@@ -26,15 +26,17 @@ type LLMLogTraceInfo struct {
 }
 
 type LLMLogRecord struct {
-	RequestID  string          `json:"request_id"`
-	EventTime  string          `json:"event_time"`
-	SampleType string          `json:"sample_type"`
-	ModelID    string          `json:"model_id"`
-	UserUUID   string          `json:"user_uuid"`
-	Tools      json.RawMessage `json:"tools"`
-	Messages   []LLMLogMessage `json:"messages"`
-	Usage      LLMLogUsage     `json:"usage"`
-	Metadata   map[string]any  `json:"metadata,omitempty"`
+	// HTTPArchive preserves the versioned raw exchange event without interpreting protocol fields.
+	HTTPArchive json.RawMessage `json:"http_archive,omitempty"`
+	RequestID   string          `json:"request_id"`
+	EventTime   string          `json:"event_time"`
+	SampleType  string          `json:"sample_type"`
+	ModelID     string          `json:"model_id"`
+	UserUUID    string          `json:"user_uuid"`
+	Tools       json.RawMessage `json:"tools"`
+	Messages    []LLMLogMessage `json:"messages"`
+	Usage       LLMLogUsage     `json:"usage"`
+	Metadata    map[string]any  `json:"metadata,omitempty"`
 }
 
 type LLMLogRequest struct {
@@ -46,4 +48,16 @@ type LLMLogRequest struct {
 type LLMLogSyncFilesResult struct {
 	SourceLineCount int64
 	DatasetRowCount int64
+}
+
+// LLMLogSyncByDateInput keeps source inventories inside the executing Activity.
+type LLMLogSyncByDateInput struct {
+	Date        string
+	ArchiveOnly bool
+}
+
+// LLMLogSyncByDateResult has a bounded size independent of the source file count.
+type LLMLogSyncByDateResult struct {
+	FileCount int
+	LLMLogSyncFilesResult
 }

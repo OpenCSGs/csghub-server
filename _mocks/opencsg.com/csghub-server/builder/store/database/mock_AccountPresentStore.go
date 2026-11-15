@@ -591,6 +591,63 @@ func (_c *MockAccountPresentStore_MarkPresentAsUsed_Call) RunAndReturn(run func(
 	return _c
 }
 
+// SendInviterPresent provides a mock function with given fields: ctx, gift
+func (_m *MockAccountPresentStore) SendInviterPresent(ctx context.Context, gift database.NewUserPresentGift) (bool, error) {
+	ret := _m.Called(ctx, gift)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SendInviterPresent")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.NewUserPresentGift) (bool, error)); ok {
+		return rf(ctx, gift)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.NewUserPresentGift) bool); ok {
+		r0 = rf(ctx, gift)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.NewUserPresentGift) error); ok {
+		r1 = rf(ctx, gift)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountPresentStore_SendInviterPresent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendInviterPresent'
+type MockAccountPresentStore_SendInviterPresent_Call struct {
+	*mock.Call
+}
+
+// SendInviterPresent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - gift database.NewUserPresentGift
+func (_e *MockAccountPresentStore_Expecter) SendInviterPresent(ctx interface{}, gift interface{}) *MockAccountPresentStore_SendInviterPresent_Call {
+	return &MockAccountPresentStore_SendInviterPresent_Call{Call: _e.mock.On("SendInviterPresent", ctx, gift)}
+}
+
+func (_c *MockAccountPresentStore_SendInviterPresent_Call) Run(run func(ctx context.Context, gift database.NewUserPresentGift)) *MockAccountPresentStore_SendInviterPresent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.NewUserPresentGift))
+	})
+	return _c
+}
+
+func (_c *MockAccountPresentStore_SendInviterPresent_Call) Return(_a0 bool, _a1 error) *MockAccountPresentStore_SendInviterPresent_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountPresentStore_SendInviterPresent_Call) RunAndReturn(run func(context.Context, database.NewUserPresentGift) (bool, error)) *MockAccountPresentStore_SendInviterPresent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SendNewUserPresent provides a mock function with given fields: ctx, gift
 func (_m *MockAccountPresentStore) SendNewUserPresent(ctx context.Context, gift database.NewUserPresentGift) (bool, error) {
 	ret := _m.Called(ctx, gift)

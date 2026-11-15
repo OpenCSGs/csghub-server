@@ -60,6 +60,14 @@ const (
 // Sustained high-priority traffic can therefore starve low-priority
 // requests; aging (promoting long-waiting tickets) is a deliberate v2
 // non-goal.
+//
+// Priority classes are arranged as bands so that caller-side promotions
+// (the user-tag priority:<n> tiers; future VIP or recharge tiers) always
+// queue ahead of every API-key-scope class, which itself precedes
+// caller-side demotions (the low_priority tag). The ZSET score
+// (priority*queuePriorityScoreStride + enqueueMs) keeps the bands strictly
+// ordered no matter how long tickets wait, and ResolveQueuePriority is the
+// single place that maps per-request inputs to a class.
 type AdmissionPriority int
 
 const (
@@ -68,15 +76,28 @@ const (
 	// AdmissionPriorityLow is the default for requests that declare no
 	// priority.
 	AdmissionPriorityLow AdmissionPriority = 1
+	// AdmissionPriorityLowest is the bottom band, below every scope class:
+	// callers carrying the low_priority user tag wait behind everyone.
+	AdmissionPriorityLowest AdmissionPriority = 2
+	// maxUserTagPriority bounds the user-tag promotion tiers so that every
+	// queue score stays an EXACT integer in IEEE-754 double (Redis ZSET
+	// scores are doubles; integers are exact only up to 2^53 ≈ 9.007e15).
+	// The worst score is the top tier's: maxUserTagPriority×1e13 − enqueueMs
+	// ≈ 9.0e15 − 1.8e12 < 2^53, so same-tier tickets keep full
+	// millisecond-resolution FIFO at every supported tier. Tags are
+	// operator-written SQL values with no validation ceiling upstream; tiers
+	// above the clamp share the top class (FIFO among them).
+	maxUserTagPriority = 900
 )
 
-// AdmissionPriorityFromSource resolves the queue priority from the API
-// key's server-side priority scope, set by the quota middleware from the
-// key's quota configuration (the ONLY source: clients cannot influence
-// queue scheduling). The default for missing or unrecognized scope values
-// is HIGH: unconfigured keys are interactive chat traffic and must not be
-// queued behind explicitly demoted batch keys — only an explicit "low"
-// scope demotes a key to the low-priority class.
+// AdmissionPriorityFromSource resolves the API-key side of the queue
+// priority from the key's server-side priority scope, set by the quota
+// middleware from the key's quota configuration. It is the scope-band
+// fallback of ResolveQueuePriority for callers without a priority tag. The
+// default for missing or unrecognized scope values is HIGH: unconfigured
+// keys are interactive chat traffic and must not be queued behind
+// explicitly demoted batch keys — only an explicit "low" scope demotes a
+// key to the low-priority class.
 func AdmissionPriorityFromSource(priorityScope string) AdmissionPriority {
 	switch strings.ToLower(strings.TrimSpace(priorityScope)) {
 	case "low":
@@ -84,6 +105,66 @@ func AdmissionPriorityFromSource(priorityScope string) AdmissionPriority {
 	default:
 		return AdmissionPriorityHigh
 	}
+}
+
+// QueuePriorityInput is the per-request input to ResolveQueuePriority. Every
+// field is optional: an unset field does not participate. New priority
+// sources (VIP level, recharge tier, ...) extend this struct with one field
+// and add one band-mapping branch in ResolveQueuePriority; the Lua scripts
+// and the status observer need no change — the observer's high bucket
+// (score < stride) already aggregates every promotion band with the
+// scope-high class, and demotion bands land in its low bucket.
+type QueuePriorityInput struct {
+	// APIKeyScope is the API key's quota priority scope ("high"/"low"/""),
+	// see AdmissionPriorityFromSource. It is the fallback when no
+	// caller-side priority tag is present.
+	APIKeyScope string
+	// UserTag is the caller's upstream channel priority resolved from the
+	// user's routing tags by the user-tags middleware: 0 = low_priority tag,
+	// >= 1 = priority:<n>, nil = no routing tag (unrestricted). When set it
+	// dominates the queue priority in BOTH directions: priority:<n> promotes
+	// above every scope class, low_priority demotes to the bottom band.
+	UserTag *int
+}
+
+// ResolveQueuePriority maps the per-request priority inputs to the queue
+// scheduling class. Lower values are promoted first (band layout):
+//
+//	promotion bands  q < 0  caller-side promotions: user tag priority:<n> →
+//	                       -n, n clamped to maxUserTagPriority. Any tagged
+//	                       caller queues ahead of every API-key-scope class.
+//	scope band        q 0/1  API key quota scope (high/unset = 0, low = 1):
+//	                       the behavior of callers without a priority tag is
+//	                       unchanged.
+//	demotion bands    q >= 2  caller-side demotions: low_priority tag = 2,
+//	                       the bottom band.
+//
+// The 1:1 tag→class mapping (no multiplier) is deliberate: adjacent tag
+// tiers are one stride (1e13) apart, and the clamp keeps every score an
+// exact integer below 2^53, so same-tier tickets keep full
+// millisecond-resolution FIFO — see the maxUserTagPriority comment and the
+// queuePriorityScoreStride comment in the admission component.
+//
+// A set tag fully decides the band (both promotion and demotion); the API
+// key scope only applies to callers without a tag. This is a deliberate
+// alternative to merging both inputs with max/min: those operators are
+// monotone and can express either promotion or demotion against the scope
+// class, never both, so the low_priority bottom band cannot be expressed as
+// a max over the two inputs.
+func ResolveQueuePriority(in QueuePriorityInput) AdmissionPriority {
+	if in.UserTag != nil {
+		switch {
+		case *in.UserTag >= 1:
+			n := *in.UserTag
+			if n > maxUserTagPriority {
+				n = maxUserTagPriority
+			}
+			return -AdmissionPriority(n)
+		default: // 0: the low_priority tag
+			return AdmissionPriorityLowest
+		}
+	}
+	return AdmissionPriorityFromSource(in.APIKeyScope)
 }
 
 // AdmissionLease identifies the Redis lease held by one upstream attempt.

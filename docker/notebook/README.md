@@ -24,6 +24,15 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   --push .
 ```
 
+### PyTorch CPU (torch 2.15.0)
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-22.04-py311-torch2.15.0 \
+  -f Dockerfile.pytorch-cpu \
+  --push .
+```
+
 ### PyTorch CUDA 11.8
 
 ```bash
@@ -38,6 +47,15 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ```bash
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-24.04-cuda12.8-py313-torch2.8.0 \
+  -f Dockerfile.pytorch-cu12 \
+  --push .
+```
+
+### PyTorch CUDA 12 (torch 2.11.0)
+
+```bash
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-26.04-cuda12.8-py313-torch2.11.0 \
   -f Dockerfile.pytorch-cu12 \
   --push .
 ```
@@ -60,6 +78,15 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   --push .
 ```
 
+### TensorFlow GPU (2.21.0)
+
+```bash
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-22.04-cuda12.3-py311-tensorflow2.21.0 \
+  -f Dockerfile.tensorflow \
+  --push .
+```
+
 ### Unsloth
 
 ```bash
@@ -69,13 +96,26 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   --push .
 ```
 
+### Unsloth (nightly-2026.10.28)
+
+```bash
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-24.04-cuda12.8-py312-unsloth2026.10.28 \
+  -f Dockerfile.unsloth \
+  --push .
+```
+
 ## Notebook Images
 
 | Dockerfile | Image Tag | Framework | CUDA/ROCm | Python | OS |
 |---|---|---|---|---|---|
 | Dockerfile.pytorch-cpu | `ubuntu-22.04-py311-torch2.3.1` | PyTorch 2.3.1 | CPU only | 3.11 | Ubuntu 22.04 |
+| Dockerfile.pytorch-cpu | `ubuntu-22.04-py311-torch2.15.0` | PyTorch 2.15.0 | CPU only | 3.11 | Ubuntu 22.04 |
 | Dockerfile.pytorch-cu118 | `ubuntu-24.04-cuda11.8-py313-torch2.7.1` | PyTorch 2.7.1 | CUDA 11.8 | 3.13 | Ubuntu 24.04 |
 | Dockerfile.pytorch-cu12 | `ubuntu-24.04-cuda12.8-py313-torch2.8.0` | PyTorch 2.8.0 | CUDA 12.8 | 3.13 | Ubuntu 24.04 |
+| Dockerfile.pytorch-cu12 | `ubuntu-26.04-cuda12.8-py313-torch2.11.0` | PyTorch 2.11.0 | CUDA 12.8 | 3.13 | Ubuntu 26.04 |
 | Dockerfile.pytorch-amd | `rocm7.1_ubuntu22.04_py3.11_pytorch_release_2.9.1` | PyTorch 2.9.1 | ROCm 7.1 | 3.11 | Ubuntu 22.04 |
 | Dockerfile.tensorflow | `ubuntu-22.04-cuda12.3-py311-tensorflow2.20.0` | TensorFlow 2.20.0 | CUDA 12.3 | 3.11 | Ubuntu 22.04 |
+| Dockerfile.tensorflow | `ubuntu-22.04-cuda12.3-py311-tensorflow2.21.0` | TensorFlow 2.21.0 | CUDA 12.3 | 3.11 | Ubuntu 22.04 |
 | Dockerfile.unsloth | `ubuntu-22.04-cuda12.6-py311-unsloth2025.8.10` | Unsloth 2025.8.10 | CUDA 12.6 | 3.11 | Ubuntu 22.04 |
+| Dockerfile.unsloth | `ubuntu-24.04-cuda12.8-py312-unsloth2026.10.28` | Unsloth 2026.10.28 | CUDA 12.8 | 3.12 | Ubuntu 24.04 |

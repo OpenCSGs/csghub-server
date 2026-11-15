@@ -49,5 +49,9 @@
     },
     "error.AUTH-ERR-16": {
         "other": "Email address not set"
+    },
+    "error.AUTH-ERR-17": {"other": "Account is banned"},
+    "error.AUTH-ERR-18": {
+        "other": "Account closed"
     }
 }

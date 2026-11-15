@@ -794,19 +794,23 @@ func newNewUserPresentGift(userUUID string, activityID int64, voucherValue float
 }
 
 // seedNewUserPresentActivity inserts an active activity whose grant window
-// contains now, so the new user present tests can request it. The voucher value
-// is the server-side amount the store applies to each gifted voucher.
+// contains now, so the new user present tests can request it. The per-type
+// voucher values are the server-side amounts the store applies to each gifted
+// voucher, and valid_duration_month bounds their validity window.
 func seedNewUserPresentActivity(t *testing.T, ctx context.Context, db *database.DB, activityID int64) {
 	t.Helper()
 	now := time.Now()
 	_, err := db.Core.NewInsert().Model(&database.AccountActivity{
-		ActID:        activityID,
-		ActCode:      fmt.Sprintf("test_activity_%d", activityID),
-		ActName:      fmt.Sprintf("Test Activity %d", activityID),
-		Status:       types.ActivityStatusActive,
-		BeginAt:      now.Add(-time.Hour),
-		EndAt:        now.Add(24 * time.Hour),
-		VoucherValue: 100,
+		ActID:               activityID,
+		ActCode:             fmt.Sprintf("test_activity_%d", activityID),
+		ActName:             fmt.Sprintf("Test Activity %d", activityID),
+		Status:              types.ActivityStatusActive,
+		BeginAt:             now.Add(-time.Hour),
+		EndAt:               now.Add(24 * time.Hour),
+		VoucherValue:        100,
+		VoucherTokenValue:   100,
+		VoucherComputeValue: 100,
+		ValidDurationMonth:  1,
 	}).Exec(ctx)
 	require.NoError(t, err)
 }
@@ -824,12 +828,19 @@ func TestAccountPresentStore_SendNewUserPresent(t *testing.T) {
 	_, err := db.Core.NewInsert().Model(&database.AccountUser{UserUUID: userUUID, Balance: 77}).Exec(ctx)
 	require.Nil(t, err)
 
-	beginDate := time.Now().Add(-time.Hour).UTC().Truncate(time.Microsecond)
-	endDate := beginDate.AddDate(0, 1, 0)
+	// the caller-provided amount and validity dates must be ignored: the
+	// activity configuration is the only source of truth for the present and
+	// voucher amounts, and for the voucher validity window
+	callerBeginDate := time.Date(2020, 1, 1, 8, 0, 0, 0, time.UTC)
+	callerEndDate := callerBeginDate.AddDate(0, 1, 0)
 
-	// the caller-provided amount must be ignored: the activity's voucher_value
-	// is the only source of truth for the present and voucher amounts
-	awarded, err := store.SendNewUserPresent(ctx, newNewUserPresentGift(userUUID, activityID, 999, beginDate, endDate))
+	// the store derives the voucher window from the grant time and the
+	// activity's valid_duration_month (one month in seedNewUserPresentActivity)
+	now := time.Now()
+	wantBeginDate := database.NormalizeBeginDate(now)
+	wantEndDate := database.NormalizeEndDate(now.AddDate(0, 1, 0))
+
+	awarded, err := store.SendNewUserPresent(ctx, newNewUserPresentGift(userUUID, activityID, 999, callerBeginDate, callerEndDate))
 	require.Nil(t, err)
 	require.True(t, awarded)
 
@@ -840,16 +851,20 @@ func TestAccountPresentStore_SendNewUserPresent(t *testing.T) {
 	require.False(t, present.ExpireAt.IsZero())
 	require.WithinDuration(t, time.Now(), present.ExpireAt, time.Minute)
 
-	// the gift must not touch the account balance and writes no statement
+	// the gift must not touch the account balance, but records a zero-amount
+	// audit statement carrying the voucher face value
 	var account database.AccountUser
 	require.Nil(t, db.Core.NewSelect().Model(&account).Where("user_uuid = ?", userUUID).Scan(ctx))
 	require.Equal(t, float64(77), account.Balance)
-	statementCount, err := db.Core.NewSelect().Model((*database.AccountStatement)(nil)).Where("user_uuid = ?", userUUID).Count(ctx)
-	require.Nil(t, err)
-	require.Equal(t, 0, statementCount)
+	var statement database.AccountStatement
+	require.Nil(t, db.Core.NewSelect().Model(&statement).Where("user_uuid = ?", userUUID).Scan(ctx))
+	require.Equal(t, present.EventUUID, statement.EventUUID)
+	require.Equal(t, float64(0), statement.Value)
+	require.Equal(t, float64(200), statement.EventValue)
+	require.Equal(t, types.ScenePortalCharge, statement.Scene)
 
 	// the canceled/expired record stays out of the legacy auto-expire scan
-	autoExpirePresents, err := store.ListAutoExpirePresents(ctx, activityID, beginDate.Add(-time.Hour), endDate.Add(time.Hour), 0, 0, 100)
+	autoExpirePresents, err := store.ListAutoExpirePresents(ctx, activityID, now.Add(-2*time.Hour), now.AddDate(0, 2, 0), 0, 0, 100)
 	require.Nil(t, err)
 	require.Empty(t, autoExpirePresents)
 
@@ -864,8 +879,8 @@ func TestAccountPresentStore_SendNewUserPresent(t *testing.T) {
 		require.Equal(t, float64(100), voucher.Total)
 		require.Equal(t, types.VoucherStatusActive, voucher.Status)
 		require.Equal(t, present.EventUUID.String(), voucher.BatchNo)
-		require.WithinDuration(t, beginDate, voucher.BeginDate, time.Millisecond)
-		require.WithinDuration(t, endDate, voucher.EndDate, time.Millisecond)
+		require.WithinDuration(t, wantBeginDate, voucher.BeginDate, time.Minute)
+		require.WithinDuration(t, wantEndDate, voucher.EndDate, time.Minute)
 	}
 
 	var sub database.AccountSubscription
@@ -906,13 +921,16 @@ func TestAccountPresentStore_SendNewUserPresent(t *testing.T) {
 	require.WithinDuration(t, sub.LastPeriodEnd, license.ExpireTime, time.Second)
 
 	// a repeated send for the same user and activity is skipped untouched
-	awarded, err = store.SendNewUserPresent(ctx, newNewUserPresentGift(userUUID, activityID, 100, beginDate, endDate))
+	awarded, err = store.SendNewUserPresent(ctx, newNewUserPresentGift(userUUID, activityID, 100, callerBeginDate, callerEndDate))
 	require.Nil(t, err)
 	require.False(t, awarded)
 
 	presentCount, err := db.Core.NewSelect().Model((*database.AccountPresent)(nil)).Where("user_uuid = ?", userUUID).Count(ctx)
 	require.Nil(t, err)
 	require.Equal(t, 1, presentCount)
+	statementCount, err := db.Core.NewSelect().Model((*database.AccountStatement)(nil)).Where("user_uuid = ?", userUUID).Count(ctx)
+	require.Nil(t, err)
+	require.Equal(t, 1, statementCount)
 	voucherCount, err := db.Core.NewSelect().Model((*database.AccountVoucher)(nil)).Where("target_uuid = ?", userUUID).Count(ctx)
 	require.Nil(t, err)
 	require.Equal(t, 2, voucherCount)
@@ -928,6 +946,61 @@ func TestAccountPresentStore_SendNewUserPresent(t *testing.T) {
 	require.Equal(t, float64(77), account.Balance)
 }
 
+// TestAccountPresentStore_SendNewUserPresentUsesActivityVoucherConfig proves the
+// store fills every voucher from the activity's per-type value instead of using
+// one shared amount: a zero compute value skips the compute voucher entirely
+// while the token voucher carries the token value, the present total is the sum
+// of the granted vouchers, and valid_duration_month bounds the window.
+func TestAccountPresentStore_SendNewUserPresentUsesActivityVoucherConfig(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewAccountPresentStoreWithDB(db)
+
+	userUUID := "new-user-gift-voucher-config"
+	activityID := int64(9108)
+	now := time.Now()
+	_, err := db.Core.NewInsert().Model(&database.AccountActivity{
+		ActID:               activityID,
+		ActCode:             fmt.Sprintf("test_activity_%d", activityID),
+		ActName:             fmt.Sprintf("Test Activity %d", activityID),
+		Status:              types.ActivityStatusActive,
+		BeginAt:             now.Add(-time.Hour),
+		EndAt:               now.Add(24 * time.Hour),
+		VoucherValue:        300,
+		VoucherTokenValue:   300,
+		VoucherComputeValue: 0,
+		ValidDurationMonth:  2,
+	}).Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(&database.AccountUser{UserUUID: userUUID, Balance: 10}).Exec(ctx)
+	require.NoError(t, err)
+
+	awarded, err := store.SendNewUserPresent(ctx, newNewUserPresentGift(userUUID, activityID, 999, now, now.AddDate(0, 1, 0)))
+	require.NoError(t, err)
+	require.True(t, awarded)
+
+	var present database.AccountPresent
+	require.NoError(t, db.Core.NewSelect().Model(&present).
+		Where("user_uuid = ? and activity_id = ?", userUUID, activityID).
+		Scan(ctx))
+	require.Equal(t, float64(300), present.Value, "the present total is the sum of the granted vouchers")
+
+	var vouchers []database.AccountVoucher
+	require.NoError(t, db.Core.NewSelect().Model(&vouchers).
+		Where("target_uuid = ?", userUUID).
+		Order("id").
+		Scan(ctx))
+	require.Len(t, vouchers, 1, "the compute voucher carries a zero value and must be skipped")
+	require.Equal(t, types.VoucherTypeToken, vouchers[0].VoucherType)
+	require.Equal(t, float64(300), vouchers[0].Total)
+	require.WithinDuration(t, database.NormalizeBeginDate(now), vouchers[0].BeginDate, time.Minute)
+	require.WithinDuration(t, database.NormalizeEndDate(now.AddDate(0, 2, 0)), vouchers[0].EndDate, time.Minute)
+}
+
+// TestAccountPresentStore_SendNewUserPresentRejectsNonPositiveVoucherValue
+// proves the grant is refused when the activity has no per-type voucher value to
+// hand out, even if the legacy voucher_value column is still positive.
 func TestAccountPresentStore_SendNewUserPresentRejectsNonPositiveVoucherValue(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -938,13 +1011,56 @@ func TestAccountPresentStore_SendNewUserPresentRejectsNonPositiveVoucherValue(t 
 	activityID := int64(9106)
 	now := time.Now()
 	_, err := db.Core.NewInsert().Model(&database.AccountActivity{
-		ActID:        activityID,
-		ActCode:      fmt.Sprintf("test_activity_%d", activityID),
-		ActName:      fmt.Sprintf("Test Activity %d", activityID),
-		Status:       types.ActivityStatusActive,
-		BeginAt:      now.Add(-time.Hour),
-		EndAt:        now.Add(24 * time.Hour),
-		VoucherValue: 0,
+		ActID:               activityID,
+		ActCode:             fmt.Sprintf("test_activity_%d", activityID),
+		ActName:             fmt.Sprintf("Test Activity %d", activityID),
+		Status:              types.ActivityStatusActive,
+		BeginAt:             now.Add(-time.Hour),
+		EndAt:               now.Add(24 * time.Hour),
+		VoucherValue:        100,
+		VoucherTokenValue:   0,
+		VoucherComputeValue: 0,
+		ValidDurationMonth:  1,
+	}).Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(&database.AccountUser{UserUUID: userUUID, Balance: 10}).Exec(ctx)
+	require.NoError(t, err)
+
+	awarded, err := store.SendNewUserPresent(ctx, newNewUserPresentGift(userUUID, activityID, 100, now, now.AddDate(0, 1, 0)))
+	require.ErrorIs(t, err, database.ErrActivityNotGrantable)
+	require.False(t, awarded)
+
+	presentCount, err := db.Core.NewSelect().Model((*database.AccountPresent)(nil)).Where("user_uuid = ?", userUUID).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, presentCount)
+	voucherCount, err := db.Core.NewSelect().Model((*database.AccountVoucher)(nil)).Where("target_uuid = ?", userUUID).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, voucherCount)
+}
+
+// TestAccountPresentStore_SendNewUserPresentRejectsNonPositiveValidDuration
+// proves the grant is refused when the activity does not configure a positive
+// validity window, instead of granting vouchers that expire the same day.
+func TestAccountPresentStore_SendNewUserPresentRejectsNonPositiveValidDuration(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewAccountPresentStoreWithDB(db)
+
+	userUUID := "new-user-zero-valid-duration"
+	activityID := int64(9109)
+	now := time.Now()
+	_, err := db.Core.NewInsert().Model(&database.AccountActivity{
+		ActID:               activityID,
+		ActCode:             fmt.Sprintf("test_activity_%d", activityID),
+		ActName:             fmt.Sprintf("Test Activity %d", activityID),
+		Status:              types.ActivityStatusActive,
+		BeginAt:             now.Add(-time.Hour),
+		EndAt:               now.Add(24 * time.Hour),
+		VoucherValue:        100,
+		VoucherTokenValue:   100,
+		VoucherComputeValue: 100,
+		ValidDurationMonth:  0,
 	}).Exec(ctx)
 	require.NoError(t, err)
 	_, err = db.Core.NewInsert().Model(&database.AccountUser{UserUUID: userUUID, Balance: 10}).Exec(ctx)
@@ -1164,13 +1280,16 @@ func TestAccountPresentStore_SendNewUserPresentActivityWindow(t *testing.T) {
 
 	insertActivity := func(actID int64, status types.ActivityStatus, beginAt, endAt time.Time) {
 		_, err := db.Core.NewInsert().Model(&database.AccountActivity{
-			ActID:        actID,
-			ActCode:      fmt.Sprintf("window_activity_%d", actID),
-			ActName:      fmt.Sprintf("Window Activity %d", actID),
-			Status:       status,
-			BeginAt:      beginAt,
-			EndAt:        endAt,
-			VoucherValue: 100,
+			ActID:               actID,
+			ActCode:             fmt.Sprintf("window_activity_%d", actID),
+			ActName:             fmt.Sprintf("Window Activity %d", actID),
+			Status:              status,
+			BeginAt:             beginAt,
+			EndAt:               endAt,
+			VoucherValue:        100,
+			VoucherTokenValue:   100,
+			VoucherComputeValue: 100,
+			ValidDurationMonth:  1,
 		}).Exec(ctx)
 		require.NoError(t, err)
 	}
@@ -1280,4 +1399,152 @@ func TestAccountPresentStore_SendNewUserPresentWaitsForSubscriptionLock(t *testi
 		Where("sku_type = ?", types.SKUCSGLite).
 		Scan(ctx))
 	require.Len(t, subs, 1)
+}
+
+func TestAccountPresentStore_ListPresentsActivityParticipantFilter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewAccountPresentStoreWithDB(db)
+
+	_, err := db.Core.NewInsert().Model(&database.AccountUser{UserUUID: "foo", Balance: 0}).Exec(ctx)
+	require.NoError(t, err)
+	for _, p := range []database.AccountPresent{
+		{UserUUID: "foo", ActivityID: 1004, ParticipantUUID: "invitee-1", Value: 1},
+		{UserUUID: "foo", ActivityID: 1004, ParticipantUUID: "invitee-2", Value: 1},
+		{UserUUID: "foo", ActivityID: 1001, ParticipantUUID: "invitee-1", Value: 1},
+	} {
+		_, err := db.Core.NewInsert().Model(&p).Exec(ctx)
+		require.NoError(t, err)
+	}
+
+	presents, total, err := store.ListPresents(ctx, database.PresentFilter{
+		UserUUID: "foo", ActivityID: 1004, ParticipantUUID: "invitee-1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, presents, 1)
+	require.Equal(t, "invitee-1", presents[0].ParticipantUUID)
+}
+
+// TestAccountPresentStore_SendNewUserPresentRejectsMixedSignVoucherValues
+// covers a mixed-sign activity configuration (one positive type, one negative).
+// The grant must be refused: issuing only the positive voucher while recording
+// the sum of both would make the present and audit totals differ from the
+// vouchers actually handed out.
+func TestAccountPresentStore_SendNewUserPresentRejectsMixedSignVoucherValues(t *testing.T) {
+	cases := []struct {
+		name       string
+		tokenValue int64
+		compValue  int64
+	}{
+		{name: "positive token and negative compute", tokenValue: 3000, compValue: -1000},
+		{name: "negative token and positive compute", tokenValue: -1000, compValue: 3000},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := tests.InitTestDB()
+			defer db.Close()
+			ctx := context.TODO()
+			store := database.NewAccountPresentStoreWithDB(db)
+
+			userUUID := fmt.Sprintf("new-user-mixed-%d", tc.tokenValue)
+			activityID := int64(9200)
+			now := time.Now()
+			_, err := db.Core.NewInsert().Model(&database.AccountActivity{
+				ActID:               activityID,
+				ActCode:             fmt.Sprintf("test_activity_mixed_%d", tc.tokenValue),
+				ActName:             "Mixed Sign Activity",
+				Status:              types.ActivityStatusActive,
+				BeginAt:             now.Add(-time.Hour),
+				EndAt:               now.Add(24 * time.Hour),
+				VoucherValue:        3000,
+				VoucherTokenValue:   tc.tokenValue,
+				VoucherComputeValue: tc.compValue,
+				ValidDurationMonth:  1,
+			}).Exec(ctx)
+			require.NoError(t, err)
+			_, err = db.Core.NewInsert().Model(&database.AccountUser{UserUUID: userUUID, Balance: 10}).Exec(ctx)
+			require.NoError(t, err)
+
+			awarded, err := store.SendNewUserPresent(ctx,
+				newNewUserPresentGift(userUUID, activityID, 100, now, now.AddDate(0, 1, 0)))
+			require.ErrorIs(t, err, database.ErrActivityNotGrantable)
+			require.False(t, awarded)
+
+			// nothing may be written: no present, no voucher, no audit statement
+			presentCount, err := db.Core.NewSelect().Model((*database.AccountPresent)(nil)).
+				Where("user_uuid = ?", userUUID).Count(ctx)
+			require.NoError(t, err)
+			require.Zero(t, presentCount)
+
+			voucherCount, err := db.Core.NewSelect().Model((*database.AccountVoucher)(nil)).
+				Where("target_uuid = ?", userUUID).Count(ctx)
+			require.NoError(t, err)
+			require.Zero(t, voucherCount)
+
+			statementCount, err := db.Core.NewSelect().Model((*database.AccountStatement)(nil)).
+				Where("user_uuid = ?", userUUID).Count(ctx)
+			require.NoError(t, err)
+			require.Zero(t, statementCount)
+		})
+	}
+}
+
+// TestAccountPresentStore_SendNewUserPresentGiftTotalMatchesIssuedVouchers
+// pins the invariant the mixed-sign configuration used to break: the present
+// total and the audit statement carry exactly the face value of the vouchers
+// that were inserted, including when one type is configured as zero.
+func TestAccountPresentStore_SendNewUserPresentGiftTotalMatchesIssuedVouchers(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewAccountPresentStoreWithDB(db)
+
+	userUUID := "new-user-token-only"
+	activityID := int64(9201)
+	now := time.Now()
+	_, err := db.Core.NewInsert().Model(&database.AccountActivity{
+		ActID:               activityID,
+		ActCode:             "test_activity_token_only",
+		ActName:             "Token Only Activity",
+		Status:              types.ActivityStatusActive,
+		BeginAt:             now.Add(-time.Hour),
+		EndAt:               now.Add(24 * time.Hour),
+		VoucherValue:        3000,
+		VoucherTokenValue:   3000,
+		VoucherComputeValue: 0,
+		ValidDurationMonth:  1,
+	}).Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(&database.AccountUser{UserUUID: userUUID, Balance: 10}).Exec(ctx)
+	require.NoError(t, err)
+
+	awarded, err := store.SendNewUserPresent(ctx,
+		newNewUserPresentGift(userUUID, activityID, 100, now, now.AddDate(0, 1, 0)))
+	require.NoError(t, err)
+	require.True(t, awarded)
+
+	var present database.AccountPresent
+	require.NoError(t, db.Core.NewSelect().Model(&present).
+		Where("user_uuid = ? and activity_id = ?", userUUID, activityID).Scan(ctx))
+
+	var vouchers []database.AccountVoucher
+	require.NoError(t, db.Core.NewSelect().Model(&vouchers).
+		Where("target_uuid = ?", userUUID).Scan(ctx))
+
+	issuedTotal := 0.0
+	for _, v := range vouchers {
+		require.Positive(t, v.Total, "a zero-valued voucher must not be inserted")
+		issuedTotal += v.Total
+	}
+	require.Equal(t, issuedTotal, present.Value,
+		"the recorded gift total must equal the sum of the issued vouchers")
+
+	var statement database.AccountStatement
+	require.NoError(t, db.Core.NewSelect().Model(&statement).
+		Where("user_uuid = ?", userUUID).Scan(ctx))
+	require.Equal(t, issuedTotal, statement.EventValue,
+		"the audit statement must carry the same total as the issued vouchers")
 }

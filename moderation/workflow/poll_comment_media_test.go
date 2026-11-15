@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
@@ -18,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/moderation/workflow/common"
 )
 
+// TestStartCommentMediaModerationWorkflow_ReservesFinalizeAndDeleteBudget checks replacement policy and cleanup time.
 func TestStartCommentMediaModerationWorkflow_ReservesFinalizeAndDeleteBudget(t *testing.T) {
 	temporalClient := mocktemporal.NewMockClient(t)
 	timing := common.PollCommentMediaOptions{WorkflowTimeout: 30 * time.Minute}
@@ -27,7 +29,11 @@ func TestStartCommentMediaModerationWorkflow_ReservesFinalizeAndDeleteBudget(t *
 	temporalClient.EXPECT().ExecuteWorkflow(
 		mock.Anything,
 		mock.MatchedBy(func(options client.StartWorkflowOptions) bool {
-			return options.WorkflowExecutionTimeout >= timing.WorkflowTimeout+2*finalizeScheduleTimeout
+			return options.ID == "comment-media-moderation-42" &&
+				options.TaskQueue == common.PollCommentMediaQueue &&
+				options.WorkflowIDReusePolicy == enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE &&
+				options.WorkflowIDConflictPolicy == enums.WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING &&
+				options.WorkflowExecutionTimeout >= timing.WorkflowTimeout+2*finalizeScheduleTimeout
 		}),
 		common.PollCommentMediaWorkflowName,
 		req,

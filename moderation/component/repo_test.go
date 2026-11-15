@@ -292,6 +292,8 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 		ID:           1,
 		RepositoryID: 1,
 		Path:         "file1.txt",
+		FileType:     "file",
+		Size:         int64(len("test string")),
 		Repository:   repo,
 	}
 
@@ -299,6 +301,8 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 		ID:           2,
 		RepositoryID: 1,
 		Path:         "file2.txt",
+		FileType:     "file",
+		Size:         int64(len("sensitive word")),
 		Repository:   repo,
 	}
 	// The first batch returns two files
@@ -361,6 +365,152 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 
 	require.True(t, passFound, "Check for passed file not found")
 	require.True(t, failFound, "Check for failed file not found")
+}
+
+// TestRepoComponent_CheckRepoFiles_EmptyFile verifies the production path end
+// to end: the incremental scan (BatchGetUnchcked) reads each empty file's
+// actual content, records Pass, and DetectRepoSensitiveCheckStatus then
+// aggregates the repository to Pass. Empty unknown files used to fail on
+// io.EOF and empty images were uploaded to the remote service as a zero-byte
+// payload; both recorded an exception that blocked the whole repository.
+func TestRepoComponent_CheckRepoFiles_EmptyFile(t *testing.T) {
+	mockRepoStore := mockdb.NewMockRepoStore(t)
+	mockRepoFileStore := mockdb.NewMockRepoFileStore(t)
+	mockRepoFileCheckStore := mockdb.NewMockRepoFileCheckStore(t)
+	mockGitServer := mockgit.NewMockGitServer(t)
+	repoComp := &repoComponentImpl{
+		rs:               mockRepoStore,
+		rfs:              mockRepoFileStore,
+		rfcs:             mockRepoFileCheckStore,
+		git:              mockGitServer,
+		concurrencyLimit: 10,
+	}
+	fileComp := &repoFileComponentImpl{
+		rfs: mockRepoFileStore,
+		rs:  mockRepoStore,
+	}
+
+	ctx := context.Background()
+	repo := &database.Repository{
+		ID:                   1,
+		Name:                 "empty-files",
+		Path:                 "test-namespace/empty-files",
+		DefaultBranch:        "main",
+		SensitiveCheckStatus: types.SensitiveCheckPass,
+		RepositoryType:       types.ModelRepo,
+	}
+
+	emptyText := &database.RepositoryFile{ID: 1, RepositoryID: repo.ID, Path: "empty.txt", FileType: "file", Size: 0, Repository: repo}
+	emptyImage := &database.RepositoryFile{ID: 2, RepositoryID: repo.ID, Path: "empty.png", FileType: "file", Size: 0, Repository: repo}
+	emptyUnknown := &database.RepositoryFile{ID: 3, RepositoryID: repo.ID, Path: "skills/.skillhub-lock.json.lock", FileType: "file", Size: 0, Repository: repo}
+	// An empty LFS file must keep the LFS skip behavior and is never read.
+	emptyLfs := &database.RepositoryFile{ID: 4, RepositoryID: repo.ID, Path: "empty.bin", FileType: "file", Size: 0, LfsRelativePath: "lfs/aa/bb", Repository: repo}
+	allFiles := []*database.RepositoryFile{emptyText, emptyImage, emptyUnknown, emptyLfs}
+
+	mockRepoFileStore.EXPECT().BatchGetUnchcked(mock.Anything, repo.ID, int64(0), int64(10)).Once().
+		Return(allFiles, nil)
+	for _, file := range []*database.RepositoryFile{emptyText, emptyImage, emptyUnknown} {
+		mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
+			return req.Path == file.Path
+		})).Return(io.NopCloser(strings.NewReader("")), int64(0), nil).Once()
+	}
+
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.Enable = true
+	cfg.SensitiveCheck.ImageCheckEnable = true
+	mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
+	checker.InitWithContentChecker(cfg, mockSensitiveChecker)
+	// Empty files must not reach a remote checker; the strict mock fails the
+	// test on any PassTextCheck or PassImageStreamCheck call.
+
+	results := make(map[int64]database.RepositoryFileCheck)
+	var mu sync.Mutex
+	mockRepoFileCheckStore.EXPECT().Upsert(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, rfc database.RepositoryFileCheck) error {
+			mu.Lock()
+			defer mu.Unlock()
+			results[rfc.RepoFileID] = rfc
+			return nil
+		}).Times(len(allFiles))
+
+	require.NoError(t, repoComp.CheckRepoFiles(ctx, repo.ID, CheckOption{}))
+
+	mu.Lock()
+	require.Equal(t, types.SensitiveCheckPass, results[emptyText.ID].Status, "empty text file")
+	require.Equal(t, types.SensitiveCheckPass, results[emptyImage.ID].Status, "empty image file")
+	require.Equal(t, "empty file", results[emptyImage.ID].Message, "empty image check must not call the remote service")
+	require.Equal(t, types.SensitiveCheckPass, results[emptyUnknown.ID].Status, "empty unknown file")
+	require.Equal(t, "empty file", results[emptyUnknown.ID].Message)
+	require.Equal(t, types.SensitiveCheckSkip, results[emptyLfs.ID].Status, "empty LFS file")
+	require.Equal(t, "skip lfs file", results[emptyLfs.ID].Message)
+	mu.Unlock()
+
+	// Production aggregation: no Fail/Exception records exist, so the
+	// repository status becomes Pass instead of staying Exception.
+	mockRepoFileStore.EXPECT().ExistsSensitiveCheckRecord(mock.Anything, repo.ID, repo.DefaultBranch, types.SensitiveCheckFail).Return(false, nil)
+	mockRepoFileStore.EXPECT().ExistsSensitiveCheckRecord(mock.Anything, repo.ID, repo.DefaultBranch, types.SensitiveCheckException).Return(false, nil)
+	mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(mock.Anything, repo.ID, types.SensitiveCheckPass).Return(nil)
+	status, err := fileComp.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
+	require.NoError(t, err)
+	require.Equal(t, types.SensitiveCheckPass, status)
+}
+
+// TestRepoComponent_CheckRepoFiles_StaleSizeMetadata verifies that a persisted
+// Size of 0 is not trusted to skip the content check: the file record comes
+// from an earlier tree snapshot, while the reader serves the current default
+// branch. Content that is non-empty by the time it is read must still be
+// checked and can still fail.
+func TestRepoComponent_CheckRepoFiles_StaleSizeMetadata(t *testing.T) {
+	mockRepoStore := mockdb.NewMockRepoStore(t)
+	mockRepoFileStore := mockdb.NewMockRepoFileStore(t)
+	mockRepoFileCheckStore := mockdb.NewMockRepoFileCheckStore(t)
+	mockGitServer := mockgit.NewMockGitServer(t)
+	repoComp := &repoComponentImpl{
+		rs:               mockRepoStore,
+		rfs:              mockRepoFileStore,
+		rfcs:             mockRepoFileCheckStore,
+		git:              mockGitServer,
+		concurrencyLimit: 10,
+	}
+
+	ctx := context.Background()
+	repo := &database.Repository{
+		ID:                   1,
+		Name:                 "drifted-files",
+		Path:                 "test-namespace/drifted-files",
+		DefaultBranch:        "main",
+		SensitiveCheckStatus: types.SensitiveCheckPass,
+		RepositoryType:       types.ModelRepo,
+	}
+	driftedFile := &database.RepositoryFile{
+		ID: 1, RepositoryID: repo.ID, Path: "drifted.txt", FileType: "file", Size: 0, Repository: repo,
+	}
+
+	mockRepoFileStore.EXPECT().BatchGetUnchcked(mock.Anything, repo.ID, int64(0), int64(10)).Once().
+		Return([]*database.RepositoryFile{driftedFile}, nil)
+
+	const content = "sensitive word"
+	mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
+		return req.Path == driftedFile.Path
+	})).Return(io.NopCloser(strings.NewReader(content)), int64(len(content)), nil).Once()
+
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.Enable = true
+	mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
+	checker.InitWithContentChecker(cfg, mockSensitiveChecker)
+	mockSensitiveChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, content).
+		Return(&ss_type.CheckResult{IsSensitive: true, Reason: "label:porn"}, nil).Once()
+
+	mockRepoFileCheckStore.EXPECT().Upsert(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, rfc database.RepositoryFileCheck) error {
+			require.Equal(t, driftedFile.ID, rfc.RepoFileID)
+			require.Equal(t, types.SensitiveCheckFail, rfc.Status)
+			require.Equal(t, "label:porn", rfc.Message)
+			return nil
+		}).Once()
+	mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(mock.Anything, repo.ID, types.SensitiveCheckFail).Return(nil)
+
+	require.NoError(t, repoComp.CheckRepoFiles(ctx, repo.ID, CheckOption{}))
 }
 
 // TestRepoComponent_CheckRepoFiles_ImageByStream is a regression test for the
@@ -456,6 +606,7 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 				RepositoryID: tt.repo.ID,
 				Path:         "screenshot." + tt.imageExt,
 				FileType:     "file",
+				Size:         1024,
 				Repository:   tt.repo,
 			}
 
@@ -464,13 +615,19 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 			mockRepoFileStore.EXPECT().BatchGetUnchcked(mock.Anything, tt.repo.ID, int64(0), int64(10)).Once().
 				Return([]*database.RepositoryFile{imageFile}, nil)
 
+			// ImageFileChecker probes one byte to prove the stream is not
+			// empty, so the lazy git reader is opened once even though the
+			// mocked stream check does not read the payload.
+			mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
+				return req.Path == imageFile.Path
+			})).Return(io.NopCloser(strings.NewReader("image-bytes")), int64(len("image-bytes")), nil).Once()
+
 			cfg := &config.Config{}
 			cfg.SensitiveCheck.Enable = true
 			cfg.SensitiveCheck.ImageCheckEnable = true
 			mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
 			// Stream check should be invoked (path that uploads to S3 +
-			// presigned URL). The mock does not read from the reader, so the
-			// lazy git reader (GetRepoFileReader) is never opened.
+			// presigned URL). The mock does not read from the reader.
 			mockSensitiveChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
 				Return(&ss_type.CheckResult{IsSensitive: false}, nil).Once()
 			// URL check must never be called — this is the core of the
@@ -520,17 +677,21 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 			RepositoryID: 1,
 			Path:         "screenshot.png",
 			FileType:     "file",
+			Size:         1024,
 			Repository:   repo,
 		}
 
 		mockRepoFileStore.EXPECT().BatchGetUnchcked(mock.Anything, repo.ID, int64(0), int64(10)).Once().
 			Return([]*database.RepositoryFile{imageFile}, nil)
 
-		// Provide real image bytes via the git reader.
+		// Provide real image bytes via the git reader. The empty-content probe
+		// opens the reader once and rewinds it, so the check reopens the stream.
 		imageContent := "png-image-bytes"
 		mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
 			return req.Path == imageFile.Path
-		})).Return(io.NopCloser(strings.NewReader(imageContent)), int64(len(imageContent)), nil).Once()
+		})).RunAndReturn(func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, int64, error) {
+			return io.NopCloser(strings.NewReader(imageContent)), int64(len(imageContent)), nil
+		}).Twice()
 
 		cfg := &config.Config{}
 		cfg.SensitiveCheck.Enable = true
@@ -558,10 +719,11 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 
 	// "stream check retry reopens git reader with identical content" verifies
 	// the full retry path: the first PassImageStreamCheck fails, checkByStream
-	// retries by calling Seek(0) on RepoFileContentReader (which reopens the
-	// git stream), and the second attempt succeeds. Both attempts must receive
-	// the exact same image bytes. GetRepoFileReader is called twice (once per
-	// open). This directly addresses the review feedback.
+	// retries by rewinding RepoFileContentReader (which reopens the git
+	// stream), and the second attempt succeeds. Both attempts must receive
+	// the exact same image bytes. Each attempt opens the reader twice (probe
+	// and payload), so two attempts make four opens. This directly addresses
+	// the review feedback.
 	t.Run("stream check retry reopens git reader with identical content", func(t *testing.T) {
 		mockRepoStore := mockdb.NewMockRepoStore(t)
 		mockRepoFileStore := mockdb.NewMockRepoFileStore(t)
@@ -591,6 +753,7 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 			RepositoryID: 1,
 			Path:         "screenshot.png",
 			FileType:     "file",
+			Size:         1024,
 			Repository:   repo,
 		}
 
@@ -598,14 +761,16 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 			Return([]*database.RepositoryFile{imageFile}, nil)
 
 		imageContent := "png-image-bytes-for-retry"
-		// GetRepoFileReader called twice: initial open + reopen after Seek.
+		// The empty-content probe runs inside every stream check attempt, and
+		// each attempt rewinds before probing and again before reading the
+		// payload: 2 opens per attempt, 2 attempts = 4 opens.
 		// Use RunAndReturn so each call returns a fresh reader (the previous
-		// one is consumed/closed by the first attempt).
+		// one is consumed/closed by the read).
 		mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
 			return req.Path == imageFile.Path
 		})).RunAndReturn(func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, int64, error) {
 			return io.NopCloser(strings.NewReader(imageContent)), int64(len(imageContent)), nil
-		}).Twice()
+		}).Times(4)
 
 		cfg := &config.Config{}
 		cfg.SensitiveCheck.Enable = true
@@ -648,6 +813,82 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 		for i, got := range contents {
 			require.Equal(t, imageContent, got, "attempt %d: expected identical content", i)
 		}
+	})
+
+	// "stream check retries a transient git read failure during the empty
+	// probe" verifies the empty-content probe participates in the retry flow.
+	// The first GetRepoFileReader call fails; the retry rewinds
+	// RepoFileContentReader (reopening the git stream), the probe succeeds, and
+	// the file is finally recorded as Pass with its full payload uploaded.
+	t.Run("stream check retries transient git read failure", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockRepoFileStore := mockdb.NewMockRepoFileStore(t)
+		mockRepoFileCheckStore := mockdb.NewMockRepoFileCheckStore(t)
+		mockGitServer := mockgit.NewMockGitServer(t)
+		repoComp := &repoComponentImpl{
+			rs:               mockRepoStore,
+			rfs:              mockRepoFileStore,
+			rfcs:             mockRepoFileCheckStore,
+			git:              mockGitServer,
+			concurrencyLimit: 10,
+		}
+		repoComp.config = &config.Config{}
+		repoComp.config.APIServer.PublicDomain = "https://hub.opencsg.com"
+
+		repo := &database.Repository{
+			ID:                   1,
+			Name:                 "test-dataset",
+			Path:                 "root/test-dataset",
+			DefaultBranch:        "main",
+			SensitiveCheckStatus: types.SensitiveCheckPass,
+			RepositoryType:       types.DatasetRepo,
+			Private:              false,
+		}
+		imageFile := &database.RepositoryFile{
+			ID:           1,
+			RepositoryID: 1,
+			Path:         "screenshot.png",
+			FileType:     "file",
+			Size:         1024,
+			Repository:   repo,
+		}
+
+		mockRepoFileStore.EXPECT().BatchGetUnchcked(mock.Anything, repo.ID, int64(0), int64(10)).Once().
+			Return([]*database.RepositoryFile{imageFile}, nil)
+
+		imageContent := "png-image-bytes"
+		var calls int
+		mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
+			return req.Path == imageFile.Path
+		})).RunAndReturn(func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, int64, error) {
+			calls++
+			if calls == 1 {
+				return nil, 0, errors.New("transient gitaly failure")
+			}
+			return io.NopCloser(strings.NewReader(imageContent)), int64(len(imageContent)), nil
+		}).Times(3)
+
+		cfg := &config.Config{}
+		cfg.SensitiveCheck.Enable = true
+		cfg.SensitiveCheck.ImageCheckEnable = true
+		mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
+		mockSensitiveChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
+				b, err := io.ReadAll(r)
+				require.NoError(t, err)
+				require.Equal(t, imageContent, string(b))
+				return &ss_type.CheckResult{IsSensitive: false}, nil
+			}).Once()
+		checker.InitWithContentChecker(cfg, mockSensitiveChecker)
+
+		mockRepoFileCheckStore.EXPECT().Upsert(mock.Anything, mock.Anything).
+			RunAndReturn(func(ctx context.Context, rfc database.RepositoryFileCheck) error {
+				require.Equal(t, types.SensitiveCheckPass, rfc.Status)
+				require.Empty(t, rfc.Message)
+				return nil
+			}).Once()
+
+		require.NoError(t, repoComp.CheckRepoFiles(ctx, repo.ID, CheckOption{BatchSize: 10}))
 	})
 }
 

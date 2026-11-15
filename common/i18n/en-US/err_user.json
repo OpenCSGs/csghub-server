@@ -88,5 +88,8 @@
     },
     "error.USER-ERR-30": {
         "other": "Identity verification failed or expired. Please start again"
+    },
+    "error.USER-ERR-31": {
+        "other": "API key limit reached. Delete an unused key and try again."
     }
 }

@@ -33,6 +33,7 @@ const (
 
 	AgentSessionHistoryMsgSubject string = "agent.session.history.message"
 	LLMLogSubject                 string = "aigateway.llmlog"
+	HTTPArchiveSubject            string = "aigateway.http_archive"
 
 	LfsXnetProcessedSubject string = "xnet.lfs.processed"
 
@@ -47,8 +48,8 @@ const (
 	// consumed by the AIGateway upstream sync consumer to keep the
 	// ai_gateway_upstreams table in sync with deploys.
 	DeployUpstreamSyncRunningSubject string = "aigateway.upstream.sync.running"
-	DeployUpstreamSyncStopSubject   string = "aigateway.upstream.sync.stop"
-	DeployUpstreamSyncDeleteSubject string = "aigateway.upstream.sync.delete"
+	DeployUpstreamSyncStopSubject    string = "aigateway.upstream.sync.stop"
+	DeployUpstreamSyncDeleteSubject  string = "aigateway.upstream.sync.delete"
 )
 
 type MQGroup struct {
@@ -105,7 +106,8 @@ var (
 		StreamName:   "agentSessionHistoryMsgStream",
 		ConsumerName: "agentSessionHistoryMsgConsumer",
 	}
-	LLMLogGroup = MQGroup{
+	HTTPArchiveGroup = MQGroup{StreamName: "httpArchiveStream", ConsumerName: "httpArchiveConsumer"}
+	LLMLogGroup      = MQGroup{
 		StreamName:   "llmLogStream",
 		ConsumerName: "llmLogConsumer",
 	}

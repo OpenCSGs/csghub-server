@@ -12,6 +12,6 @@ func (a *Activities) UpdateModelTree(ctx context.Context, req *types.GiteaCallba
 	return nil
 }
 
-func (a *Activities) ScanModelTree(ctx context.Context, req types.ScanModels) error {
+func (a *Activities) ScanModelTree(ctx context.Context, req types.ScanModelTreeParams) error {
 	return nil
 }

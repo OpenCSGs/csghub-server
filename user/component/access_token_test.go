@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -153,6 +154,18 @@ func TestAccessTokenComponentImpl_Delete(t *testing.T) {
 }
 
 func TestAccessTokenComponentImpl_Check(t *testing.T) {
+	t.Run("organization key retains only its namespace after closure", func(t *testing.T) {
+		store := mockdb.NewMockAccessTokenStore(t)
+		store.EXPECT().FindByToken(mock.Anything, "shared", "").Return(&database.AccessToken{
+			Application: types.AccessTokenAppAIGateway, NsUUID: "organization",
+			User: &database.User{Username: "alice", UUID: "creator", LoginFrozen: true},
+		}, nil).Once()
+		response, err := (&accessTokenComponentImpl{ts: store}).Check(context.Background(), &types.CheckAccessTokenReq{Token: "shared"})
+		require.NoError(t, err)
+		require.Equal(t, "organization", response.NSUUID)
+		require.Empty(t, response.Username)
+		require.Empty(t, response.UserUUID)
+	})
 	t.Run("token not found", func(t *testing.T) {
 		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
 		mockTokenStore.EXPECT().FindByToken(mock.Anything, "invalid-token", "git").
@@ -1023,4 +1036,81 @@ func TestAccessTokenComponentImpl_UpdateAccessTokenQuotas_ZeroIDCreatesNewRow(t 
 	require.Equal(t, int64(0), result[0].ID, "zero ID must insert a new row, not reuse an existing one")
 	require.Equal(t, int64(42), result[0].TokenID)
 	require.Equal(t, types.AccountingQuotaTotal, result[0].QuotaType)
+}
+
+// TestAccessTokenComponent_BuiltinDisplay verifies namespace authorization,
+// read-only missing/error handling, and masking without mutating the stored key.
+func TestAccessTokenComponent_BuiltinDisplay(t *testing.T) {
+	cases := []struct {
+		name      string
+		nsType    database.NamespaceType
+		allowed   bool
+		lookupErr error
+	}{
+		{"personal", database.UserNamespace, true, nil},
+		{"organization", database.OrgNamespace, true, nil},
+		{"missing", database.UserNamespace, true, errorx.ErrDatabaseNoRows},
+		{"lookup failure", database.UserNamespace, true, context.DeadlineExceeded},
+		{"forbidden", database.OrgNamespace, false, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			tokens := mockdb.NewMockAccessTokenStore(t)
+			namespaces := mockdb.NewMockNamespaceStore(t)
+			users := mockdb.NewMockUserStore(t)
+			authorizer := mockrebac.NewMockAuthorizer(t)
+			namespaces.EXPECT().FindByUUID(ctx, "namespace-uuid").Return(database.Namespace{UUID: "namespace-uuid", NamespaceType: tc.nsType}, nil).Once()
+			users.EXPECT().FindByUsername(ctx, "alice", types.UserWithAdminPermissions).Return(database.User{Username: "alice", UUID: "user-uuid"}, nil).Once()
+			authorizer.EXPECT().Check(ctx, rebac.CheckRequest{Subject: rebac.UserSubject("user-uuid"), Relation: rebac.NamespaceCanAdmin, Object: rebac.NamespaceObject("namespace-uuid"), Consistency: rebac.ConsistencyHigher}).Return(rebac.Decision{Allowed: tc.allowed}, nil).Once()
+			original := &database.AccessToken{ID: 42, Token: "original-gateway-key", Name: "builtin", Application: types.AccessTokenAppAIGateway, NsUUID: "namespace-uuid", TokenType: types.AccessTokenTypeBuiltIn, IsActive: true}
+			if tc.allowed {
+				tokens.EXPECT().FindBuiltinByNsUUID(ctx, "namespace-uuid", "aigateway").Return(original, tc.lookupErr).Once()
+			}
+			c := &accessTokenComponentImpl{ts: tokens, nsStore: namespaces, us: users, rebac: authorizer}
+			resp, err := c.GetBuiltinAPIKeyDisplay(ctx, &types.GetAccessTokenRequest{Username: "alice", OpUUID: "user-uuid", NSUUID: "namespace-uuid"})
+			switch {
+			case !tc.allowed:
+				require.Error(t, err)
+				require.Nil(t, resp)
+			case errors.Is(tc.lookupErr, errorx.ErrDatabaseNoRows):
+				require.NoError(t, err)
+				require.Nil(t, resp)
+			case tc.lookupErr != nil:
+				require.ErrorIs(t, err, tc.lookupErr)
+				require.Nil(t, resp)
+			default:
+				require.NoError(t, err)
+				require.Equal(t, &types.CheckAccessTokenResp{ID: 42, Token: "or********ey", TokenName: "builtin", Application: types.AccessTokenAppAIGateway, NSUUID: "namespace-uuid", TokenType: string(types.AccessTokenTypeBuiltIn), IsActive: true}, resp)
+			}
+			require.Equal(t, "original-gateway-key", original.Token)
+			tokens.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// TestAccessTokenComponent_BuiltinRawCreation preserves automatic creation and
+// the plaintext response on the original runtime resolver.
+func TestAccessTokenComponent_BuiltinRawCreation(t *testing.T) {
+	ctx := context.Background()
+	tokens := mockdb.NewMockAccessTokenStore(t)
+	namespaces := mockdb.NewMockNamespaceStore(t)
+	users := mockdb.NewMockUserStore(t)
+	authorizer := mockrebac.NewMockAuthorizer(t)
+	namespaces.EXPECT().FindByUUID(ctx, "namespace-uuid").Return(database.Namespace{UUID: "namespace-uuid", NamespaceType: database.UserNamespace}, nil).Once()
+	users.EXPECT().FindByUsername(ctx, "alice", types.UserWithAdminPermissions).Return(database.User{ID: 1, Username: "alice", UUID: "user-uuid"}, nil).Once()
+	authorizer.EXPECT().Check(ctx, mock.Anything).Return(rebac.Decision{Allowed: true}, nil).Once()
+	tokens.EXPECT().FindBuiltinByNsUUID(ctx, "namespace-uuid", "aigateway").Return(nil, errorx.ErrDatabaseNoRows).Once()
+	var created string
+	tokens.EXPECT().Create(ctx, mock.Anything, mock.Anything).Run(func(_ context.Context, token *database.AccessToken, quotas []database.AccountAccessTokenQuota) {
+		created = token.Token
+		require.Len(t, quotas, 1)
+		require.Equal(t, created, quotas[0].APIKey)
+	}).Return(nil).Once()
+	c := &accessTokenComponentImpl{ts: tokens, nsStore: namespaces, us: users, rebac: authorizer}
+	resp, err := c.GetOrCreateBuiltinAPIKey(ctx, &types.GetAccessTokenRequest{Username: "alice", OpUUID: "user-uuid", NSUUID: "namespace-uuid"})
+	require.NoError(t, err)
+	require.NotEmpty(t, created)
+	require.Equal(t, created, resp.Token)
+	require.NotContains(t, resp.Token, "*")
 }

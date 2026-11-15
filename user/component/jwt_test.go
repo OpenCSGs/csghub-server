@@ -37,7 +37,7 @@ func TestJwtComponent_GenerateToken(t *testing.T) {
 
 	require.Equal(t, user.Username, claims.CurrentUser)
 
-	mockus.EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(*user, nil)
+	user.Username = "renamed-after-token-was-issued"
 	parseUser, err := jwt.ParseToken(ctx, token)
 	require.NoError(t, err)
 	require.Equal(t, user.UUID, parseUser.UUID)
@@ -76,7 +76,7 @@ func TestJwtComponent_ParseToken_RoleAssignments(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			us := mockdb.NewMockUserStore(t)
-			us.EXPECT().FindByUsername(ctx, tt.user.Username, types.UserWithAdminPermissions).Return(tt.user, nil).Once()
+			us.EXPECT().FindByUUID(ctx, tt.user.UUID, types.UserWithAdminPermissions).Return(&tt.user, nil).Once()
 			jwtc := &jwtComponentImpl{SigningKey: []byte("test-signing-key"), us: us}
 			token, err := jwtc.signClaims(jwtc.buildClaims(&tt.user, time.Now().Add(time.Hour)))
 			require.NoError(t, err)

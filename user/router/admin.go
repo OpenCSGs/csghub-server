@@ -158,8 +158,8 @@ func createAdminOrganizationCreateRoute(apiGroup *gin.RouterGroup, mc middleware
 // @Param verify_status query string false "Verification status"
 // @Param labels query []string false "User labels"
 // @Param exact_match query bool false "Match the search text exactly"
-// @Param sort_by query string false "Sort field"
-// @Param sort_order query string false "Sort direction"
+// @Param sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Success 200 {object} types.Response{}
 // @Failure 400 {object} types.APIBadRequest
 // @Failure 401 {object} types.APIUnauthorized
@@ -181,8 +181,8 @@ func (h *adminUserRouteHandler) AccountUsers(ctx *gin.Context) { h.target(ctx) }
 // @Param verify_status query string false "Verification status"
 // @Param labels query []string false "User labels"
 // @Param exact_match query bool false "Match the search text exactly"
-// @Param sort_by query string false "Sort field"
-// @Param sort_order query string false "Sort direction"
+// @Param sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Success 200 {object} types.Response{}
 // @Failure 400 {object} types.APIBadRequest
 // @Failure 401 {object} types.APIUnauthorized
@@ -203,8 +203,8 @@ func (h *adminUserRouteHandler) AdminCandidateUsers(ctx *gin.Context) { h.target
 // @Param verify_status query string false "Verification status"
 // @Param labels query []string false "User labels"
 // @Param exact_match query bool false "Match the search text exactly"
-// @Param sort_by query string false "Sort field"
-// @Param sort_order query string false "Sort direction"
+// @Param sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Success 200 {object} types.Response{data=types.UserChoiceList}
 // @Failure 400 {object} types.APIBadRequest
 // @Failure 401 {object} types.APIUnauthorized
@@ -226,8 +226,8 @@ func (h *adminUserRouteHandler) OrganizationUsers(ctx *gin.Context) { h.target(c
 // @Param verify_status query string false "Verification status"
 // @Param labels query []string false "User labels"
 // @Param exact_match query bool false "Match the search text exactly"
-// @Param sort_by query string false "Sort field"
-// @Param sort_order query string false "Sort direction"
+// @Param sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Success 200 {object} types.Response{data=types.UserChoiceList}
 // @Failure 400 {object} types.APIBadRequest
 // @Failure 401 {object} types.APIUnauthorized
@@ -249,8 +249,8 @@ func (h *adminUserRouteHandler) NodeUsers(ctx *gin.Context) { h.target(ctx) }
 // @Param verify_status query string false "Verification status"
 // @Param labels query []string false "User labels"
 // @Param exact_match query bool false "Match the search text exactly"
-// @Param sort_by query string false "Sort field"
-// @Param sort_order query string false "Sort direction"
+// @Param sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Success 200 {object} types.Response{data=types.UserChoiceList}
 // @Failure 400 {object} types.APIBadRequest
 // @Failure 401 {object} types.APIUnauthorized
@@ -272,8 +272,8 @@ func (h *adminUserRouteHandler) ModelUsers(ctx *gin.Context) { h.target(ctx) }
 // @Param verify_status query string false "Verification status"
 // @Param labels query []string false "User labels"
 // @Param exact_match query bool false "Match the search text exactly"
-// @Param sort_by query string false "Sort field"
-// @Param sort_order query string false "Sort direction"
+// @Param sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Success 200 {object} types.Response{data=types.UserChoiceList}
 // @Failure 400 {object} types.APIBadRequest
 // @Failure 401 {object} types.APIUnauthorized
@@ -295,8 +295,8 @@ func (h *adminUserRouteHandler) DatasetUsers(ctx *gin.Context) { h.target(ctx) }
 // @Param verify_status query string false "Verification status"
 // @Param labels query []string false "User labels"
 // @Param exact_match query bool false "Match the search text exactly"
-// @Param sort_by query string false "Sort field"
-// @Param sort_order query string false "Sort direction"
+// @Param sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Success 200 {object} types.Response{data=types.UserChoiceList}
 // @Failure 400 {object} types.APIBadRequest
 // @Failure 401 {object} types.APIUnauthorized

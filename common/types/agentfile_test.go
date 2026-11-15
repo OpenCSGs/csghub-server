@@ -50,6 +50,29 @@ func TestParseAgentFile_Invalid(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestParseAgentFileCSGClawManifest(t *testing.T) {
+	content := `schema_version = "agentfile/v1"
+name = "reviewer"
+template_uid = "uid"
+revision = 2
+avatar = "icon"
+display_name = "Reviewer"
+runtime_kind = "codex"
+[runtime_options]
+memory_mode = "disabled"
+[model_config]
+model_id = "model-a"
+reasoning_effort = "high"
+`
+	file, err := ParseAgentFile(content)
+	require.NoError(t, err)
+	require.Equal(t, "uid", file.TemplateUID)
+	require.Equal(t, 2, file.Revision)
+	require.Equal(t, "disabled", file.RuntimeOptions["memory_mode"])
+	require.Equal(t, "model-a", file.ModelConfig.ModelID)
+	require.Equal(t, "high", file.ModelConfig.ReasoningEffort)
+}
+
 func TestParseAgentFile_MissingName(t *testing.T) {
 	_, err := ParseAgentFile("runtime_kind = 'codex'")
 	require.ErrorContains(t, err, "name")

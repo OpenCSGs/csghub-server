@@ -3,11 +3,13 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/cryptox"
 )
 
 // LLMServiceComponent is an interface that defines methods for interacting with LLM configurations.
@@ -137,6 +140,7 @@ func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page 
 			NeedSensitiveCheck: cfg.NeedSensitiveCheck,
 			ModelSizeB:         cfg.ModelSizeB,
 			AccessPolicy:       cfg.AccessPolicy,
+			RateLimit:          cfg.RateLimit,
 			IsAvailable:        cfg.Enabled && isAvailable,
 			AvailabilityReason: reason,
 			CreatedAt:          cfg.CreatedAt,
@@ -246,6 +250,7 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 		NeedSensitiveCheck: dbLlmConfig.NeedSensitiveCheck,
 		ModelSizeB:         dbLlmConfig.ModelSizeB,
 		AccessPolicy:       dbLlmConfig.AccessPolicy,
+		RateLimit:          dbLlmConfig.RateLimit,
 		CreatedAt:          dbLlmConfig.CreatedAt,
 		UpdatedAt:          dbLlmConfig.UpdatedAt,
 	}
@@ -324,6 +329,12 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		}
 		llmConfig.AccessPolicy = accessPolicy
 	}
+	if req.RateLimit != nil {
+		if err := validateUserRateLimitPolicy(req.RateLimit); err != nil {
+			return nil, err
+		}
+		llmConfig.RateLimit = req.RateLimit
+	}
 	updatedConfig, updateErr := s.llmConfigStore.Update(ctx, *llmConfig)
 	if updateErr != nil {
 		return nil, updateErr
@@ -347,6 +358,7 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		NeedSensitiveCheck: updatedConfig.NeedSensitiveCheck,
 		ModelSizeB:         updatedConfig.ModelSizeB,
 		AccessPolicy:       updatedConfig.AccessPolicy,
+		RateLimit:          updatedConfig.RateLimit,
 		CreatedAt:          updatedConfig.CreatedAt,
 		UpdatedAt:          updatedConfig.UpdatedAt,
 	}
@@ -412,6 +424,10 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		NeedSensitiveCheck: req.NeedSensitiveCheck,
 		ModelSizeB:         req.ModelSizeB,
 		AccessPolicy:       accessPolicy,
+		RateLimit:          req.RateLimit,
+	}
+	if err := validateUserRateLimitPolicy(req.RateLimit); err != nil {
+		return nil, err
 	}
 	dbRes, err := s.llmConfigStore.Create(ctx, dbLLMConfig)
 	if err != nil {
@@ -464,6 +480,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		NeedSensitiveCheck: dbRes.NeedSensitiveCheck,
 		ModelSizeB:         dbRes.ModelSizeB,
 		AccessPolicy:       dbRes.AccessPolicy,
+		RateLimit:          dbRes.RateLimit,
 		CreatedAt:          dbRes.CreatedAt,
 		UpdatedAt:          dbRes.UpdatedAt,
 	}
@@ -526,6 +543,25 @@ func validateOptionalLLMTypes(types []int) error {
 //     rejected
 //   - queue mode requires MaxTPM and MaxRPM to be unset (0): they are not
 //     enforced when the queue is active, so storing them would be misleading
+//
+// validateUserRateLimitPolicy checks an admin-supplied per-user rate limit
+// policy. Disabled policies are stored as-is; enabled policies must keep
+// both limits non-negative — a negative cap would silently mean "unlimited"
+// in the limiter while still overriding the gateway-global policy, the
+// opposite of the admin's intent.
+func validateUserRateLimitPolicy(p *types.UserRateLimitPolicy) error {
+	if p == nil || !p.Enabled {
+		return nil
+	}
+	if p.MaxRPM < 0 {
+		return fmt.Errorf("%w: rate_limit.max_rpm must be >= 0 (0 means unlimited)", ErrInvalidLLMConfig)
+	}
+	if p.MaxTPM < 0 {
+		return fmt.Errorf("%w: rate_limit.max_tpm must be >= 0 (0 means unlimited)", ErrInvalidLLMConfig)
+	}
+	return nil
+}
+
 func validateCapacityPolicy(p *types.CapacityPolicy) error {
 	if p == nil || !p.Enabled {
 		return nil
@@ -932,6 +968,7 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 		dbUp.ModelName = strings.TrimSpace(*req.ModelName)
 	}
 	if req.AuthHeader != nil && !isCSGHubSource {
+		// Only an explicitly supplied credential replaces the stored value.
 		dbUp.AuthHeader = *req.AuthHeader
 	}
 	if req.Provider != nil && !isCSGHubSource {
@@ -1227,4 +1264,42 @@ func aggregateLLMSource(upstreams []types.UpstreamConfig) types.UpstreamSource {
 		}
 	}
 	return first
+}
+
+// LLMConfigForDisplay copies the response before masking upstream credentials.
+// Legacy management responses and runtime values remain suitable for read-update flows.
+func LLMConfigForDisplay(config *types.LLMConfig) *types.LLMConfig {
+	if config == nil {
+		return nil
+	}
+	display := *config
+	display.Upstreams = slices.Clone(config.Upstreams)
+	for i := range display.Upstreams {
+		display.Upstreams[i].AuthHeader = maskUpstreamAuthHeader(display.Upstreams[i].AuthHeader)
+	}
+	return &display
+}
+
+// maskUpstreamAuthHeader preserves the header representation while hiding every credential value.
+func maskUpstreamAuthHeader(value string) string {
+	if value == "" {
+		return ""
+	}
+	var headers map[string]string
+	if json.Unmarshal([]byte(value), &headers) == nil && headers != nil {
+		for name, secret := range headers {
+			headers[name] = maskUpstreamAuthValue(secret)
+		}
+		encoded, _ := json.Marshal(headers)
+		return string(encoded)
+	}
+	return maskUpstreamAuthValue(value)
+}
+
+// maskUpstreamAuthValue retains a Bearer scheme while masking only its credential.
+func maskUpstreamAuthValue(value string) string {
+	if len(value) > 7 && strings.EqualFold(value[:7], "Bearer ") {
+		return value[:7] + cryptox.MaskCredential(value[7:])
+	}
+	return cryptox.MaskCredential(value)
 }

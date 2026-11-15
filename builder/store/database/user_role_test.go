@@ -273,7 +273,7 @@ func newAdminRoleManagementTestDBWithDSN(t *testing.T, dsn string) *DB {
 	require.NoError(t, db.BunDB.DB.Close())
 	db.BunDB.DB = connection
 	for _, statement := range []string{
-		`CREATE TABLE users (id INTEGER PRIMARY KEY, uuid TEXT NOT NULL, username TEXT NOT NULL UNIQUE, name TEXT NOT NULL, avatar TEXT NOT NULL DEFAULT '', role_mask TEXT NOT NULL DEFAULT '', deleted_at TIMESTAMP NULL)`,
+		`CREATE TABLE users (id INTEGER PRIMARY KEY, uuid TEXT NOT NULL, username TEXT NOT NULL UNIQUE, name TEXT NOT NULL, avatar TEXT NOT NULL DEFAULT '', role_mask TEXT NOT NULL DEFAULT '', login_frozen BOOLEAN NOT NULL DEFAULT FALSE, deleted_at TIMESTAMP NULL)`,
 		`CREATE TABLE roles (role_code TEXT PRIMARY KEY, display_name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', is_admin BOOLEAN NOT NULL DEFAULT FALSE, is_builtin BOOLEAN NOT NULL DEFAULT FALSE, can_delete BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, user_id INTEGER NOT NULL)`,
 		`CREATE TABLE admin_role_permissions (role_code TEXT NOT NULL REFERENCES roles(role_code), permission_code TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (role_code, permission_code))`,
 		`CREATE TABLE user_roles (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), role_code TEXT NOT NULL, operator_user_id INTEGER NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at TIMESTAMP NULL)`,
@@ -1078,4 +1078,80 @@ func TestOrganizationMemberSearchRouting(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+// TestUserStore_IndexWithSearchRejectsInvalidSort proves validation precedes even database access.
+func TestUserStore_IndexWithSearchRejectsInvalidSort(t *testing.T) {
+	for _, req := range []types.UserListReq{
+		{SortBy: "created_at"}, {SortBy: "user.id"}, {SortBy: "id, last_login_at"},
+		{SortBy: "id; SELECT 1"}, {SortBy: "(SELECT 1)"},
+		{SortOrder: "invalid"}, {SortOrder: "asc nulls first"}, {SortOrder: "desc nulls last"},
+		{SortOrder: "asc; SELECT 1"}, {SortOrder: "desc--"},
+	} {
+		t.Run(req.SortBy+"/"+req.SortOrder, func(t *testing.T) {
+			// A nil database makes any query attempt fail the test immediately.
+			store := &UserStoreImpl{}
+			users, count, err := store.IndexWithSearch(context.Background(), req)
+			require.ErrorIs(t, err, errorx.ErrReqParamInvalid)
+			require.Nil(t, users)
+			require.Zero(t, count)
+		})
+	}
+}
+
+// TestUserStore_IndexWithSearchSorting verifies real ordering and pagination for both allowed columns.
+func TestUserStore_IndexWithSearchSorting(t *testing.T) {
+	ctx := context.Background()
+	db := newUserRoleRelationTestDB(t)
+	_, err := db.Core.ExecContext(ctx, `UPDATE users SET last_login_at = CASE id
+		WHEN 1 THEN '2026-01-04' WHEN 2 THEN '2026-01-02'
+		WHEN 3 THEN '2026-01-03' WHEN 4 THEN '2026-01-01' END`)
+	require.NoError(t, err)
+	store := NewUserStoreWithDB(db)
+	for _, tc := range []struct {
+		name, by, order string
+		page, per       int
+		want            []int64
+	}{
+		{"defaults", "", "", 1, 10, []int64{1, 2, 3, 4}},
+		{"id ascending", "id", "asc", 1, 10, []int64{1, 2, 3, 4}},
+		{"id descending", "id", "DESC", 1, 10, []int64{4, 3, 2, 1}},
+		{"login ascending", "last_login_at", "ASC", 1, 10, []int64{4, 2, 3, 1}},
+		{"login descending", "last_login_at", "dEsC", 1, 10, []int64{1, 3, 2, 4}},
+		{"default column", "", "desc", 1, 10, []int64{4, 3, 2, 1}},
+		{"default direction", "last_login_at", "", 1, 10, []int64{4, 2, 3, 1}},
+		{"sorted second page", "last_login_at", "asc", 2, 2, []int64{3, 1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			users, count, err := store.IndexWithSearch(ctx, types.UserListReq{
+				SortBy: tc.by, SortOrder: tc.order, Page: tc.page, Per: tc.per,
+			})
+			require.NoError(t, err)
+			require.Equal(t, 4, count)
+			ids := make([]int64, len(users))
+			for i, user := range users {
+				ids[i] = user.ID
+			}
+			require.Equal(t, tc.want, ids)
+		})
+	}
+}
+
+func TestFrozenAccountCannotReceiveOrReplaceAdmin(t *testing.T) {
+	ctx := context.Background()
+	db := newAdminRoleManagementTestDB(t)
+	seedAdminRoleMutationUsers(t, db)
+	store := NewUserRoleStoreWithDB(db)
+	_, err := db.Core.ExecContext(ctx, "INSERT INTO admin_role_permissions (role_code, permission_code) VALUES ('reader','*')")
+	require.NoError(t, err)
+	admin := types.AdminUserRoleRequest{UserID: 2, RoleCode: "reader", CurrentUser: "actor"}
+	require.NoError(t, store.AssignAdminRole(ctx, admin))
+	other := admin
+	other.UserID = 1
+	require.NoError(t, store.AssignAdminRole(ctx, other))
+	_, err = db.Core.ExecContext(ctx, "UPDATE users SET login_frozen = TRUE WHERE id = 1")
+	require.NoError(t, err)
+	require.ErrorIs(t, store.AssignAdminRole(ctx, other), errorx.ErrNotFound)
+	require.ErrorIs(t, store.RemoveAdminRole(ctx, admin), errorx.ErrLastAccountAdmin)
+	require.NoError(t, store.RemoveAdminRole(ctx, other))
 }

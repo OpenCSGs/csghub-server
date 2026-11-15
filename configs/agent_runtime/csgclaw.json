@@ -1,7 +1,7 @@
 {
   "agent_type": "csgclaw",
-  "version": "v0.9.0",
-  "image": "opencsghq/csgclaw-server-sandbox:2026102302",
+  "version": "v0.10.0-beta.7",
+  "image": "opencsghq/csgclaw-server-sandbox:2026110605",
   "port": 18080,
   "command": [
     "/sbin/tini",
@@ -21,8 +21,8 @@
     "SKILLS_POLL_INTERVAL": "600"
   },
   "custom_ui": {
-    "url": "https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/agentichub/agent-ui-framework/v1.0.2/bundle.tar.gz",
-    "sha256": "aa797ed3016885403cf1fe2980446232432df69d8b70d27c64b30bede14ec66a",
+    "url": "https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/agentichub/agent-ui-framework/v1.0.3/bundle.tar.gz",
+    "sha256": "8b6fc7cc8be8b59073d2cc0596582b13db8ea01b463e64c3a6535bce7e3d1777",
     "sdk": "gradio"
   }
 }

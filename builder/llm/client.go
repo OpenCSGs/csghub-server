@@ -31,10 +31,11 @@ type Client struct {
 	llmConfig *database.LLMConfig
 }
 
-func NewClient() *Client {
-	return &Client{
-		client: rpc.NewHttpClient("").WithRetry(2),
-	}
+func NewClient() *Client { return NewClientWithTransport(nil) }
+
+// NewClientWithTransport lets a caller observe only its own LLM traffic.
+func NewClientWithTransport(wrap func(http.RoundTripper) http.RoundTripper) *Client {
+	return &Client{client: rpc.NewHttpClient("").WithRetry(2).WrapTransport(wrap)}
 }
 
 // WithLLMConfig returns a new Client that calls the given LLMConfig's best
@@ -164,6 +165,7 @@ func (c *Client) doRequest(ctx context.Context, method, url, host string, header
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("unexpected http status code:%d", resp.StatusCode)
 	}
 

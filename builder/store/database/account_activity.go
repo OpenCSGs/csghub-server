@@ -12,16 +12,19 @@ import (
 )
 
 type AccountActivity struct {
-	ID            int64                `bun:",pk,autoincrement" json:"id"`
-	ActID         int64                `bun:",notnull,unique" json:"act_id"`
-	ActCode       string               `bun:",notnull,unique" json:"act_code"`
-	ActName       string               `bun:",notnull" json:"act_name"`
-	Status        types.ActivityStatus `bun:",notnull,default:'active'" json:"status"` // active, expired
-	BeginAt       time.Time            `bun:",nullzero" json:"begin_at"`
-	EndAt         time.Time            `bun:",nullzero" json:"end_at"`
-	Description   string               `bun:",nullzero" json:"description"`
-	VoucherValue  int64                `bun:",notnull,default:0" json:"voucher_value"`
-	ValidDuration int64                `bun:",nullzero" json:"valid_duration"` // valid duration in seconds
+	ID                  int64                `bun:",pk,autoincrement" json:"id"`
+	ActID               int64                `bun:",notnull,unique" json:"act_id"`
+	ActCode             string               `bun:",notnull,unique" json:"act_code"`
+	ActName             string               `bun:",notnull" json:"act_name"`
+	Status              types.ActivityStatus `bun:",notnull,default:'active'" json:"status"` // active, expired
+	BeginAt             time.Time            `bun:",nullzero" json:"begin_at"`
+	EndAt               time.Time            `bun:",nullzero" json:"end_at"`
+	Description         string               `bun:",nullzero" json:"description"`
+	VoucherValue        int64                `bun:",notnull,default:0" json:"voucher_value"`         // total voucher value in cents
+	ValidDuration       int64                `bun:",nullzero" json:"valid_duration"`                 // valid duration in seconds
+	VoucherTokenValue   int64                `bun:",notnull,default:0" json:"voucher_token_value"`   // voucher token value in cents
+	VoucherComputeValue int64                `bun:",notnull,default:0" json:"voucher_compute_value"` // voucher compute value in cents
+	ValidDurationMonth  int64                `bun:",notnull,default:0" json:"valid_duration_month"`  // valid duration in months
 }
 
 // ErrActivityNotGrantable reports that the activity cannot grant a present at

@@ -8,6 +8,6 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func ScanModelTreeWorkflow(ctx workflow.Context, req types.ScanModels) error {
+func ScanModelTreeWorkflow(ctx workflow.Context, req types.ScanModelTreeParams) error {
 	return nil
 }

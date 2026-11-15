@@ -164,6 +164,11 @@ func TestClusterComponent_GetDeploys(t *testing.T) {
 		},
 	}
 
+	// The organization deployment remains visible after its creator is purged.
+	orgDeploy := testDeploys[0]
+	orgDeploy.ID, orgDeploy.User, orgDeploy.OwnerNamespace = 2, nil, "team"
+	orgDeploy.DeployName = "org-deploy"
+	testDeploys = append(testDeploys, orgDeploy)
 	// Create mock for deployTaskStore
 	mockDeployStore := &mockdb.MockDeployTaskStore{}
 	mockClusterStore := &mockdb.MockClusterInfoStore{}
@@ -202,7 +207,9 @@ func TestClusterComponent_GetDeploys(t *testing.T) {
 
 	// Verify results
 	require.NoError(t, err)
-	require.Len(t, res, 1)
+	require.Len(t, res, 2)
+	require.Equal(t, "org-deploy", res[1].DeployName)
+	require.Empty(t, res[1].User.Username)
 	require.Equal(t, 2, total)
 
 	// Verify first deploy

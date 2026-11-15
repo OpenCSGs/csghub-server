@@ -79,3 +79,8 @@ func (c *accessTokenComponentImpl) updateAccessTokenQuotas(ctx context.Context, 
 func (c *accessTokenComponentImpl) GetAPIKeyQuotas(ctx context.Context, apiKey string) ([]database.AccountAccessTokenQuota, error) {
 	return []database.AccountAccessTokenQuota{}, nil
 }
+
+// setAccessTokenCreationLimit leaves CE API key creation unrestricted.
+func (c *accessTokenComponentImpl) setAccessTokenCreationLimit(_ context.Context, _ *database.AccessToken, _ database.User) error {
+	return nil
+}

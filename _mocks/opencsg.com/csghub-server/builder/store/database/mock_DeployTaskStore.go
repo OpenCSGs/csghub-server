@@ -374,6 +374,54 @@ func (_c *MockDeployTaskStore_DeleteDeployNow_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// DispatchPendingTask provides a mock function with given fields: ctx, task, submit
+func (_m *MockDeployTaskStore) DispatchPendingTask(ctx context.Context, task *database.DeployTask, submit func(database.DeployTaskStore) error) error {
+	ret := _m.Called(ctx, task, submit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DispatchPendingTask")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.DeployTask, func(database.DeployTaskStore) error) error); ok {
+		r0 = rf(ctx, task, submit)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployTaskStore_DispatchPendingTask_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DispatchPendingTask'
+type MockDeployTaskStore_DispatchPendingTask_Call struct {
+	*mock.Call
+}
+
+// DispatchPendingTask is a helper method to define mock.On call
+//   - ctx context.Context
+//   - task *database.DeployTask
+//   - submit func(database.DeployTaskStore) error
+func (_e *MockDeployTaskStore_Expecter) DispatchPendingTask(ctx interface{}, task interface{}, submit interface{}) *MockDeployTaskStore_DispatchPendingTask_Call {
+	return &MockDeployTaskStore_DispatchPendingTask_Call{Call: _e.mock.On("DispatchPendingTask", ctx, task, submit)}
+}
+
+func (_c *MockDeployTaskStore_DispatchPendingTask_Call) Run(run func(ctx context.Context, task *database.DeployTask, submit func(database.DeployTaskStore) error)) *MockDeployTaskStore_DispatchPendingTask_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.DeployTask), args[2].(func(database.DeployTaskStore) error))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_DispatchPendingTask_Call) Return(_a0 error) *MockDeployTaskStore_DispatchPendingTask_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_DispatchPendingTask_Call) RunAndReturn(run func(context.Context, *database.DeployTask, func(database.DeployTaskStore) error) error) *MockDeployTaskStore_DispatchPendingTask_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindActiveDeployByName provides a mock function with given fields: ctx, name
 func (_m *MockDeployTaskStore) FindActiveDeployByName(ctx context.Context, name string) (*database.Deploy, error) {
 	ret := _m.Called(ctx, name)

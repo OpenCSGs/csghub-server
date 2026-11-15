@@ -85,6 +85,9 @@ func InitDB(config DBConfig) error {
 
 // NewDB initializes a DB via config
 func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
+	if _, _, keyErr := storageCipher(); keyErr != nil {
+		return nil, fmt.Errorf("initialize credential encryption: %w", keyErr)
+	}
 	db = &DB{}
 	var bunDB *bun.DB
 

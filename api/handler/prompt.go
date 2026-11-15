@@ -190,11 +190,7 @@ func (h *PromptHandler) PromptDetail(ctx *gin.Context) {
 		needOpWeight = false
 	}
 
-	qNeedMultiSync := ctx.Query("need_multi_sync")
-	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
-	if err != nil {
-		needMultiSync = false
-	}
+	needMultiSync := queryBool(ctx, "need_multi_sync")
 
 	detail, err := h.prompt.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {

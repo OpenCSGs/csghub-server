@@ -119,6 +119,32 @@ func TestAgentOrchestratorStoreReserveAllocationIsIdempotent(t *testing.T) {
 	require.Equal(t, int64(1), counter.CapacityLimit)
 }
 
+func TestAgentOrchestratorStoreExpectedAllocationDoesNotCreateReplacement(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	owner := uuid.NewString()
+	logical := createPublicLogicalAgent(t, ctx, db, owner, "logical-"+uuid.NewString())
+	actor := uuid.NewString()
+	input := database.ReserveAgentAllocationInput{LogicalInstanceID: logical.ID, ActorKind: "user", ActorID: actor, RuntimePrincipal: actor, BillingOwner: actor, InstanceQuota: 1, ExpectedAllocationID: 123456}
+	store := database.NewAgentOrchestratorStoreWithDB(db)
+	_, err := store.ReserveAllocation(ctx, input)
+	require.ErrorIs(t, err, errorx.ErrAgentAllocationLifecycleConflict)
+	count, err := db.Core.NewSelect().Model((*database.AgentAllocation)(nil)).Where("logical_instance_id = ?", logical.ID).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+	input.ExpectedAllocationID = 0
+	created, err := store.ReserveAllocation(ctx, input)
+	require.NoError(t, err)
+	input.ExpectedAllocationID = created.Allocation.ID + 1
+	_, err = store.ReserveAllocation(ctx, input)
+	require.ErrorIs(t, err, errorx.ErrAgentAllocationLifecycleConflict)
+	input.ExpectedAllocationID = created.Allocation.ID
+	reused, err := store.ReserveAllocation(ctx, input)
+	require.NoError(t, err)
+	require.Equal(t, created.Allocation.ID, reused.Allocation.ID)
+}
+
 func TestAgentOrchestratorStoreReservePrivateLogicalAgentForOwnerOnly(t *testing.T) {
 	db := tests.InitTransactionTestDB()
 	defer db.Close()
@@ -1036,6 +1062,36 @@ func TestAgentOrchestratorStoreRecordAllocationSuspended(t *testing.T) {
 
 	// Non-orchestrated deploys are ignored.
 	require.NoError(t, store.RecordAllocationSuspended(ctx, 999999))
+}
+
+func TestAgentOrchestratorStoreSuspendFencesAdmission(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewAgentOrchestratorStoreWithDB(db)
+	logical := createPublicLogicalAgent(t, ctx, db, uuid.NewString(), "logical-"+uuid.NewString())
+	actorID := uuid.NewString()
+	reserved, deploy := provisionReadyAgentAllocation(t, ctx, db, store, logical.ID, actorID)
+	actor := types.AgentActor{Kind: types.AgentActorKindUser, ID: actorID}
+	admission, err := store.AcquireExecutionAdmission(ctx, executionAdmissionInput(reserved.Allocation.ID, actorID, uuid.NewString()))
+	require.NoError(t, err)
+	_, err = store.BeginAllocationSuspend(ctx, reserved.Allocation.ID, actor)
+	require.ErrorIs(t, err, errorx.ErrAgentAllocationLifecycleConflict)
+	require.NoError(t, store.CompleteExecutionAdmission(ctx, admission.ID, "completed", time.Hour))
+	operation, err := store.BeginAllocationSuspend(ctx, reserved.Allocation.ID, actor)
+	require.NoError(t, err)
+	require.NotNil(t, operation)
+	_, err = store.AcquireExecutionAdmission(ctx, executionAdmissionInput(reserved.Allocation.ID, actorID, uuid.NewString()))
+	require.ErrorIs(t, err, errorx.ErrAgentAllocationLifecycleConflict)
+	_, err = db.Core.NewUpdate().Model((*database.AgentAllocationOperation)(nil)).Set("status = 'dispatched'").Where("id = ?", operation.ID).Exec(ctx)
+	require.NoError(t, err)
+	require.NoError(t, store.MarkSuspendOperationRunning(ctx, operation.ID))
+	require.NoError(t, store.RecordAllocationSuspended(ctx, deploy.ID))
+	require.NoError(t, store.CompleteSuspendOperation(ctx, operation.ID))
+	state, err := store.FindOperationContext(ctx, operation.ID)
+	require.NoError(t, err)
+	require.Equal(t, "completed", state.Operation.Status)
+	require.Equal(t, "suspended", state.Allocation.ObservedState)
 }
 
 func TestAgentOrchestratorStoreResumeOperation(t *testing.T) {

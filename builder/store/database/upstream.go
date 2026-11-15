@@ -22,7 +22,9 @@ type Upstream struct {
 	Weight                int                  `bun:",notnull,default:1" json:"weight"`
 	Enabled               bool                 `bun:",notnull,default:true" json:"enabled"`
 	ModelName             string               `bun:",nullzero" json:"model_name"`
-	AuthHeader            string               `bun:",nullzero" json:"auth_header"`
+	AuthHeader            string               `bun:"-" json:"auth_header"`
+	EncryptedAuthHeader   string               `bun:"column:auth_header,nullzero" json:"-"`
+	CredentialVersion     int                  `bun:",notnull,default:0" json:"-"`
 	Provider              string               `bun:",nullzero" json:"provider"`
 	HealthCheckEnabled    bool                 `bun:",notnull,default:false" json:"health_check_enabled"`
 	CircuitBreakerEnabled bool                 `bun:",notnull,default:false" json:"circuit_breaker_enabled"`
@@ -122,7 +124,11 @@ func NewUpstreamStoreWithDB(db *DB, _ *config.Config) UpstreamStore {
 	return &upstreamStoreImpl{db: db}
 }
 
+// Create explicitly encrypts the external credential before inserting the upstream.
 func (s *upstreamStoreImpl) Create(ctx context.Context, upstream *Upstream) error {
+	if err := upstream.encryptCredentials(); err != nil {
+		return err
+	}
 	res, err := s.db.Core.NewInsert().Model(upstream).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("create upstream: %w", err)
@@ -133,7 +139,11 @@ func (s *upstreamStoreImpl) Create(ctx context.Context, upstream *Upstream) erro
 	return nil
 }
 
+// Update explicitly encrypts the external credential before updating the upstream.
 func (s *upstreamStoreImpl) Update(ctx context.Context, upstream *Upstream) error {
+	if err := upstream.encryptCredentials(); err != nil {
+		return err
+	}
 	_, err := s.db.Core.NewUpdate().Model(upstream).WherePK().Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("update upstream: %w", err)
@@ -146,33 +156,46 @@ func (s *upstreamStoreImpl) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
+// GetByID explicitly restores upstream credentials after database reads.
 func (s *upstreamStoreImpl) GetByID(ctx context.Context, id int64) (*Upstream, error) {
 	var u Upstream
 	err := s.db.Core.NewSelect().Model(&u).Where("upstream.id = ?", id).Relation("HealthState").Relation("CircuitState").Scan(ctx)
+	if err == nil {
+		err = u.decryptCredentials()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("get upstream by id: %w", err)
 	}
 	return &u, nil
 }
 
+// ListByLLMConfigID explicitly restores upstream credentials after database reads.
 func (s *upstreamStoreImpl) ListByLLMConfigID(ctx context.Context, llmConfigID int64) ([]*Upstream, error) {
 	var upstreams []*Upstream
 	err := s.db.Core.NewSelect().Model(&upstreams).Where("upstream.llm_config_id = ?", llmConfigID).Relation("HealthState").Relation("CircuitState").Order("upstream.id ASC").Scan(ctx)
+	if err == nil {
+		err = decryptUpstreams(upstreams)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("list upstreams by llm_config_id: %w", err)
 	}
 	return upstreams, nil
 }
 
+// ListAllEnabled explicitly restores upstream credentials after database reads.
 func (s *upstreamStoreImpl) ListAllEnabled(ctx context.Context) ([]*Upstream, error) {
 	var upstreams []*Upstream
 	err := s.db.Core.NewSelect().Model(&upstreams).Where("enabled = true").Order("id ASC").Scan(ctx)
+	if err == nil {
+		err = decryptUpstreams(upstreams)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("list all enabled upstreams: %w", err)
 	}
 	return upstreams, nil
 }
 
+// ListHealthCheckEnabled explicitly restores upstream credentials after database reads.
 func (s *upstreamStoreImpl) ListHealthCheckEnabled(ctx context.Context) ([]*Upstream, error) {
 	var upstreams []*Upstream
 	err := s.db.Core.NewSelect().Model(&upstreams).
@@ -182,6 +205,9 @@ func (s *upstreamStoreImpl) ListHealthCheckEnabled(ctx context.Context) ([]*Upst
 		Where("c.enabled = true").
 		Order("upstream.id ASC").
 		Scan(ctx)
+	if err == nil {
+		err = decryptUpstreams(upstreams)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("list health check enabled upstreams: %w", err)
 	}
@@ -193,6 +219,7 @@ func (s *upstreamStoreImpl) DeleteByLLMConfigID(ctx context.Context, llmConfigID
 	return err
 }
 
+// GetBySourceID explicitly restores upstream credentials after database reads.
 func (s *upstreamStoreImpl) GetBySourceID(ctx context.Context, source types.UpstreamSource, sourceID int64) (*Upstream, error) {
 	var u Upstream
 	err := s.db.Core.NewSelect().Model(&u).
@@ -202,6 +229,9 @@ func (s *upstreamStoreImpl) GetBySourceID(ctx context.Context, source types.Upst
 		Relation("CircuitState").
 		Limit(1).
 		Scan(ctx)
+	if err == nil {
+		err = u.decryptCredentials()
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -220,6 +250,7 @@ var sourceOwnedColumns = []string{
 	"metadata", "source", "source_id", "llm_config_id", "updated_at",
 }
 
+// UpsertInternalDeployTarget encrypts credentials on insert or when their owner changes.
 func (s *upstreamStoreImpl) UpsertInternalDeployTarget(ctx context.Context, upstream *Upstream) error {
 	existing, err := s.GetBySourceID(ctx, upstream.Source, upstream.SourceID)
 	if err != nil {
@@ -230,6 +261,7 @@ func (s *upstreamStoreImpl) UpsertInternalDeployTarget(ctx context.Context, upst
 		// SourceID are copied too — they match the lookup key today, but
 		// copying them keeps the update correct if the lookup logic changes
 		// and avoids silently persisting stale values.
+		rebindCredential := existing.LLMConfigID != upstream.LLMConfigID
 		existing.URL = upstream.URL
 		existing.ModelName = upstream.ModelName
 		existing.Provider = upstream.Provider
@@ -238,9 +270,16 @@ func (s *upstreamStoreImpl) UpsertInternalDeployTarget(ctx context.Context, upst
 		existing.Source = upstream.Source
 		existing.SourceID = upstream.SourceID
 		existing.LLMConfigID = upstream.LLMConfigID
+		columns := sourceOwnedColumns
+		if rebindCredential {
+			if err := existing.encryptCredentials(); err != nil {
+				return err
+			}
+			columns = append(append([]string{}, columns...), "auth_header", "credential_version")
+		}
 		_, err := s.db.Core.NewUpdate().
 			Model(existing).
-			Column(sourceOwnedColumns...).
+			Column(columns...).
 			WherePK().
 			Exec(ctx)
 		if err != nil {
@@ -251,6 +290,9 @@ func (s *upstreamStoreImpl) UpsertInternalDeployTarget(ctx context.Context, upst
 		return nil
 	}
 	// Create new upstream.
+	if err := upstream.encryptCredentials(); err != nil {
+		return err
+	}
 	res, err := s.db.Core.NewInsert().Model(upstream).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("upsert internal deploy target: create: %w", err)
@@ -261,6 +303,7 @@ func (s *upstreamStoreImpl) UpsertInternalDeployTarget(ctx context.Context, upst
 	return nil
 }
 
+// ListEnabledBySource explicitly restores upstream credentials after database reads.
 func (s *upstreamStoreImpl) ListEnabledBySource(ctx context.Context, source types.UpstreamSource) ([]*Upstream, error) {
 	var upstreams []*Upstream
 	err := s.db.Core.NewSelect().Model(&upstreams).
@@ -268,12 +311,16 @@ func (s *upstreamStoreImpl) ListEnabledBySource(ctx context.Context, source type
 		Where("enabled = true").
 		Order("id ASC").
 		Scan(ctx)
+	if err == nil {
+		err = decryptUpstreams(upstreams)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("list enabled upstreams by source %q: %w", source, err)
 	}
 	return upstreams, nil
 }
 
+// ListEnabledByLogicalModelIDs explicitly restores upstream credentials after database reads.
 func (s *upstreamStoreImpl) ListEnabledByLogicalModelIDs(ctx context.Context, modelIDs []int64) ([]*Upstream, error) {
 	if len(modelIDs) == 0 {
 		return nil, nil
@@ -285,6 +332,9 @@ func (s *upstreamStoreImpl) ListEnabledByLogicalModelIDs(ctx context.Context, mo
 		Order("llm_config_id").
 		Order("id").
 		Scan(ctx)
+	if err == nil {
+		err = decryptUpstreams(upstreams)
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
@@ -332,4 +382,33 @@ func (s *upstreamStoreImpl) GetLLMConfigIDBySourceID(ctx context.Context, source
 		return 0, fmt.Errorf("get llm_config_id by source %q source_id %d: %w", source, sourceID, err)
 	}
 	return id, nil
+}
+
+// encryptCredentials prepares storage fields explicitly before a credential write.
+// Plaintext remains available in memory for existing callers and create responses.
+func (t *Upstream) encryptCredentials() error {
+	var err error
+	t.EncryptedAuthHeader, err = encryptStoredCredential(t.AuthHeader, "upstream-api-key", credentialOwner(t.LLMConfigID))
+	if err != nil {
+		return err
+	}
+	t.CredentialVersion = credentialEncryptionVersion
+	return nil
+}
+
+// decryptCredentials restores stored values explicitly after a successful query.
+func (t *Upstream) decryptCredentials() error {
+	var err error
+	t.AuthHeader, err = decryptStoredCredential(t.EncryptedAuthHeader, t.CredentialVersion, "upstream-api-key", credentialOwner(t.LLMConfigID))
+	return err
+}
+
+// decryptUpstreams restores credentials in the rows loaded by an explicit store query.
+func decryptUpstreams(rows []*Upstream) error {
+	for i := range rows {
+		if err := rows[i].decryptCredentials(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -127,7 +127,7 @@ func TestMirrorComponent_SyncMirrorRoutesRequestedQueue(t *testing.T) {
 	for _, urgent := range []bool{false, true} {
 		t.Run(fmt.Sprintf("urgent_%t", urgent), func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			repo := &database.Repository{ID: 123, Path: "ns/name", RepositoryType: types.ModelRepo}
 			mirror := &database.Mirror{
 				ID: 456, RepositoryID: repo.ID, Repository: repo, Priority: types.HighMirrorPriority,
@@ -150,7 +150,7 @@ func TestMirrorComponent_SyncMirrorRoutesRequestedQueue(t *testing.T) {
 // TestMirrorComponent_SyncMirrorAdminAuthorized preserves scheduling rules without requiring repository permissions.
 func TestMirrorComponent_SyncMirrorAdminAuthorized(t *testing.T) {
 	ctx := types.WithAdminAuthorization(context.Background())
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	repo := &database.Repository{ID: 123, Path: "ns/name", RepositoryType: types.ModelRepo}
 	mirror := &database.Mirror{ID: 456, RepositoryID: repo.ID, Repository: repo, Priority: types.HighMirrorPriority}
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "module-admin", types.UserWithAdminPermissions).
@@ -177,7 +177,7 @@ func TestMirrorComponent_SyncMirrorRequiresWritePermission(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			repo := &database.Repository{ID: 123, Path: "ns/name", RepositoryType: types.ModelRepo}
 			mirror := &database.Mirror{
 				ID: 456, RepositoryID: repo.ID, Repository: repo, Priority: types.LowMirrorPriority,
@@ -210,7 +210,7 @@ func TestMirrorComponent_SyncMirrorRequiresWritePermission(t *testing.T) {
 func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 	t.Run("creates mirror records and repo job for existing repo without mirror", func(t *testing.T) {
 		ctx := context.TODO()
-		mc := initializeTestMirrorComponent(ctx, t)
+		mc := newPublicMirrorTestComponent(ctx, t)
 		mc.config.MultiSync.SaasSyncDomain = "https://saas.test"
 		fakeStore := &fakeMirrorRepoStore{result: &database.Mirror{
 			ID:            456,
@@ -254,7 +254,7 @@ func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 
 	t.Run("requeues existing mirror through workhub", func(t *testing.T) {
 		ctx := context.TODO()
-		mc := initializeTestMirrorComponent(ctx, t)
+		mc := newPublicMirrorTestComponent(ctx, t)
 		taskJobStore := mockdb.NewMockMirrorTaskJobStore(t)
 		mc.mirrorTaskJobStore = taskJobStore
 		useFakeMirrorJobClient(mc)
@@ -291,7 +291,7 @@ func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 	for _, repoType := range []types.RepositoryType{types.MCPServerRepo, types.SkillRepo} {
 		t.Run(fmt.Sprintf("requeues existing %s mirror without metadata refresh", repoType), func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			taskJobStore := mockdb.NewMockMirrorTaskJobStore(t)
 			mc.mirrorTaskJobStore = taskJobStore
 			useFakeMirrorJobClient(mc)
@@ -326,7 +326,7 @@ func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 
 	t.Run("rejects users without write permission", func(t *testing.T) {
 		ctx := context.TODO()
-		mc := initializeTestMirrorComponent(ctx, t)
+		mc := newPublicMirrorTestComponent(ctx, t)
 		repo := &database.Repository{ID: 123, Path: "CSG_ns/n", RepositoryType: types.ModelRepo}
 		mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
 		mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "reader", repo, rebac.RepositoryCanWrite).Return(false, nil)
@@ -424,7 +424,7 @@ func TestMirrorComponent_MirrorFromSaasStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			tt.task.UpdatedAt = updatedAt
 			mirror := &database.Mirror{ID: 8, RepositoryID: repo.ID, CurrentTaskID: tt.task.ID, CurrentTask: tt.task}
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
@@ -441,7 +441,7 @@ func TestMirrorComponent_MirrorFromSaasStatus(t *testing.T) {
 	}
 
 	t.Run("rejects users without read permission", func(t *testing.T) {
-		mc := initializeTestMirrorComponent(ctx, t)
+		mc := newPublicMirrorTestComponent(ctx, t)
 		mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
 		mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "guest", repo, rebac.RepositoryCanRead).Return(false, nil)
 
@@ -453,7 +453,7 @@ func TestMirrorComponent_MirrorFromSaasStatus(t *testing.T) {
 	})
 
 	t.Run("rejects a nonterminal task without a job reference", func(t *testing.T) {
-		mc := initializeTestMirrorComponent(ctx, t)
+		mc := newPublicMirrorTestComponent(ctx, t)
 		task := &database.MirrorTask{ID: 14, MirrorID: 8, Status: types.MirrorRepoSyncStart}
 		mirror := &database.Mirror{ID: 8, RepositoryID: repo.ID, CurrentTaskID: task.ID, CurrentTask: task}
 		mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
@@ -471,7 +471,7 @@ func TestMirrorComponent_MirrorFromSaasStatus(t *testing.T) {
 // TestMirrorComponent_DeleteMirror verifies manual mirror deletion uses the transactional delete path.
 func TestMirrorComponent_DeleteMirror(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	jobClient := &fakeWorkhubJobClient{}
 	syncCache := mockcache.NewMockCache(t)
 	mc.mirrorJobClient = jobClient
@@ -498,7 +498,7 @@ func TestMirrorComponent_DeleteMirror(t *testing.T) {
 // TestMirrorComponent_GetMirror verifies mirror configuration reads are owned by MirrorComponent.
 func TestMirrorComponent_GetMirror(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	repo := &database.Repository{ID: 123}
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
@@ -513,13 +513,14 @@ func TestMirrorComponent_GetMirror(t *testing.T) {
 		CurrentUser: "user",
 	})
 	require.Nil(t, err)
+	m.LatestLFSReady = mm.LatestLFSReady
 	require.Equal(t, m, mm)
 }
 
 // TestMirrorComponent_UpdateMirror verifies mirror configuration writes normalize embedded source credentials.
 func TestMirrorComponent_UpdateMirror(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	repo := &database.Repository{ID: 123}
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
@@ -554,7 +555,7 @@ func TestMirrorComponent_UpdateMirror(t *testing.T) {
 // TestMirrorComponent_CreateMirror verifies existing repositories are bound to mirrors through the transactional store.
 func TestMirrorComponent_CreateMirror(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 
@@ -605,7 +606,7 @@ func TestMirrorComponent_CreateMirror(t *testing.T) {
 // TestMirrorComponent_CreateMirrorRequeuesSameSource verifies repeated creation starts a fresh sync for the existing source.
 func TestMirrorComponent_CreateMirrorRequeuesSameSource(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 
@@ -641,7 +642,7 @@ func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T
 	for _, repoType := range []types.RepositoryType{types.CodeRepo, types.SkillRepo} {
 		t.Run(string(repoType), func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
 
@@ -684,7 +685,7 @@ func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T
 // (not a user-imported code/skill repo).
 func TestMirrorComponent_CreateMirrorRefreshesSkillMetadata(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 
@@ -731,7 +732,7 @@ func TestMirrorComponent_CreateMirrorRefreshesSkillMetadata(t *testing.T) {
 // always defaulting to the lowest priority.
 func TestMirrorComponent_CreateMirrorHonorsRequestPriority(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 
@@ -763,7 +764,7 @@ func TestMirrorComponent_CreateMirrorHonorsRequestPriority(t *testing.T) {
 // TestMirrorComponent_CreateMirrorRejectsDifferentSource verifies creation cannot replace an existing mirror source.
 func TestMirrorComponent_CreateMirrorRejectsDifferentSource(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	repo := &database.Repository{ID: 123, Path: "ns/n", RepositoryType: types.ModelRepo}
 	mirror := &database.Mirror{
@@ -788,7 +789,7 @@ func TestMirrorComponent_CreateMirrorRejectsDifferentSource(t *testing.T) {
 // TestMirrorComponent_CreateMirrorRepoRejectsEmptyCurrentUser verifies mirror creation requires an explicit current user.
 func TestMirrorComponent_CreateMirrorRepoRejectsEmptyCurrentUser(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	got, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -805,7 +806,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsEmptyCurrentUser(t *testing.T) {
 // TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase verifies local mirror target identifiers are trimmed without changing case.
 func TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
@@ -847,7 +848,7 @@ func TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase(t *testing.T) {
 // TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget verifies repository identity remains case-insensitive.
 func TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	createTargetRepo := true
 	repo := &database.Repository{ID: 11, Path: "alice/MyName", Name: "MyName", RepositoryType: types.CodeRepo}
@@ -873,7 +874,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget(t *tes
 // TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials verifies normalized source data reaches the mirror record.
 func TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
@@ -936,7 +937,7 @@ func TestMirrorComponent_CreateMirrorRepoUsesExplicitVisibility(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			expectMirrorTargetNamespaceExists(mc)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
@@ -992,7 +993,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsInvalidSourceURL(t *testing.T) {
 	for _, sourceURL := range cases {
 		t.Run(sourceURL, func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			store := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = store
 			jobClient := useFakeMirrorJobClient(mc)
@@ -1118,13 +1119,13 @@ func TestMirrorWriteEntrypointsRejectInvalidSourcePath(t *testing.T) {
 		t.Run(sourceURL, func(t *testing.T) {
 			ctx := context.Background()
 			t.Run("CreateMirror", func(t *testing.T) {
-				mc := initializeTestMirrorComponent(ctx, t)
+				mc := newPublicMirrorTestComponent(ctx, t)
 				got, err := mc.CreateMirror(ctx, types.CreateMirrorReq{SourceUrl: sourceURL})
 				require.ErrorIs(t, err, errorx.ErrMirrorSourceURLInvalid)
 				require.Nil(t, got)
 			})
 			t.Run("UpdateMirror", func(t *testing.T) {
-				mc := initializeTestMirrorComponent(ctx, t)
+				mc := newPublicMirrorTestComponent(ctx, t)
 				got, err := mc.UpdateMirror(ctx, types.UpdateMirrorReq{SourceUrl: sourceURL})
 				require.ErrorIs(t, err, errorx.ErrMirrorSourceURLInvalid)
 				require.Nil(t, got)
@@ -1138,7 +1139,7 @@ func TestMirrorWriteEntrypointsValidateCredentials(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("CreateMirrorRepo", func(t *testing.T) {
-		mc := initializeTestMirrorComponent(ctx, t)
+		mc := newPublicMirrorTestComponent(ctx, t)
 		_, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
 			SourceNamespace:   "source",
 			SourceName:        "repo",
@@ -1154,7 +1155,7 @@ func TestMirrorWriteEntrypointsValidateCredentials(t *testing.T) {
 	})
 
 	t.Run("CreateMirror", func(t *testing.T) {
-		mc := initializeTestMirrorComponent(ctx, t)
+		mc := newPublicMirrorTestComponent(ctx, t)
 		_, err := mc.CreateMirror(ctx, types.CreateMirrorReq{
 			SourceUrl: "https://example.com/source/repo.git",
 			Username:  "user",
@@ -1164,7 +1165,7 @@ func TestMirrorWriteEntrypointsValidateCredentials(t *testing.T) {
 	})
 
 	t.Run("UpdateMirror", func(t *testing.T) {
-		mc := initializeTestMirrorComponent(ctx, t)
+		mc := newPublicMirrorTestComponent(ctx, t)
 		_, err := mc.UpdateMirror(ctx, types.UpdateMirrorReq{
 			SourceUrl:   "https://example.com/source/repo.git",
 			AccessToken: "token",
@@ -1178,7 +1179,7 @@ func TestMirrorWriteEntrypointsValidateCredentials(t *testing.T) {
 // TestMirrorComponent_CreateMirrorRepoRequeuesSameTargetAndSource preserves private settings when a public request requeues the same target.
 func TestMirrorComponent_CreateMirrorRepoRequeuesSameTargetAndSource(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 
 	req := types.CreateMirrorRepoReq{
@@ -1212,7 +1213,7 @@ func TestMirrorComponent_CreateMirrorRepoRequeuesSameTargetAndSource(t *testing.
 // TestMirrorComponent_CreateMirrorRepoRequeuePreservesCredentials verifies omitted credentials do not clear stored values.
 func TestMirrorComponent_CreateMirrorRepoRequeuePreservesCredentials(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -1243,7 +1244,7 @@ func TestMirrorComponent_CreateMirrorRepoRequeuePreservesCredentials(t *testing.
 // TestMirrorComponent_CreateMirrorRepoAddsSourceToExistingTargetWithoutMirror preserves private settings when binding an existing target.
 func TestMirrorComponent_CreateMirrorRepoAddsSourceToExistingTargetWithoutMirror(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
@@ -1280,7 +1281,7 @@ func TestMirrorComponent_CreateMirrorRepoAddsSourceToExistingTargetWithoutMirror
 // TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWhenRequested verifies callers can keep import-style no-overwrite semantics.
 func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWhenRequested(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	createTargetRepo := true
 
@@ -1308,7 +1309,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWhenRequested(t *t
 // TestMirrorComponent_CreateMirrorRepoRejectsMissingTargetWhenCreationIsDisabled verifies callers can require an existing target.
 func TestMirrorComponent_CreateMirrorRepoRejectsMissingTargetWhenCreationIsDisabled(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	createTargetRepo := false
 	req := types.CreateMirrorRepoReq{
@@ -1333,7 +1334,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsMissingTargetWhenCreationIsDisab
 // TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWithDifferentSource keeps one repo bound to at most one mirror source URL.
 func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWithDifferentSource(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 
 	req := types.CreateMirrorRepoReq{
@@ -1361,7 +1362,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWithDifferentSourc
 // TestMirrorComponent_CreateMirrorRepoRejectsMissingWritePermission verifies write access is checked before mirror creation.
 func TestMirrorComponent_CreateMirrorRepoRejectsMissingWritePermission(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 
 	req := types.CreateMirrorRepoReq{
@@ -1396,7 +1397,7 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 	for _, repoType := range cases {
 		t.Run(string(repoType), func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			expectMirrorTargetNamespaceExists(mc)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
@@ -1494,7 +1495,7 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 // TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata verifies OpenCSG MCP mirrors import metadata before transactional creation.
 func TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
@@ -1580,7 +1581,7 @@ func TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata(t *testing.T) {
 // TestMirrorComponent_CreateMirrorRepoFetchesSkillMetadata verifies third-party skill mirrors use the configured source API endpoint.
 func TestMirrorComponent_CreateMirrorRepoFetchesSkillMetadata(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
@@ -1671,7 +1672,7 @@ func TestMirrorComponent_CreateMirrorRepoSkipsMetadataForUnsupportedHosts(t *tes
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			expectMirrorTargetNamespaceExists(mc)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
@@ -1756,7 +1757,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsInvalidMirrorSourceConfig(t *tes
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			expectMirrorTargetNamespaceExists(mc)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
@@ -1792,7 +1793,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsInvalidMirrorSourceConfig(t *tes
 // TestMirrorComponent_CreateMirrorRepoReturnsMetadataError verifies identified OpenCSG metadata failures abort creation before database writes.
 func TestMirrorComponent_CreateMirrorRepoReturnsMetadataError(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
@@ -1827,7 +1828,7 @@ func TestMirrorComponent_CreateMirrorRepoReturnsMetadataError(t *testing.T) {
 // the source path fields (HFPath/MSPath/GithubPath) are not set on the repository.
 func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
@@ -1867,7 +1868,7 @@ func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
 // TestMirrorComponent_CreateMirrorRepoRefreshesMCPMetadataOnRequeue verifies repeated MCP syncs refresh API metadata with the new task.
 func TestMirrorComponent_CreateMirrorRepoRefreshesMCPMetadataOnRequeue(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -1930,7 +1931,7 @@ func TestMirrorComponent_CreateMirrorRepoRefreshesMCPMetadataOnRequeue(t *testin
 // TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataOnRequeue verifies repeated skill syncs refresh API metadata with the new task.
 func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataOnRequeue(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -1991,7 +1992,7 @@ func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataOnRequeue(t *test
 // TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataWhenBindingExistingTarget verifies first task creation also refreshes an existing target.
 func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataWhenBindingExistingTarget(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
@@ -2038,7 +2039,7 @@ func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataWhenBindingExisti
 // TestMirrorComponent_SyncMirrorRefreshesSkillMetadata verifies manual sync refreshes skill API metadata before task creation.
 func TestMirrorComponent_SyncMirrorRefreshesSkillMetadata(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	repo := &database.Repository{
 		ID: 21, Path: "local/reviewer", Name: "reviewer", Nickname: "Old Skill", Description: "old description",
 		License: "old-license", Readme: "old readme", DefaultBranch: "main", RepositoryType: types.SkillRepo,
@@ -2082,7 +2083,7 @@ func TestMirrorComponent_SyncMirrorRefreshesSkillMetadata(t *testing.T) {
 // without a persisted source path can still be requeued when its Git host has no metadata API.
 func TestMirrorComponent_SyncMirrorSkipsSkillMetadataForUnsupportedHost(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	repo := &database.Repository{
 		ID: 22, Path: "local/reviewer", Name: "reviewer", Nickname: "Existing Skill",
 		Description: "existing description", License: "MIT", DefaultBranch: "main", RepositoryType: types.SkillRepo,
@@ -2126,7 +2127,7 @@ func TestMirrorComponent_SyncMirrorSkipsSkillMetadataForUnsupportedHost(t *testi
 // namespace is left unchanged and is never converted into an organization.
 func TestEnsureMirrorOrgNamespaceNoopWhenExists(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "existing-org").Return(true, nil)
 	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "existing-org").Return(database.Namespace{
@@ -2141,7 +2142,7 @@ func TestEnsureMirrorOrgNamespaceNoopWhenExists(t *testing.T) {
 // reconciles ReBAC after the database rows were committed by an earlier attempt.
 func TestEnsureMirrorOrgNamespaceRepairsExistingRelationships(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	orgUUID := uuid.MustParse("00000000-0000-0000-0000-000000000011")
 
 	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "existing-org").Return(true, nil)
@@ -2159,7 +2160,7 @@ func TestEnsureMirrorOrgNamespaceRepairsExistingRelationships(t *testing.T) {
 // TestEnsureMirrorOrgNamespaceCreatesOrg verifies the target organization, namespace, and admin ReBAC tuples are written when the namespace is missing.
 func TestEnsureMirrorOrgNamespaceCreatesOrg(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new-org").Return(false, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
@@ -2179,7 +2180,7 @@ func TestEnsureMirrorOrgNamespaceCreatesOrg(t *testing.T) {
 // TestEnsureMirrorOrgNamespaceToleratesConcurrentCreation verifies a race that creates the namespace between the existence check and the insert is treated as success.
 func TestEnsureMirrorOrgNamespaceToleratesConcurrentCreation(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "raced-org").Return(false, nil).Once()
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
@@ -2203,7 +2204,7 @@ func TestEnsureMirrorOrgNamespaceToleratesConcurrentCreation(t *testing.T) {
 // TestEnsureMirrorOrgNamespaceFailsWhenOwnerMissing verifies a missing owner user surfaces an error instead of falling back.
 func TestEnsureMirrorOrgNamespaceFailsWhenOwnerMissing(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new-org").Return(false, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "ghost").Return(database.User{}, sql.ErrNoRows)
@@ -2216,7 +2217,7 @@ func TestEnsureMirrorOrgNamespaceFailsWhenOwnerMissing(t *testing.T) {
 // TestEnsureMirrorOrgNamespaceSkipsWhenArgsEmpty verifies empty namespace or owner short-circuits without store calls.
 func TestEnsureMirrorOrgNamespaceSkipsWhenArgsEmpty(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	require.NoError(t, mc.ensureMirrorOrgNamespace(ctx, "", "admin"))
 	require.NoError(t, mc.ensureMirrorOrgNamespace(ctx, "new-org", ""))
@@ -2225,7 +2226,7 @@ func TestEnsureMirrorOrgNamespaceSkipsWhenArgsEmpty(t *testing.T) {
 // TestMapNamespaceAndNameReturnsMappedTarget verifies a configured mapping resolves to its trimmed target namespace.
 func TestMapNamespaceAndNameReturnsMappedTarget(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
 		FindBySourceNamespace(ctx, "SourceTeam").
 		Return(&database.MirrorNamespaceMapping{TargetNamespace: "  Target-Team  "}, nil)
@@ -2239,7 +2240,7 @@ func TestMapNamespaceAndNameReturnsMappedTarget(t *testing.T) {
 // are not interpreted as a missing mapping.
 func TestMapNamespaceAndNamePropagatesStoreError(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
 		FindBySourceNamespace(ctx, "SourceTeam").
 		Return(nil, fmt.Errorf("store unavailable"))
@@ -2271,7 +2272,7 @@ func TestResolveMirrorRepoTargetPreservesExplicitForkForAllRepoTypes(t *testing.
 
 func TestMirrorComponent_CreateMirrorRepoRejectsMissingNonCanonicalTarget(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 
 	got, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
 		RepoType:          types.CodeRepo,
@@ -2288,7 +2289,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsMissingNonCanonicalTarget(t *tes
 // to callers that did not receive the handler's internal authorization flag.
 func TestMirrorComponent_CreateMirrorRepoSourceOrganizationDoesNotAutoCreateForSharedCallers(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	createTargetRepo := false
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "conflicting-target", "conflicting-name").Return(nil, sql.ErrNoRows)
 	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(
@@ -2311,7 +2312,7 @@ func TestMapNamespaceAndNameFallsBackToSourceWhenTargetEmpty(t *testing.T) {
 	for _, target := range []string{"", "  ", "\t"} {
 		t.Run(fmt.Sprintf("target_%q", target), func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
 				FindBySourceNamespace(ctx, "SourceTeam").
 				Return(&database.MirrorNamespaceMapping{TargetNamespace: target}, nil)
@@ -2326,7 +2327,7 @@ func TestMapNamespaceAndNameFallsBackToSourceWhenTargetEmpty(t *testing.T) {
 // TestMapNamespaceAndNameFallsBackToSourceWhenMappingNil verifies a nil mapping with no error falls back to the source namespace.
 func TestMapNamespaceAndNameFallsBackToSourceWhenMappingNil(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
 		FindBySourceNamespace(ctx, "SourceTeam").
 		Return(nil, nil)
@@ -2353,7 +2354,7 @@ func TestMirrorComponent_CreateMirrorRepoAutoCreatesTargetOrganization(t *testin
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			mc := initializeTestMirrorComponent(ctx, t)
+			mc := newPublicMirrorTestComponent(ctx, t)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
 
@@ -2399,7 +2400,7 @@ func TestMirrorComponent_CreateMirrorRepoAutoCreatesTargetOrganization(t *testin
 // CreateMirrorRepo before repository or mirror persistence.
 func TestMirrorComponent_CreateMirrorRepoTargetOrganizationFailurePreventsWrites(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 
@@ -2426,7 +2427,7 @@ func TestMirrorComponent_CreateMirrorRepoTargetOrganizationFailurePreventsWrites
 // TestCreateMirrorRepoRecordsRequiresNamespace rejects invalid tuple ownership before persistence.
 func TestCreateMirrorRepoRecordsRequiresNamespace(t *testing.T) {
 	ctx := context.Background()
-	component := initializeTestMirrorComponent(ctx, t)
+	component := newPublicMirrorTestComponent(ctx, t)
 	store := &fakeMirrorRepoStore{}
 	component.mirrorRepoStore = store
 	_, err := component.createMirrorRepoRecords(ctx, types.CreateMirrorRepoReq{}, &database.Repository{}, "namespace", "repo", true, nil, nil)

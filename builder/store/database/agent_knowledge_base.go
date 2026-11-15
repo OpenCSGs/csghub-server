@@ -16,6 +16,7 @@ import (
 
 // AgentKnowledgeBase represents a knowledge base configuration for an agent
 type AgentKnowledgeBase struct {
+	Recommended   bool                         `bun:",scanonly" json:"recommended"`
 	ID            int64                        `bun:",pk,autoincrement" json:"id"`
 	UserUUID      string                       `bun:",notnull" json:"user_uuid"`
 	NsUUID        string                       `bun:",notnull" json:"ns_uuid"`
@@ -220,6 +221,7 @@ func (s *agentKnowledgeBaseStoreImpl) List(ctx context.Context, filter types.Age
 		q = q.Where("akb.ns_uuid = ? OR akb.public = ?", filter.NsUUID, true)
 	}
 
+	q = applyAgentKnowledgeCuration(q, filter.NsUUID, filter.CurationAdminIDs)
 	q = s.applyAgentKnowledgeBaseFilters(q, filter)
 
 	total, err := q.Count(ctx)
@@ -230,16 +232,7 @@ func (s *agentKnowledgeBaseStoreImpl) List(ctx context.Context, filter types.Age
 	}
 
 	err = q.
-		OrderExpr(`
-			(pin_pref.id IS NOT NULL) DESC,
-			CASE akb.type
-				WHEN ? THEN 0
-				WHEN ? THEN 1
-				ELSE 2
-			END,
-			akb.updated_at DESC,
-			akb.id DESC
-		`, types.AgentKnowledgeBaseTypeLLMWiki, types.AgentKnowledgeBaseTypeLangflow).
+		Apply(orderAgentKnowledgeCuration).
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &knowledgeBases)

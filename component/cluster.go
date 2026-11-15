@@ -167,7 +167,10 @@ func (c *clusterComponentImpl) GetDeploys(ctx context.Context, req types.DeployR
 	}
 	var res []types.DeployRes
 	for _, deploy := range deploys {
-		if deploy.User == nil {
+		var creator types.User
+		if deploy.User != nil {
+			creator = types.User{ID: deploy.UserID, Username: deploy.User.Username, Avatar: deploy.User.Avatar}
+		} else if deploy.OwnerNamespace == "" {
 			continue
 		}
 		totalTime := 0
@@ -210,16 +213,12 @@ func (c *clusterComponentImpl) GetDeploys(ctx context.Context, req types.DeployR
 		region := getClusterRegion(deploy.ClusterID, clusterInos)
 
 		res = append(res, types.DeployRes{
-			ClusterID:     deploy.ClusterID,
-			ClusterRegion: region,
-			DeployName:    deploy.DeployName,
-			Status:        deployStatusCodeToString(deploy.Status),
-			CreateTime:    deploy.CreatedAt,
-			User: types.User{
-				ID:       deploy.UserID,
-				Username: deploy.User.Username,
-				Avatar:   deploy.User.Avatar,
-			},
+			ClusterID:       deploy.ClusterID,
+			ClusterRegion:   region,
+			DeployName:      deploy.DeployName,
+			Status:          deployStatusCodeToString(deploy.Status),
+			CreateTime:      deploy.CreatedAt,
+			User:            creator,
 			Resource:        deploy.Hardware,
 			TotalTimeInMin:  totalTime,
 			TotalFeeInCents: totalFee,

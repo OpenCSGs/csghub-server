@@ -31,8 +31,14 @@ type RequestMetadata struct {
 	// API key by its quota configuration ("high"/"low"; empty = unset, which
 	// resolves to the high class — see AdmissionPriorityFromSource). It
 	// is populated by the Extract phase from the request context and is the
-	// sole source of the queue priority in the admission reservation queue.
+	// scope-band input of the queue priority (see ResolveQueuePriority).
 	PriorityScope string
+	// UserPriority is the caller's upstream channel priority resolved from
+	// the user's routing tags by the user-tags middleware (nil = no routing
+	// tag; 0 = low_priority; >= 1 = priority:<n>). The Planner injects it
+	// from the request context; when set it dominates the queue priority in
+	// both directions — see ResolveQueuePriority.
+	UserPriority *int
 	// Streaming indicates whether the client requested a streaming response.
 	Streaming bool
 	// Headers are the HTTP request headers.
@@ -154,6 +160,12 @@ const (
 	// low-priority user with no priority-0 upstream configured. Rendered as
 	// HTTP 403. Appended last so the existing constant values do not shift.
 	PlanErrUpstreamPriorityDenied
+	// PlanErrUserRateLimitExceeded marks a request rejected because ONE user
+	// exceeded the per-user rate limit (RPM/TPM) configured at the model or
+	// gateway-global level over the current fixed window. It is rendered as
+	// HTTP 429 with a Retry-After hint. Appended last so the existing
+	// constant values do not shift.
+	PlanErrUserRateLimitExceeded
 )
 
 // ModelTarget is the protocol-agnostic model target information produced by

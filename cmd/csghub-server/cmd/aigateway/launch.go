@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/component/upstream"
 	"opencsg.com/csghub-server/aigateway/router"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/analytics"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -29,6 +30,22 @@ var cmdLaunch = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		analyticsPublisher, analyticsErr := analytics.New(analytics.Config{
+			Enabled:      cfg.PostHog.Enabled,
+			ProjectToken: cfg.PostHog.ProjectToken,
+			APIHost:      cfg.PostHog.APIHost,
+			Environment:  cfg.PostHog.Environment,
+		})
+		if analyticsErr != nil {
+			slog.Error("PostHog publisher is disabled", slog.Any("error", analyticsErr))
+		}
+		analytics.Assign(analyticsPublisher)
+		defer func() {
+			if closeErr := analyticsPublisher.Close(); closeErr != nil {
+				slog.Warn("Failed to flush PostHog events during shutdown", slog.Any("error", closeErr))
+			}
+			analytics.Assign(nil)
+		}()
 		slog.Debug("config", slog.Any("data", cfg))
 		// Check APIToken length
 		if len(cfg.APIToken) < 128 {

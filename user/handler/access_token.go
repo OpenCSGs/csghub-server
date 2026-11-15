@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/cryptox"
 	apicomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/user/component"
 )
@@ -82,6 +83,10 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	}
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrAPIKeyLimitReached) {
+			httpbase.BadRequestWithExt(ctx, errorx.ErrAPIKeyLimitReached)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create user access token", slog.String("user_name", req.Username), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -129,6 +134,10 @@ func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 	req.TokenName = ctx.Param("token_name")
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrAPIKeyLimitReached) {
+			httpbase.BadRequestWithExt(ctx, errorx.ErrAPIKeyLimitReached)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create user access token", slog.String("user_name", req.Username), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -334,6 +343,29 @@ func (h *AccessTokenHandler) Get(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/tokens [get]
 func (h *AccessTokenHandler) GetUserTokens(ctx *gin.Context) {
+	h.getUserTokens(ctx, false)
+}
+
+// GetUserTokensDisplay godoc
+// @Security     ApiKey
+// @Summary      Get masked access tokens for display without creating credentials
+// @Tags         Access token
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        current_user query string false "current user name"
+// @Param        app query string false "application" Enums(git,starship,mirror)
+// @Success      200  {object}  types.Response{data=[]types.CheckAccessTokenResp} "OK"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/tokens/display [get]
+func (h *AccessTokenHandler) GetUserTokensDisplay(ctx *gin.Context) {
+	h.getUserTokens(ctx, true)
+}
+
+// getUserTokens shares identity, filtering, and error handling between the legacy
+// plaintext endpoint and the display-only projection. Neither path creates tokens.
+func (h *AccessTokenHandler) getUserTokens(ctx *gin.Context, masked bool) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	if currentUser == "" {
 		httpbase.UnauthorizedError(ctx, component.ErrUserNotFound)
@@ -351,6 +383,11 @@ func (h *AccessTokenHandler) GetUserTokens(ctx *gin.Context) {
 		return
 	}
 
+	if masked {
+		for i := range resp {
+			resp[i].Token = cryptox.MaskCredential(resp[i].Token)
+		}
+	}
 	httpbase.OK(ctx, resp)
 }
 
@@ -458,6 +495,10 @@ func (h *AccessTokenHandler) CreateAPIKey(ctx *gin.Context) {
 
 	key, err := h.c.Create(ctx, &apikeyReq)
 	if err != nil {
+		if errors.Is(err, errorx.ErrAPIKeyLimitReached) {
+			httpbase.BadRequestWithExt(ctx, errorx.ErrAPIKeyLimitReached)
+			return
+		}
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -753,6 +794,26 @@ func (h *AccessTokenHandler) GetAPIKeyQuotas(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /namespaces/{uuid}/apikeys/builtin [get]
 func (h *AccessTokenHandler) GetBuiltinKeys(ctx *gin.Context) {
+	h.getBuiltinKeys(ctx, false)
+}
+
+// GetBuiltinKeysDisplay godoc
+// @Security     ApiKey
+// @Summary      Get an existing masked builtin API key without creating credentials
+// @Tags         API Key
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "organization or user namespace uuid"
+// @Success      200  {object}  types.Response{data=types.CheckAccessTokenResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespaces/{uuid}/apikeys/builtin/display [get]
+func (h *AccessTokenHandler) GetBuiltinKeysDisplay(ctx *gin.Context) {
+	h.getBuiltinKeys(ctx, true)
+}
+
+// getBuiltinKeys shares request parsing while keeping raw resolution and display reads separate.
+func (h *AccessTokenHandler) getBuiltinKeys(ctx *gin.Context, masked bool) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	userUUID := httpbase.GetCurrentUserUUID(ctx)
 
@@ -769,7 +830,13 @@ func (h *AccessTokenHandler) GetBuiltinKeys(ctx *gin.Context) {
 		Application: types.AccessTokenAppAIGateway,
 	}
 
-	key, err := h.c.GetOrCreateBuiltinAPIKey(ctx.Request.Context(), req)
+	var key *types.CheckAccessTokenResp
+	var err error
+	if masked {
+		key, err = h.c.GetBuiltinAPIKeyDisplay(ctx.Request.Context(), req)
+	} else {
+		key, err = h.c.GetOrCreateBuiltinAPIKey(ctx.Request.Context(), req)
+	}
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get or create builtin API key", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

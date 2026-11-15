@@ -54,3 +54,5 @@ func MustUserOrgApiKey(config *config.Config) gin.HandlerFunc {
 		ctx.Next()
 	}
 }
+
+func continueUserSession(c *gin.Context) { c.Next() }

@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
+	"opencsg.com/csghub-server/common/utils/common"
 	"strings"
 	"testing"
 
@@ -56,6 +58,7 @@ func (m *MockMessageSender) Send(ctx context.Context, message types.MessageReque
 func TestRepoSyncWorker_checkSourceURL(t *testing.T) {
 	t.Run("check success", func(t *testing.T) {
 		worker := &RepoSyncWorker{
+			sourcePolicy: testPublicSourcePolicy(),
 			httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				username, accessToken, ok := req.BasicAuth()
 				assert.Equal(t, "https", req.URL.Scheme)
@@ -78,6 +81,7 @@ func TestRepoSyncWorker_checkSourceURL(t *testing.T) {
 	t.Run("skip non-huggingface url", func(t *testing.T) {
 		requestSent := false
 		worker := &RepoSyncWorker{
+			sourcePolicy: testPublicSourcePolicy(),
 			httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				requestSent = true
 				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(""))}, nil
@@ -92,6 +96,7 @@ func TestRepoSyncWorker_checkSourceURL(t *testing.T) {
 	t.Run("allow HTTP huggingface url", func(t *testing.T) {
 		requestSent := false
 		worker := &RepoSyncWorker{
+			sourcePolicy: testPublicSourcePolicy(),
 			httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				requestSent = true
 				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(""))}, nil
@@ -152,6 +157,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		cfg := &config.Config{}
 		cfg.Frontend.URL = "http://localhost"
 		worker := &RepoSyncWorker{
+			sourcePolicy:      testPublicSourcePolicy(),
 			git:               mockGit,
 			msgSender:         mockSender,
 			repoStore:         testRepoDescriptionStore{RepoStore: mockRepoStore},
@@ -244,6 +250,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		cfg.Frontend.URL = "http://localhost"
 
 		worker := &RepoSyncWorker{
+			sourcePolicy:      testPublicSourcePolicy(),
 			httpClient:        server.Client(),
 			git:               mockGit,
 			msgSender:         mockSender,
@@ -255,7 +262,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		}
 
 		mirror := database.Mirror{
-			SourceUrl: server.URL,
+			SourceUrl: "https://example.com/ns/repo.git",
 			Repository: &database.Repository{
 				Path:           "namespace/name",
 				RepositoryType: types.ModelRepo,
@@ -312,6 +319,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		cfg.Frontend.URL = "http://localhost"
 
 		worker := &RepoSyncWorker{
+			sourcePolicy:      testPublicSourcePolicy(),
 			httpClient:        server.Client(),
 			git:               mockGit,
 			msgSender:         mockSender,
@@ -323,7 +331,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		}
 
 		mirror := database.Mirror{
-			SourceUrl: server.URL,
+			SourceUrl: "https://example.com/ns/repo.git",
 			Repository: &database.Repository{
 				Path:           "namespace/name",
 				RepositoryType: types.ModelRepo,
@@ -379,6 +387,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		cfg.Frontend.URL = "http://localhost"
 
 		worker := &RepoSyncWorker{
+			sourcePolicy:      testPublicSourcePolicy(),
 			httpClient:        server.Client(),
 			git:               mockGit,
 			msgSender:         mockSender,
@@ -390,7 +399,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		}
 
 		mirror := database.Mirror{
-			SourceUrl: server.URL,
+			SourceUrl: "https://example.com/ns/repo.git",
 			Repository: &database.Repository{
 				Path:           "namespace/name",
 				RepositoryType: types.ModelRepo,
@@ -475,6 +484,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		cfg.Frontend.URL = "http://localhost"
 
 		worker := &RepoSyncWorker{
+			sourcePolicy:      testPublicSourcePolicy(),
 			httpClient:        server.Client(),
 			git:               mockGit,
 			msgSender:         mockSender,
@@ -487,7 +497,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		}
 
 		mirror := database.Mirror{
-			SourceUrl: server.URL,
+			SourceUrl: "https://example.com/ns/repo.git",
 			Repository: &database.Repository{
 				Path:           "namespace/name",
 				RepositoryType: types.CodeRepo,
@@ -495,10 +505,20 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		}
 		mt := &database.MirrorTask{}
 
+		recorded := false
+		worker.recordLatestLFS = func(_ context.Context, repoID, taskID int64, commit string, oids []string) error {
+			require.Equal(t, mt.AfterLastCommitID, commit)
+			require.Equal(t, "new-commit", commit)
+			require.Empty(t, oids)
+			recorded = true
+			return nil
+		}
+
 		result, err := worker.SyncRepo(context.Background(), &mirror, mt)
 		assert.NoError(t, err)
 		require.NotNil(t, result.Task)
 		assert.Equal(t, "new-commit", result.Task.AfterLastCommitID)
+		require.True(t, recorded)
 		assert.True(t, result.NoLFS)
 	})
 }
@@ -804,4 +824,10 @@ func TestRepoSyncWorkerSkillRefRestoration(t *testing.T) {
 			require.Equal(t, expectedRef, currentRef)
 		})
 	}
+}
+
+func testPublicSourcePolicy() common.PublicHTTPPolicy {
+	return common.PublicHTTPPolicy{LookupNetIP: func(context.Context, string, string) ([]netip.Addr, error) {
+		return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+	}}
 }

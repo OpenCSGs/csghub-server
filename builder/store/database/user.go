@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -139,7 +140,7 @@ func activeUserAdminOrganizationIDsTx(ctx context.Context, tx bun.Tx, userID int
 	if err := tx.NewSelect().
 		Model((*Member)(nil)).
 		Column("member.organization_id").
-		Join("JOIN users AS target_user ON target_user.id = member.user_id AND target_user.deleted_at IS NULL").
+		Join("JOIN users AS target_user ON target_user.id = member.user_id AND target_user.deleted_at IS NULL AND NOT target_user.login_frozen").
 		Join("JOIN organizations AS organization ON organization.id = member.organization_id AND organization.deleted_at IS NULL").
 		Where("member.user_id = ?", userID).
 		Where("member.deleted_at IS NULL").
@@ -239,7 +240,7 @@ func (s *UserStoreImpl) ensureUserIsNotLastOrganizationAdmin(ctx context.Context
 	query := tx.NewSelect().
 		Model((*Member)(nil)).
 		Column("member.organization_id").
-		Join("JOIN users AS admin_user ON admin_user.id = member.user_id AND admin_user.deleted_at IS NULL").
+		Join("JOIN users AS admin_user ON admin_user.id = member.user_id AND admin_user.deleted_at IS NULL AND NOT admin_user.login_frozen").
 		Join("JOIN organizations AS organization ON organization.id = member.organization_id AND organization.deleted_at IS NULL").
 		Where("member.organization_id IN (?)", bun.In(targetOrganizationIDs)).
 		Where("member.deleted_at IS NULL").
@@ -319,6 +320,7 @@ type User struct {
 	VerifyStatus types.VerifyStatus `bun:",notnull,default:'none'" json:"verify_status"` // none, pending, approved, rejected
 	Labels       []string           `bun:",type:jsonb" json:"labels"`
 	DeletedAt    time.Time          `bun:",soft_delete,nullzero"`
+	LoginFrozen  bool               `bun:",notnull,default:false,skipupdate" json:"-"`
 	RetainData   string             `bun:",nullzero" json:"retain_data"`
 	Tags         []UserTag          `bun:"rel:has-many,join:id=user_id" json:"tags"`
 
@@ -401,7 +403,11 @@ func (s *UserStoreImpl) Index(ctx context.Context, options ...types.UserQueryOpt
 }
 
 // IndexWithSearch filters and paginates active users, batch-loading role relationships for the page.
+// Sorting is validated before Count or Scan, including for callers that bypass HTTP validation.
 func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, req types.UserListReq, options ...types.UserQueryOption) (users []User, count int, err error) {
+	if err := req.NormalizeSort(); err != nil {
+		return nil, 0, errorx.ReqParamInvalid(err, nil)
+	}
 	search := strings.ToLower(req.Search)
 	query := s.db.Operator.Core.NewSelect().
 		Model(&users).Apply(userQueryRelations(options...))
@@ -426,12 +432,6 @@ func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, req types.UserListR
 	count, err = query.Count(ctx)
 	if err != nil {
 		return users, count, errorx.HandleDBError(err, nil)
-	}
-	if req.SortBy == "" {
-		req.SortBy = "id"
-	}
-	if req.SortOrder == "" {
-		req.SortOrder = "asc"
 	}
 	query.Order(fmt.Sprintf("%s %s", req.SortBy, req.SortOrder)).Limit(req.Per).Offset((req.Page - 1) * req.Per)
 	err = query.Scan(ctx)
@@ -550,6 +550,17 @@ func (s *UserStoreImpl) Create(ctx context.Context, user *User, namespace *Names
 		if err = assertAffectedOneRow(tx.NewInsert().Model(user).Exec(ctx)); err != nil {
 			return err
 		}
+		// Check after the unique user insert: if it waited for a concurrent purge,
+		// this read sees the denial committed alongside the deletion.
+		if user.RegProvider != "" {
+			closed, err := closedSSOSubjectQuery(tx, user.RegProvider, user.UUID).Exists(ctx)
+			if err != nil {
+				return err
+			}
+			if closed {
+				return errorx.ErrForbidden
+			}
+		}
 		namespace.UserID = user.ID
 		namespace.NamespaceType = UserNamespace
 		if err = assertAffectedOneRow(tx.NewInsert().Model(namespace).Exec(ctx)); err != nil {
@@ -618,11 +629,16 @@ func (s *UserStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists 
 
 // FindByGitAccessToken retrieves an active user and role relationships through an unexpired Git token.
 func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string, options ...types.UserQueryOption) (*User, error) {
+	digest, err := CredentialLookupHash(token)
+	if err != nil {
+		return nil, err
+	}
 	var user User
-	err := s.db.Operator.Core.NewSelect().
+	err = s.db.Operator.Core.NewSelect().
 		Model(&user).Apply(userQueryRelations(options...)).
 		Join(`JOIN access_tokens AS t ON t.user_id = "user".id`).
-		Where("t.token = ? and t.is_active = true and (t.expired_at is null or t.expired_at > now()) and t.app = 'git'", token).
+		Where(`NOT "user".login_frozen`).
+		Where("(t.token_lookup_hash = ? OR (t.credential_version = 0 AND t.token = ?)) and t.is_active = true and (t.expired_at is null or t.expired_at > now()) and t.app = 'git'", digest, token).
 		Scan(ctx)
 
 	if err != nil {
@@ -653,7 +669,24 @@ func (s *UserStoreImpl) GetActiveUserCount(ctx context.Context) (int, error) {
 }
 
 // DeleteUserAndRelations protects active administrators and records permission cleanup before permanent deletion.
-func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) (err error) {
+func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) error {
+	return s.deleteUserAndRelations(ctx, input, req, false)
+}
+
+// External subject identifiers are scoped to their provider.
+func closedSSODigest(provider, uuid string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(provider+"\x00"+uuid)))
+}
+
+func closedSSOSubjectQuery(db bun.IDB, provider, uuid string) *bun.SelectQuery {
+	return db.NewSelect().Table("closed_sso_subjects").Where("digest = ?", closedSSODigest(provider, uuid))
+}
+
+var errClosureNotDue = errors.New("account closure retention has not expired")
+
+const expiredAccountClosure = "login_frozen AND closure_requested_at <= CURRENT_TIMESTAMP - INTERVAL '2160 hours'"
+
+func (s *UserStoreImpl) deleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq, expiredOnly bool) (err error) {
 	exists, err := s.IsExistWithDeleted(ctx, input.Username)
 	if err != nil {
 		return fmt.Errorf("error checking if user exists: %v", err)
@@ -673,12 +706,41 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, 
 		if err := s.ensureUserIsNotLastOrganizationAdmin(ctx, tx, input); err != nil {
 			return err
 		}
+		if expiredOnly {
+			var closed User
+			err := tx.NewSelect().Model(&closed).Column("uuid", "reg_provider").
+				WhereAllWithDeleted().Where("id = ? AND uuid = ? AND username = ?", input.ID, input.UUID, input.Username).Where(expiredAccountClosure).Scan(ctx)
+			if errors.Is(err, sql.ErrNoRows) {
+				return errClosureNotDue
+			}
+			if err != nil {
+				return err
+			}
+			if closed.RegProvider != "" {
+				_, err = tx.ExecContext(ctx, "INSERT INTO closed_sso_subjects (digest) VALUES (?) ON CONFLICT DO NOTHING", closedSSODigest(closed.RegProvider, closed.UUID))
+				if err != nil {
+					return err
+				}
+			}
+		}
 		if !req.Repository {
 			if err := lockAndSoftDeleteUserRepositoryNamespace(ctx, tx, input.ID); err != nil {
 				return err
 			}
 			var repoIDs []int64
-			if err := tx.NewSelect().Column("id").Model(&Repository{}).Where("user_id = ?", input.ID).Scan(ctx, &repoIDs); err != nil {
+			repos := tx.NewSelect().Column("id").Model(&Repository{})
+			if expiredOnly {
+				// Keep the locked personal namespace eligible after its soft deletion.
+				owner := tx.NewSelect().Model((*Namespace)(nil)).WhereAllWithDeleted().ColumnExpr("1").
+					Where(namespaceMatchesPath, bun.Safe("regexp_replace(repository.path, '/[^/]+$', '')")).
+					Where("namespace.user_id = ? AND namespace.namespace_type = ?", input.ID, UserNamespace).
+					Where("NOT EXISTS (SELECT 1 FROM namespaces AS active WHERE active.path = namespace.path AND active.deleted_at IS NULL)")
+				repos.Where("strpos(path, '/') > 0 AND EXISTS (?)", owner).
+					Order("id ASC").For("UPDATE")
+			} else {
+				repos.Where("user_id = ?", input.ID)
+			}
+			if err := repos.Scan(ctx, &repoIDs); err != nil {
 				return fmt.Errorf("failed to get user repo ids: %v", err)
 			}
 			if _, err := deleteRepositoriesByIDs(ctx, tx, repoIDs, s.repositoryDeletionJobClient, &events); err != nil {
@@ -704,7 +766,11 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, 
 			}
 		}
 		// Delete user's access token
-		if _, err := tx.NewDelete().Model(&AccessToken{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
+		tokens := tx.NewDelete().Model(&AccessToken{}).Where("user_id = ?", input.ID)
+		if expiredOnly {
+			tokens.Where("NOT ("+organizationAPIKeyPredicate+")", types.AccessTokenAppAIGateway, OrgNamespace)
+		}
+		if _, err := tokens.ForceDelete().Exec(ctx); err != nil {
 			return fmt.Errorf("failed to delete user access tokens for user ID %d: %v", input.ID, err)
 		}
 		// Delete user's member
@@ -740,7 +806,7 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, 
 func lockAndSoftDeleteUserRepositoryNamespace(ctx context.Context, tx bun.Tx, userID int64) error {
 	var namespace Namespace
 	query := tx.NewSelect().Model(&namespace).WhereAllWithDeleted().
-		Where("user_id = ?", userID).
+		Where("user_id = ? AND namespace_type = ?", userID, UserNamespace).
 		OrderExpr("deleted_at IS NULL DESC").
 		Order("id ASC").
 		Limit(1)

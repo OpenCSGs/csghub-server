@@ -79,7 +79,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		userGroup.GET("/:username", userHandler.Get)
 		// find user by uuids
 		apiV1Group.GET("/users/by-uuids", userHandler.FindByUUIDs)
-		userGroup.DELETE("/:username/close_account", userHandler.CloseAccount)
 		// user's organizations
 		// Deprecated: remove this route after all clients migrate away from the user organization list API.
 		userGroup.GET("/:username/organizations", orgHandler.ListUserOrgs)
@@ -144,6 +143,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// userGroup.DELETE("/:username", userMatch, userHandler.Delete)
 		// get user's all tokens
 		userGroup.GET("/:username/tokens", userMatch, acHandler.GetUserTokens)
+		userGroup.GET("/:username/tokens/display", userMatch, acHandler.GetUserTokensDisplay)
 		userGroup.GET("/:username/tokens/first", userMatch, acHandler.GetOrCreateFirstAvaiTokens)
 		// get user list
 		apiV1Group.GET("/users", mustLogin(), userHandler.Index)
@@ -177,6 +177,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	{
 		keysGroup.POST("/:uuid/apikeys", mustLogin(), acHandler.CreateAPIKey)
 		keysGroup.GET("/:uuid/apikeys/builtin", mustLogin(), acHandler.GetBuiltinKeys)
+		keysGroup.GET("/:uuid/apikeys/builtin/display", mustLogin(), acHandler.GetBuiltinKeysDisplay)
 		keysGroup.PUT("/:uuid/apikeys/builtin/refresh", mustLogin(), acHandler.RefreshBuiltinKey)
 		keysGroup.GET("/:uuid/apikeys", mustLogin(), acHandler.GetAPIKeys)
 		keysGroup.PUT("/:uuid/apikeys/:id", mustLogin(), acHandler.UpdateAPIKey)

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -449,12 +450,12 @@ const (
 	VerifyStatusRejected VerifyStatus = "rejected"
 )
 
+// UserVerifyReq submits image material without retaining separate identity text.
 type UserVerifyReq struct {
+	Username    string       `json:"username"`
 	UUID        string       `json:"id" binding:"required"`
-	RealName    string       `json:"real_name" binding:"required"`
 	IDCardFront string       `json:"id_card_front" binding:"required"`
 	IDCardBack  string       `json:"id_card_back" binding:"required"`
-	Username    string       `json:"username"`
 	Status      VerifyStatus `json:"status"`
 }
 
@@ -492,6 +493,13 @@ func ParseLabels(rawLabels []string) []string {
 	}
 
 	return result
+}
+
+// AccountClosureStatus reports cash in the wallet's native unit (cents).
+type AccountClosureStatus struct {
+	Organizations   []string `json:"organizations"`
+	CashBalance     float64  `json:"cash_balance"`
+	PendingRecharge bool     `json:"pending_recharge,omitempty"`
 }
 
 type CloseAccountReq struct {
@@ -656,6 +664,7 @@ type UserIndexResp struct {
 	Error error   `json:"error"`
 }
 
+// UserListReq filters and paginates users with a restricted sorting contract.
 type UserListReq struct {
 	VisitorName  string   `json:"visitor_name"`
 	Search       string   `json:"search"`
@@ -663,9 +672,33 @@ type UserListReq struct {
 	Labels       []string `json:"labels"`
 	Per          int      `json:"per"`
 	Page         int      `json:"page"`
-	SortBy       string   `json:"sort_by"`
-	SortOrder    string   `json:"sort_order"`
+	SortBy       string   `json:"sort_by"`    // id or last_login_at; empty defaults to id.
+	SortOrder    string   `json:"sort_order"` // Case-insensitive asc or desc; empty defaults to asc.
 	ExactMatch   bool     `json:"exact_match"`
+}
+
+// NormalizeSort validates user-list sorting and applies the default id ASC order.
+// Both HTTP parsing and persistence call this before any query; invalid input is
+// rejected rather than interpreted as a column expression or silently defaulted.
+func (r *UserListReq) NormalizeSort() error {
+	column := r.SortBy
+	switch column {
+	case "":
+		column = "id"
+	case "id", "last_login_at":
+	default:
+		return fmt.Errorf("sort_by must be id or last_login_at")
+	}
+	direction := strings.ToLower(r.SortOrder)
+	switch direction {
+	case "":
+		direction = "asc"
+	case "asc", "desc":
+	default:
+		return fmt.Errorf("sort_order must be asc or desc")
+	}
+	r.SortBy, r.SortOrder = column, direction
+	return nil
 }
 
 type RefreshTokenReq struct {

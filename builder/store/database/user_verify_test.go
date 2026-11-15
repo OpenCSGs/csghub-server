@@ -42,25 +42,19 @@ func TestUserVerifyStore(t *testing.T) {
 	require.NoError(t, err)
 
 	userVerify := &database.UserVerify{
-		UUID:           user.UUID,
-		RealName:       "测试用户",
-		Username:       user.Username,
-		IDCardFront:    "front_img_url",
-		IDCardBack:     "back_img_url",
-		Status:         "pending",
-		IDNumberMasked: "11**************2X",
+		UUID:        user.UUID,
+		IDCardFront: "front_img_url",
+		IDCardBack:  "back_img_url",
+		Status:      "pending",
 	}
 	created, err := verifyStore.CreateUserVerify(ctx, userVerify)
 	require.NoError(t, err)
-	require.Equal(t, "测试用户", created.RealName)
 	require.Equal(t, types.VerifyStatusPending, created.Status)
 
 	updated, err := verifyStore.UpdateUserVerify(ctx, created.ID, types.VerifyStatusApproved, "已通过审核")
 	require.NoError(t, err)
 	require.Equal(t, types.VerifyStatusApproved, updated.Status)
 	require.Equal(t, "已通过审核", updated.Reason)
-	// The masked response value must never become a database column or persisted identity value.
-	require.Empty(t, updated.IDNumberMasked)
 
 	freshUser, err := userStore.FindByUUID(ctx, user.UUID)
 	require.NoError(t, err)
@@ -76,7 +70,7 @@ func TestIdentityStoreLifecycle(t *testing.T) {
 	_, err := db.Core.NewInsert().Model(user).Exec(ctx)
 	require.NoError(t, err)
 	store := database.NewIdentityStoreWithDB(db)
-	proposed := &database.UserVerify{UUID: user.UUID, Provider: "alipay", RealName: "测试用户", IDNumberEncrypted: "ciphertext", IDNumberHash: "hmac-value"}
+	proposed := &database.UserVerify{UUID: user.UUID, Provider: "alipay"}
 	first, err := store.Begin(ctx, proposed)
 	require.NoError(t, err)
 	next := *proposed
@@ -89,7 +83,7 @@ func TestIdentityStoreLifecycle(t *testing.T) {
 	require.NoError(t, store.Attach(ctx, first, "cert-one"))
 	first.VerificationID = "cert-one"
 	require.NoError(t, store.Finish(ctx, first, types.VerifyStatusRejected, "expired"))
-	second, err := store.Begin(ctx, &database.UserVerify{UUID: user.UUID, Provider: "alipay", RealName: "测试用户", IDNumberEncrypted: "new-cipher", IDNumberHash: "hmac-value"})
+	second, err := store.Begin(ctx, &database.UserVerify{UUID: user.UUID, Provider: "alipay"})
 	require.NoError(t, err)
 	require.NoError(t, store.Attach(ctx, second, "cert-two"))
 	second.VerificationID = "cert-two"
@@ -104,7 +98,7 @@ func TestIdentityStoreLifecycle(t *testing.T) {
 	manual := database.NewUserVerifyStoreWithDB(db)
 	_, err = manual.UpdateUserVerify(ctx, second.ID, types.VerifyStatusRejected, "manual override")
 	require.ErrorIs(t, err, database.ErrIdentityConflict)
-	_, err = manual.CreateUserVerify(ctx, &database.UserVerify{UUID: user.UUID, Username: user.Username, RealName: "manual", IDCardFront: "front", IDCardBack: "back", Status: types.VerifyStatusPending})
+	_, err = manual.CreateUserVerify(ctx, &database.UserVerify{UUID: user.UUID, IDCardFront: "front", IDCardBack: "back", Status: types.VerifyStatusPending})
 	require.ErrorIs(t, err, database.ErrIdentityConflict)
 	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	require.NoError(t, userStore.UpdateVerifyStatus(ctx, user.UUID, types.VerifyStatusPending))
@@ -118,7 +112,7 @@ func TestIdentityStoreLifecycle(t *testing.T) {
 	require.NotContains(t, string(encoded), "hmac-value")
 	require.NotContains(t, string(encoded), "cert-two")
 	require.NotContains(t, string(encoded), "测试用户")
-	require.Contains(t, string(encoded), "测***")
+	require.NotContains(t, string(encoded), "real_name")
 }
 
 // TestUserVerifyStoreExternalConflict preserves external records and user status for both guarded manual writes.
@@ -131,14 +125,14 @@ func TestUserVerifyStoreExternalConflict(t *testing.T) {
 			user := &database.User{UUID: "manual-conflict", Username: "manual-conflict", Email: "manual-conflict@example.com", VerifyStatus: status}
 			_, err := db.Core.NewInsert().Model(user).Exec(ctx)
 			require.NoError(t, err)
-			record := &database.UserVerify{UUID: user.UUID, Username: user.Username, Provider: "alipay", RealName: "Original Name", Status: status,
-				VerificationID: "original-cert", IDNumberEncrypted: "original-cipher", IDNumberHash: "original-hash"}
+			record := &database.UserVerify{UUID: user.UUID, Provider: "alipay", Status: status,
+				VerificationID: "original-cert"}
 			_, err = db.Core.NewInsert().Model(record).Exec(ctx)
 			require.NoError(t, err)
 			store := database.NewUserVerifyStoreWithDB(db)
 			before, err := store.GetUserVerify(ctx, user.UUID)
 			require.NoError(t, err)
-			_, err = store.CreateUserVerify(ctx, &database.UserVerify{UUID: user.UUID, Username: user.Username, RealName: "Manual Name",
+			_, err = store.CreateUserVerify(ctx, &database.UserVerify{UUID: user.UUID,
 				IDCardFront: "front.png", IDCardBack: "back.png", Status: types.VerifyStatusPending})
 			require.ErrorIs(t, err, database.ErrIdentityConflict)
 			reviewStatus := types.VerifyStatusApproved
@@ -235,7 +229,7 @@ func TestVerificationCompletionConcurrency(t *testing.T) {
 			user := &database.User{UUID: "completion-" + provider, Username: "completion-" + provider, Email: provider + "@completion.test", VerifyStatus: types.VerifyStatusPending}
 			_, err := db.Core.NewInsert().Model(user).Exec(ctx)
 			require.NoError(t, err)
-			record := &database.UserVerify{UUID: user.UUID, Username: user.Username, RealName: "Test User", Provider: provider, Status: types.VerifyStatusPending}
+			record := &database.UserVerify{UUID: user.UUID, Provider: provider, Status: types.VerifyStatusPending}
 			_, err = db.Core.NewInsert().Model(record).Exec(ctx)
 			require.NoError(t, err)
 			// Reload PostgreSQL's timestamp precision before using the generation guard.
@@ -292,7 +286,7 @@ func TestManualVerificationGeneration(t *testing.T) {
 	_, err := db.Core.NewInsert().Model(user).Exec(ctx)
 	require.NoError(t, err)
 	store := database.NewUserVerifyStoreWithDB(db)
-	_, err = store.CreateUserVerify(ctx, &database.UserVerify{UUID: user.UUID, RealName: "Original", Status: types.VerifyStatusPending})
+	_, err = store.CreateUserVerify(ctx, &database.UserVerify{UUID: user.UUID, Status: types.VerifyStatusPending})
 	require.NoError(t, err)
 	old, err := store.GetUserVerify(ctx, user.UUID)
 	require.NoError(t, err)
@@ -301,7 +295,7 @@ func TestManualVerificationGeneration(t *testing.T) {
 	_, err = db.Core.NewUpdate().Table("user_verifies").Set("updated_at = ?", old.UpdatedAt).Where("id = ?", old.ID).Exec(ctx)
 	require.NoError(t, err)
 	submittedAt := time.Now().Truncate(time.Microsecond)
-	replacement, err := store.CreateUserVerify(ctx, &database.UserVerify{UUID: user.UUID, RealName: "Replacement", Status: types.VerifyStatusPending})
+	replacement, err := store.CreateUserVerify(ctx, &database.UserVerify{UUID: user.UUID, Status: types.VerifyStatusPending})
 	require.NoError(t, err)
 	fresh, err := store.GetUserVerify(ctx, user.UUID)
 	require.NoError(t, err)
@@ -310,7 +304,6 @@ func TestManualVerificationGeneration(t *testing.T) {
 	require.True(t, fresh.UpdatedAt.Before(old.UpdatedAt))
 	require.True(t, fresh.UpdatedAt.Equal(replacement.UpdatedAt))
 	require.ErrorIs(t, database.NewIdentityStoreWithDB(db).Finish(ctx, old, types.VerifyStatusApproved, ""), database.ErrIdentityConflict)
-	require.Equal(t, "Replacement", fresh.RealName)
 }
 
 // TestIdentityStoreRestart replaces unfinished data while rejecting stale writes and approved identities.
@@ -337,20 +330,21 @@ func TestIdentityStoreRestart(t *testing.T) {
 			user := &database.User{UUID: "identity-restart", Username: "identity-restart", Email: "identity-restart@example.com", VerifyStatus: tc.userStatus}
 			_, err := db.Core.NewInsert().Model(user).Exec(ctx)
 			require.NoError(t, err)
-			old := &database.UserVerify{UUID: user.UUID, Username: user.Username, Provider: tc.provider, Status: tc.status,
-				RealName: "旧姓名", IDNumberHash: "old-hash", IDNumberEncrypted: "old-cipher", VerificationID: tc.certifyID,
-				IDCardFront: "front", IDCardBack: "back", Reason: "old-reason"}
+			old := &database.UserVerify{UUID: user.UUID, Provider: tc.provider, Status: tc.status,
+				VerificationID: tc.certifyID,
+				IDCardFront:    "front", IDCardBack: "back", Reason: "old-reason"}
 			// A future timestamp also verifies monotonic generation changes after clock adjustments.
 			old.UpdatedAt = time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)
 			_, err = db.Core.NewInsert().Model(old).Returning("*").Exec(ctx)
 			require.NoError(t, err)
 			store := database.NewIdentityStoreWithDB(db)
-			next, err := store.Begin(ctx, &database.UserVerify{UUID: user.UUID, Provider: "alipay", RealName: "新姓名", IDNumberHash: "new-hash", IDNumberEncrypted: "new-cipher"})
+			next, err := store.Begin(ctx, &database.UserVerify{UUID: user.UUID, Provider: "alipay"})
 			if tc.conflict {
 				require.ErrorIs(t, err, database.ErrIdentityConflict)
 				stored, err := store.Get(ctx, user.UUID)
 				require.NoError(t, err)
-				require.Equal(t, old.RealName, stored.RealName)
+				require.Equal(t, old.Status, stored.Status)
+				require.Equal(t, old.Provider, stored.Provider)
 				return
 			}
 			require.NoError(t, err)
@@ -363,10 +357,7 @@ func TestIdentityStoreRestart(t *testing.T) {
 			}
 			stored, err := store.Get(ctx, user.UUID)
 			require.NoError(t, err)
-			require.Equal(t, "新姓名", stored.RealName)
 			require.Equal(t, "alipay", stored.Provider)
-			require.Equal(t, "new-hash", stored.IDNumberHash)
-			require.Equal(t, "new-cipher", stored.IDNumberEncrypted)
 			require.Equal(t, types.VerifyStatusPending, stored.Status)
 			require.Empty(t, stored.VerificationID)
 			require.Empty(t, stored.Reason)
@@ -379,21 +370,179 @@ func TestIdentityStoreRestart(t *testing.T) {
 	}
 }
 
-// TestIdentityJSONMasking preserves manual review while preventing external name disclosure.
-func TestIdentityJSONMasking(t *testing.T) {
-	for _, tc := range []struct{ provider, name, expected string }{
-		{"alipay", "王五", "王*"},
-		{"alipay", "王小明", "王**"},
-		{"alipay", "", ""},
-		{"manual", "王小明", "王小明"},
-		{"", "王小明", "王小明"},
-	} {
-		record := database.UserVerify{Provider: tc.provider, RealName: tc.name}
-		encoded, err := json.Marshal(record)
+// TestIdentityJSONOmitsPersonalData checks both providers expose no removed fields.
+func TestIdentityJSONOmitsPersonalData(t *testing.T) {
+	for _, provider := range []string{"alipay", "manual"} {
+		encoded, err := json.Marshal(database.UserVerify{Provider: provider, VerificationID: "private-cert", IDNumberHash: "internal-hash-token"})
 		require.NoError(t, err)
 		var decoded map[string]any
 		require.NoError(t, json.Unmarshal(encoded, &decoded))
-		require.Equal(t, tc.expected, decoded["real_name"])
-		require.Equal(t, tc.name, record.RealName)
+		for _, field := range []string{"real_name", "id_number", "id_number_encrypted", "id_number_hash", "verification_id"} {
+			require.NotContains(t, decoded, field)
+		}
+		require.NotContains(t, string(encoded), "private-cert")
+		require.NotContains(t, string(encoded), "internal-hash-token")
+	}
+}
+
+// TestUserVerifySchemaRetainsLegacyColumns preserves legacy columns and the non-unique hash index.
+func TestUserVerifySchemaRetainsLegacyColumns(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	var count int
+	err := db.Core.NewRaw(`SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'user_verifies' AND column_name IN ('real_name', 'id_number_encrypted')`).Scan(context.Background(), &count)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+	err = db.Core.NewRaw(`SELECT count(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_user_verifies_id_number_hash'`).Scan(context.Background(), &count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	var definition string
+	require.NoError(t, db.Core.NewRaw(`SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_user_verifies_id_number_hash'`).Scan(context.Background(), &definition))
+	require.NotContains(t, definition, "UNIQUE")
+}
+
+// TestUserVerifyWritesWithoutIdentityText exercises both writers without accessing legacy identity columns.
+func TestUserVerifyWritesWithoutIdentityText(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewIdentityStoreWithDB(db)
+	for _, provider := range []string{"manual", "alipay"} {
+		uuid := "new-identity-" + provider
+		var err error
+		if provider == "manual" {
+			_, err = database.NewUserVerifyStoreWithDB(db).CreateUserVerify(ctx, &database.UserVerify{
+				UUID: uuid, Username: uuid, IDCardFront: "front", IDCardBack: "back", Status: types.VerifyStatusPending,
+			})
+		} else {
+			_, err = db.Core.NewInsert().Model(&database.User{UUID: uuid, Username: uuid, Email: uuid + "@example.com"}).Exec(ctx)
+			require.NoError(t, err)
+			_, err = store.Begin(ctx, &database.UserVerify{UUID: uuid, Provider: provider, IDNumberHash: "new-keyed-hash"})
+		}
+		require.NoError(t, err)
+		record, err := store.Get(ctx, uuid)
+		require.NoError(t, err)
+		require.NotNil(t, record)
+		require.Equal(t, provider, record.Provider)
+		require.Equal(t, types.VerifyStatusPending, record.Status)
+	}
+}
+
+// TestIdentityRewardConcurrency proves different accounts can verify concurrently but only one owns rewards.
+func TestIdentityRewardConcurrency(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewIdentityStoreWithDB(db)
+	var records []*database.UserVerify
+	for _, uuid := range []string{"first-identity-user", "second-identity-user"} {
+		_, err := db.Core.NewInsert().Model(&database.User{UUID: uuid, Username: uuid, Email: uuid + "@example.com"}).Exec(ctx)
+		require.NoError(t, err)
+		record, err := store.Begin(ctx, &database.UserVerify{UUID: uuid, Provider: "alipay", IDNumberHash: "same-identity-hash"})
+		require.NoError(t, err)
+		records = append(records, record)
+	}
+	start := make(chan struct{})
+	results := make(chan error, len(records))
+	for _, record := range records {
+		go func() { <-start; results <- store.Finish(ctx, record, types.VerifyStatusApproved, "") }()
+	}
+	close(start)
+	for range records {
+		require.NoError(t, <-results)
+	}
+	owners := 0
+	for _, record := range records {
+		fresh, err := store.Get(ctx, record.UUID)
+		require.NoError(t, err)
+		require.Equal(t, types.VerifyStatusApproved, fresh.Status)
+		eligible, err := store.IsFirstIdentityVerification(ctx, record.UUID)
+		require.NoError(t, err)
+		if eligible {
+			owners++
+		}
+		again, err := store.IsFirstIdentityVerification(ctx, record.UUID)
+		require.NoError(t, err)
+		require.Equal(t, eligible, again)
+	}
+	require.Equal(t, 1, owners)
+
+}
+
+// TestIdentityRewardStates permits rewards only for successful, identifiable verification.
+func TestIdentityRewardStates(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewIdentityStoreWithDB(db)
+	for _, tc := range []struct {
+		uuid, hash string
+		status     types.VerifyStatus
+		eligible   bool
+	}{
+		{"failed", "reusable-hash", types.VerifyStatusRejected, false},
+		{"successful", "reusable-hash", types.VerifyStatusApproved, true},
+		{"missing-hash", "", types.VerifyStatusApproved, false},
+	} {
+		_, err := db.Core.NewInsert().Model(&database.User{UUID: tc.uuid, Username: tc.uuid, Email: tc.uuid + "@example.com"}).Exec(ctx)
+		require.NoError(t, err)
+		record, err := store.Begin(ctx, &database.UserVerify{UUID: tc.uuid, Provider: "alipay", IDNumberHash: tc.hash})
+		require.NoError(t, err)
+		eligible, err := store.IsFirstIdentityVerification(ctx, tc.uuid)
+		require.NoError(t, err)
+		require.False(t, eligible)
+		require.NoError(t, store.Finish(ctx, record, tc.status, ""))
+		eligible, err = store.IsFirstIdentityVerification(ctx, tc.uuid)
+		require.NoError(t, err)
+		require.Equal(t, tc.eligible, eligible)
+	}
+}
+
+// TestIdentityRewardHistoricalRecords uses existing approved records and ignores unsuccessful attempts.
+func TestIdentityRewardHistoricalRecords(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	_, err := db.Core.ExecContext(ctx, `INSERT INTO user_verifies (uuid, username, provider, status, id_number_hash, updated_at) VALUES
+ ('old-first', 'first', 'alipay', 'approved', 'old-hash', '2026-01-01'),
+ ('old-second', 'second', 'alipay', 'approved', 'old-hash', '2026-01-02'),
+ ('old-failed', 'failed', 'alipay', 'rejected', 'failed-hash', '2026-01-01'),
+ ('old-manual', 'manual', 'manual', 'approved', NULL, '2026-01-01')`)
+	require.NoError(t, err)
+	store := database.NewIdentityStoreWithDB(db)
+	for uuid, expected := range map[string]bool{"old-first": true, "old-second": false, "old-failed": false, "old-manual": false} {
+		eligible, err := store.IsFirstIdentityVerification(ctx, uuid)
+		require.NoError(t, err)
+		require.Equal(t, expected, eligible, uuid)
+	}
+}
+
+// TestIdentityRewardCompletionOrder uses approval order, even when the older submission finishes later.
+func TestIdentityRewardCompletionOrder(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewIdentityStoreWithDB(db)
+	var records []*database.UserVerify
+	for _, uuid := range []string{"submitted-first", "approved-first"} {
+		_, err := db.Core.NewInsert().Model(&database.User{UUID: uuid, Username: uuid, Email: uuid + "@example.com"}).Exec(ctx)
+		require.NoError(t, err)
+		record, err := store.Begin(ctx, &database.UserVerify{UUID: uuid, Provider: "alipay", IDNumberHash: "completion-order-hash"})
+		require.NoError(t, err)
+		records = append(records, record)
+	}
+	require.NoError(t, store.Finish(ctx, records[1], types.VerifyStatusApproved, ""))
+	// Simulate an earlier approval from a replica with a clock ahead of this process.
+	future := time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond)
+	_, err := db.Core.NewUpdate().Table("user_verifies").Set("updated_at = ?", future).Where("id = ?", records[1].ID).Exec(ctx)
+	require.NoError(t, err)
+	eligible, err := store.IsFirstIdentityVerification(ctx, records[1].UUID)
+	require.NoError(t, err)
+	require.True(t, eligible)
+	require.NoError(t, store.Finish(ctx, records[0], types.VerifyStatusApproved, ""))
+	for i, record := range records {
+		eligible, err := store.IsFirstIdentityVerification(ctx, record.UUID)
+		require.NoError(t, err)
+		require.Equal(t, i == 1, eligible)
 	}
 }

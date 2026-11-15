@@ -45,6 +45,11 @@ func createXnetRoutes(_ *gin.Engine, _ middleware.MiddlewareCollection, _ *confi
 	return nil
 }
 
+// createCSGRelayRoutes leaves the CSGRelay proxy disabled in CE.
+func createCSGRelayRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config) error {
+	return nil
+}
+
 // createComputingRoutes leaves advanced compute administration disabled in CE.
 func createComputingRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *handler.ClusterHandler) error {
 	return nil
@@ -85,4 +90,8 @@ func createRepoRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	skillGroup.Use(middleware.RepoType(types.SkillRepo), middlewareCollection.Repo.RepoExists)
 	skillGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
 	skillGroup.GET("/:namespace/:name/mirror_from_saas/status", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaasStatus)
+}
+
+func createAccountClosureRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler) {
+	apiGroup.DELETE("/user/:username/close_account", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 }

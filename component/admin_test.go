@@ -288,7 +288,7 @@ func newAdminComponentGrantTestDB(t *testing.T) (*database.DB, *adminComponentIm
 	require.NoError(t, db.BunDB.DB.Close())
 	db.BunDB.DB = connection
 	for _, statement := range []string{
-		`CREATE TABLE users (id INTEGER PRIMARY KEY, uuid TEXT NOT NULL, username TEXT NOT NULL UNIQUE, name TEXT NOT NULL, avatar TEXT NOT NULL DEFAULT '', deleted_at TIMESTAMP NULL)`,
+		`CREATE TABLE users (id INTEGER PRIMARY KEY, uuid TEXT NOT NULL, username TEXT NOT NULL UNIQUE, name TEXT NOT NULL, avatar TEXT NOT NULL DEFAULT '', login_frozen BOOLEAN NOT NULL DEFAULT FALSE, deleted_at TIMESTAMP NULL)`,
 		`CREATE TABLE roles (role_code TEXT PRIMARY KEY, display_name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', is_admin BOOLEAN NOT NULL DEFAULT FALSE, is_builtin BOOLEAN NOT NULL DEFAULT FALSE, can_delete BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, user_id INTEGER NOT NULL)`,
 		`CREATE TABLE admin_role_permissions (role_code TEXT NOT NULL REFERENCES roles(role_code), permission_code TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (role_code, permission_code))`,
 		`CREATE TABLE user_roles (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), role_code TEXT NOT NULL, operator_user_id INTEGER NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at TIMESTAMP NULL)`,

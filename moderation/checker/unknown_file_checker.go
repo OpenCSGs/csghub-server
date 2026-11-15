@@ -3,6 +3,7 @@ package checker
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -23,8 +24,17 @@ func (c *UnkownFileChecker) Run(ctx context.Context, fctx FileCheckContext) (typ
 	// read the first 512 bytes and detect the content type
 	buffer := make([]byte, 512)
 	n, err := reader.Read(buffer)
-	if err != nil {
+	// io.EOF is a normal outcome here: an empty file returns (0, io.EOF), and a
+	// short file may return its bytes together with io.EOF. Only real read
+	// failures are exceptions.
+	if err != nil && !errors.Is(err, io.EOF) {
 		return types.SensitiveCheckException, "failed to read file contents"
+	}
+	// A zero-byte probe ending in EOF means the file is empty, so there is no
+	// content to check. Require EOF here: (0, nil) is a legal transient read
+	// and must not be mistaken for an empty file.
+	if n == 0 && errors.Is(err, io.EOF) {
+		return types.SensitiveCheckPass, "empty file"
 	}
 
 	// remove zero bytes before detecting content type,

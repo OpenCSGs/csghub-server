@@ -25,6 +25,9 @@ const (
 	noSourceTransferPermission
 	noTargetTransferPermission
 	userEmailNotVerified
+	// accountBanned identifies a banned user account.
+	accountBanned
+	accountClosed
 )
 
 var (
@@ -245,6 +248,30 @@ var (
 	//
 	// zh-HK: 郵箱地址未設置
 	ErrUserEmailNotVerified error = CustomError{prefix: errAuthPrefix, code: userEmailNotVerified}
+
+	// user account is banned
+	//
+	// Description: The user account is banned and cannot log in or use its credentials.
+	//
+	// Description_ZH: 用户账户已被封禁，无法登录或使用关联凭证。
+	//
+	// en-US: Account is banned
+	//
+	// zh-CN: 账户已被封禁
+	//
+	// zh-HK: 帳戶已被封禁
+	ErrAccountBanned = CustomError{prefix: errAuthPrefix, code: accountBanned}
+
+	// Description: The user account has been closed and cannot sign in.
+	//
+	// Description_ZH: 用户账号已注销，无法登录。
+	//
+	// en-US: Account closed
+	//
+	// zh-CN: 账号已注销
+	//
+	// zh-HK: 帳號已註銷
+	ErrAccountClosed = CustomError{prefix: errAuthPrefix, code: accountClosed}
 )
 
 /*

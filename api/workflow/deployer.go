@@ -101,7 +101,8 @@ const (
 	CancelTimeoutDuration = 10 * time.Second
 )
 
-// StartNewDeployTaskWithCancelOld
+// StartNewDeployTaskWithCancelOld cancels the previous deployment and starts a new run.
+// A conflicting run that remains active is terminated by Temporal Server v1.24 or later.
 func StartNewDeployTaskWithCancelOld(buildTask, runTask *database.DeployTask) error {
 	if runTask == nil {
 		return fmt.Errorf("failed to start temporal deployment process due to run task is nil")
@@ -139,9 +140,10 @@ func StartNewDeployTaskWithCancelOld(buildTask, runTask *database.DeployTask) er
 			_, err = temporalClient.ExecuteWorkflow(
 				ctx,
 				client.StartWorkflowOptions{
-					ID:                    workflowID,
-					TaskQueue:             DeployWorkflowQueue,
-					WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING,
+					ID:                       workflowID,
+					TaskQueue:                DeployWorkflowQueue,
+					WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+					WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING,
 				},
 				DeployWorkflow, // func to execute
 				buildID,        // pass build task ID to workflow

@@ -49,5 +49,9 @@
     },
     "error.AUTH-ERR-16": {
         "other": "郵箱地址未設置"
+    },
+    "error.AUTH-ERR-17": {"other": "帳戶已被封禁"},
+    "error.AUTH-ERR-18": {
+        "other": "帳號已註銷"
     }
 }

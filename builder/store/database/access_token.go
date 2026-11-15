@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -60,12 +61,17 @@ func NewAccessTokenStore() AccessTokenStore {
 }
 
 type AccessToken struct {
-	ID     int64  `bun:",pk,autoincrement" json:"id"`
-	GitID  int64  `bun:",notnull" json:"git_id"`
-	Name   string `bun:",notnull" json:"name"`
-	Token  string `bun:",notnull" json:"token"` // access token value or api key value
-	UserID int64  `bun:",notnull" json:"user_id"`
-	User   *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	ID    int64  `bun:",pk,autoincrement" json:"id"`
+	GitID int64  `bun:",notnull" json:"git_id"`
+	Name  string `bun:",notnull" json:"name"`
+	// Token stays plaintext only in memory; EncryptedToken owns the database column.
+	Token             string `bun:"-" json:"token"`
+	EncryptedToken    string `bun:"column:token,notnull" json:"-"`
+	TokenLookupHash   string `bun:",nullzero" json:"-"`
+	CredentialVersion int    `bun:",notnull,default:0" json:"-"`
+	CredentialKind    string `bun:",notnull,default:''" json:"-"`
+	UserID            int64  `bun:",notnull" json:"user_id"`
+	User              *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	//example: csghub, starship
 	Application types.AccessTokenApp `bun:"column:app," json:"application"`
 	Permission  string               `bun:"," json:"permission"`
@@ -76,10 +82,25 @@ type AccessToken struct {
 	NsUUID    string                `bun:",nullzero" json:"ns_uuid"` // ns uuid
 	TokenType types.AccessTokenType `bun:",notnull,default:''" json:"token_type"`
 	times
+
+	// CreationLimit is an optional, non-persisted namespace cap enforced atomically; nil leaves creation unrestricted.
+	CreationLimit *uint `bun:"-" json:"-"`
 }
 
+// Create enforces the optional namespace limit and encrypts the token and quota copies before atomic insertion.
+// Read Committed ensures the count sees creations committed while waiting for the namespace lock.
 func (s *accessTokenStoreImpl) Create(ctx context.Context, token *AccessToken, quotas []AccountAccessTokenQuota) error {
-	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+	if err := token.prepareCredentialKind(ctx, s.db.Core); err != nil {
+		return err
+	}
+	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted}, func(ctx context.Context, tx bun.Tx) error {
+		if err := checkAccessTokenCreationLimit(ctx, tx, token); err != nil {
+			return err
+		}
+		// Prepare ciphertext only after the creation limit admits this token.
+		if err := token.encryptCredentials(); err != nil {
+			return err
+		}
 		// Insert access token
 		err := tx.NewInsert().Model(token).Scan(ctx)
 		if err != nil {
@@ -93,6 +114,9 @@ func (s *accessTokenStoreImpl) Create(ctx context.Context, token *AccessToken, q
 			// the column DEFAULT 0.
 			for i := range quotas {
 				quotas[i].TokenID = token.ID
+				if err := quotas[i].encryptCredentials(); err != nil {
+					return err
+				}
 			}
 			err = tx.NewInsert().Model(&quotas).Scan(ctx)
 			if err != nil {
@@ -102,11 +126,47 @@ func (s *accessTokenStoreImpl) Create(ctx context.Context, token *AccessToken, q
 
 		return nil
 	})
+	if errors.Is(err, errorx.ErrAPIKeyLimitReached) {
+		return errorx.ErrAPIKeyLimitReached
+	}
 	return errorx.HandleDBError(err, nil)
+}
+
+// checkAccessTokenCreationLimit serializes custom key creation on the namespace row.
+// The lock is held through insertion and commit, including when no keys exist yet.
+// Disabled and expired keys count; soft-deleted and builtin keys do not.
+// Only keys in the requested namespace count, matching the namespace API key list.
+// The inner query stops at the limit instead of counting every matching key.
+func checkAccessTokenCreationLimit(ctx context.Context, tx bun.Tx, token *AccessToken) error {
+	if token.CreationLimit == nil || token.Application != types.AccessTokenAppAIGateway || token.NsUUID == "" || token.TokenType == types.AccessTokenTypeBuiltIn {
+		return nil
+	}
+	if *token.CreationLimit == 0 {
+		return errorx.ErrAPIKeyLimitReached
+	}
+	var ns Namespace
+	if err := tx.NewSelect().Model(&ns).Column("id").Where("uuid = ?", token.NsUUID).For("UPDATE").Scan(ctx); err != nil {
+		return fmt.Errorf("lock API key namespace: %w", err)
+	}
+	keys := tx.NewSelect().Model((*AccessToken)(nil)).ColumnExpr("1").
+		Where("app = ?", types.AccessTokenAppAIGateway).
+		Where("token_type != ?", types.AccessTokenTypeBuiltIn).
+		Where("ns_uuid = ?", token.NsUUID)
+	count, err := tx.NewSelect().TableExpr("(? LIMIT ?) AS limited_keys", keys, *token.CreationLimit).Count(ctx)
+	if err != nil {
+		return fmt.Errorf("count namespace API keys: %w", err)
+	}
+	if uint(count) >= *token.CreationLimit {
+		return errorx.ErrAPIKeyLimitReached
+	}
+	return nil
 }
 
 // Refresh will disable existing access token, and then generate new one
 func (s *accessTokenStoreImpl) Refresh(ctx context.Context, token *AccessToken, newTokenValue string, newExpiredAt time.Time) (*AccessToken, error) {
+	if err := token.prepareCredentialKind(ctx, s.db.Core); err != nil {
+		return nil, err
+	}
 	var newToken *AccessToken
 	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewUpdate().Model(token).
@@ -119,18 +179,22 @@ func (s *accessTokenStoreImpl) Refresh(ctx context.Context, token *AccessToken, 
 
 		// make a copy
 		newToken = &AccessToken{
-			Name:        token.Name,
-			Token:       newTokenValue,
-			UserID:      token.UserID,
-			Application: token.Application,
-			Permission:  token.Permission,
-			IsActive:    true,
+			CredentialKind: token.CredentialKind,
+			Name:           token.Name,
+			Token:          newTokenValue,
+			UserID:         token.UserID,
+			Application:    token.Application,
+			Permission:     token.Permission,
+			IsActive:       true,
 		}
 		if newExpiredAt.After(time.Now()) {
 			newToken.ExpiredAt = newExpiredAt
 		} else {
 			//don't change old key's expire time
 			newToken.ExpiredAt = token.ExpiredAt
+		}
+		if err := newToken.encryptCredentials(); err != nil {
+			return err
 		}
 		_, err = tx.NewInsert().Model(newToken).Exec(ctx)
 		if err != nil {
@@ -144,6 +208,7 @@ func (s *accessTokenStoreImpl) Refresh(ctx context.Context, token *AccessToken, 
 	return newToken, errorx.HandleDBError(err, nil)
 }
 
+// FindByID explicitly restores access token credentials after database reads.
 func (s *accessTokenStoreImpl) FindByID(ctx context.Context, id int64) (*AccessToken, error) {
 	var token AccessToken
 	err := s.db.Operator.Core.
@@ -152,6 +217,9 @@ func (s *accessTokenStoreImpl) FindByID(ctx context.Context, id int64) (*AccessT
 		Relation("User").
 		Where("access_token.id = ?", id).
 		Scan(ctx)
+	if err == nil {
+		err = token.decryptCredentials()
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
@@ -171,6 +239,9 @@ func (s *accessTokenStoreImpl) FindByIDs(ctx context.Context, ids []int64) (map[
 		Model(&tokens).
 		Where("access_token.id IN (?)", bun.In(ids)).
 		Scan(ctx)
+	if err == nil {
+		err = decryptAccessTokens(tokens)
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
@@ -206,6 +277,7 @@ func (s *accessTokenStoreImpl) IsExist(ctx context.Context, username, tkName, ap
 	return exists, errorx.HandleDBError(err, nil)
 }
 
+// FindByUID explicitly restores access token credentials after database reads.
 func (s *accessTokenStoreImpl) FindByUID(ctx context.Context, uid int64) (token *AccessToken, err error) {
 	var tokens []AccessToken
 	err = s.db.Operator.Core.
@@ -218,6 +290,9 @@ func (s *accessTokenStoreImpl) FindByUID(ctx context.Context, uid int64) (token 
 		Order("created_at DESC").
 		Limit(1).
 		Scan(ctx)
+	if err == nil {
+		err = decryptAccessTokens(tokens)
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
@@ -228,6 +303,7 @@ func (s *accessTokenStoreImpl) FindByUID(ctx context.Context, uid int64) (token 
 	return
 }
 
+// GetUserGitToken explicitly restores access token credentials after database reads.
 func (s *accessTokenStoreImpl) GetUserGitToken(ctx context.Context, username string) (*AccessToken, error) {
 	var token AccessToken
 	err := s.db.Operator.Core.
@@ -240,29 +316,46 @@ func (s *accessTokenStoreImpl) GetUserGitToken(ctx context.Context, username str
 		Order("created_at DESC").
 		Limit(1).
 		Scan(ctx)
+	if err == nil {
+		err = token.decryptCredentials()
+	}
 	if err != nil {
 		return nil, err
 	}
 	return &token, nil
 }
 
+const organizationAPIKeyPredicate = `app = ? AND (credential_kind = 'organization-api-key' OR EXISTS (
+	SELECT 1 FROM namespaces AS n WHERE n.uuid = access_token.ns_uuid AND n.namespace_type = ?
+))`
+
+// FindByToken explicitly restores access token credentials after database reads.
 func (s *accessTokenStoreImpl) FindByToken(ctx context.Context, tokenValue, app string) (*AccessToken, error) {
+	digest, err := CredentialLookupHash(tokenValue)
+	if err != nil {
+		return nil, err
+	}
 	var token AccessToken
 	q := s.db.Operator.Core.
 		NewSelect().
 		Model(&token).
 		Relation("User").
-		Where("token = ? and is_active = true", tokenValue)
+		Where("(token_lookup_hash = ? OR (credential_version = 0 AND token = ?)) AND is_active = true", digest, tokenValue).
+		Where(`"user".login_frozen IS NOT TRUE OR (`+organizationAPIKeyPredicate+")", types.AccessTokenAppAIGateway, OrgNamespace)
 	if len(app) > 0 {
 		q = q.Where("app = ?", app)
 	}
-	err := q.Scan(ctx)
+	err = q.Scan(ctx)
+	if err == nil {
+		err = token.decryptCredentials()
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &token, nil
 }
 
+// FindByTokenName explicitly restores access token credentials after database reads.
 func (s *accessTokenStoreImpl) FindByTokenName(ctx context.Context, username, tokenName, app string) (*AccessToken, error) {
 	var token AccessToken
 	q := s.db.Operator.Core.
@@ -271,12 +364,16 @@ func (s *accessTokenStoreImpl) FindByTokenName(ctx context.Context, username, to
 		Relation("User").
 		Where("access_token.name = ? and app = ? and is_active = true and username = ?", tokenName, app, username)
 	err := q.Scan(ctx)
+	if err == nil {
+		err = token.decryptCredentials()
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &token, nil
 }
 
+// FindByUser explicitly restores access token credentials after database reads.
 func (s *accessTokenStoreImpl) FindByUser(ctx context.Context, username, app string) ([]AccessToken, error) {
 	var tokens []AccessToken
 	q := s.db.Operator.Core.
@@ -289,15 +386,22 @@ func (s *accessTokenStoreImpl) FindByUser(ctx context.Context, username, app str
 		q = q.Where("app = ?", app)
 	}
 	err := q.Scan(ctx)
+	if err == nil {
+		err = decryptAccessTokens(tokens)
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return tokens, nil
 }
 
+// GetByID explicitly restores access token credentials after database reads.
 func (s *accessTokenStoreImpl) GetByID(ctx context.Context, id int64) (*AccessToken, error) {
 	token := &AccessToken{}
 	err := s.db.Operator.Core.NewSelect().Model(token).WhereAllWithDeleted().Where("id = ?", id).Scan(ctx, token)
+	if err == nil {
+		err = token.decryptCredentials()
+	}
 	return token, errorx.HandleDBError(err, nil)
 }
 
@@ -314,7 +418,13 @@ func (s *accessTokenStoreImpl) IsExistByUUID(ctx context.Context, uuid string, t
 
 // UpdateTokenAndQuota updates a access token by id, only works for app=apikey
 func (s *accessTokenStoreImpl) UpdateTokenAndQuota(ctx context.Context, key *AccessToken, quota *AccountAccessTokenQuota) (*AccessToken, error) {
+	if err := key.prepareCredentialKind(ctx, s.db.Core); err != nil {
+		return nil, err
+	}
 	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		if err := key.encryptCredentials(); err != nil {
+			return err
+		}
 		// Update access token
 		_, err := tx.NewUpdate().Model(key).WherePK().Exec(ctx)
 		if err != nil {
@@ -323,6 +433,9 @@ func (s *accessTokenStoreImpl) UpdateTokenAndQuota(ctx context.Context, key *Acc
 
 		// Update quota record
 		if quota != nil {
+			if err := quota.encryptCredentials(); err != nil {
+				return err
+			}
 			_, err = tx.NewUpdate().Model(quota).WherePK().Exec(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to update api key quota, err:%w", err)
@@ -338,7 +451,13 @@ func (s *accessTokenStoreImpl) UpdateTokenAndQuota(ctx context.Context, key *Acc
 // UpdateTokenAndQuotas updates an access token and multiple quota records in
 // a single transaction. Each quota must carry its own primary key (ID).
 func (s *accessTokenStoreImpl) UpdateTokenAndQuotas(ctx context.Context, key *AccessToken, quotas []*AccountAccessTokenQuota) (*AccessToken, error) {
+	if err := key.prepareCredentialKind(ctx, s.db.Core); err != nil {
+		return nil, err
+	}
 	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		if err := key.encryptCredentials(); err != nil {
+			return err
+		}
 		// Update access token
 		_, err := tx.NewUpdate().Model(key).WherePK().Exec(ctx)
 		if err != nil {
@@ -348,6 +467,9 @@ func (s *accessTokenStoreImpl) UpdateTokenAndQuotas(ctx context.Context, key *Ac
 		for _, quota := range quotas {
 			if quota == nil {
 				continue
+			}
+			if err := quota.encryptCredentials(); err != nil {
+				return err
 			}
 			if quota.ID == 0 {
 				if err := tx.NewInsert().Model(quota).Scan(ctx); err != nil {
@@ -362,6 +484,9 @@ func (s *accessTokenStoreImpl) UpdateTokenAndQuotas(ctx context.Context, key *Ac
 		}
 		var tokenQuotas []AccountAccessTokenQuota
 		err = tx.NewSelect().Model(&tokenQuotas).Where("token_id = ?", key.ID).Scan(ctx)
+		if err == nil {
+			err = decryptQuotaCredentials(tokenQuotas)
+		}
 		if err != nil {
 			return fmt.Errorf("failed to get api key quotas, err:%w", err)
 		}
@@ -420,6 +545,9 @@ func (s *accessTokenStoreImpl) FindByNsUUID(ctx context.Context, nsUUID string, 
 		Order("token_type ASC").
 		Order("id DESC").
 		Scan(ctx)
+	if err == nil {
+		err = decryptAccessTokens(tokens)
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
@@ -435,20 +563,27 @@ func (s *accessTokenStoreImpl) FindBuiltinByNsUUID(ctx context.Context, nsUUID s
 		Where("app = ? and ns_uuid = ? and token_type = ? and is_active = true", app, nsUUID, types.AccessTokenTypeBuiltIn).
 		Limit(1).
 		Scan(ctx)
+	if err == nil {
+		err = token.decryptCredentials()
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &token, nil
 }
 
-// UpdateToken updates a gateway API key token value. The access token row is
-// updated in the same transaction as the matching account_access_token_quota
-// rows' api_key, so that a builtin key refresh keeps the quota records joined
-// to the new key value atomically — otherwise the stale api_key would detach
-// the quotas from the refreshed key (FindByAPIKey would miss them and the
-// updateAccessTokenQuota path would rebuild a quota=0 orphan).
+// UpdateToken refreshes a gateway API key and its quota credential copies in
+// one transaction. Quotas remain associated through the stable token_id; only
+// credential columns are synchronized so concurrent usage, settings and timestamps
+// cannot be overwritten by the quota snapshots read during refresh.
 func (s *accessTokenStoreImpl) UpdateToken(ctx context.Context, token *AccessToken) error {
+	if err := token.prepareCredentialKind(ctx, s.db.Core); err != nil {
+		return err
+	}
 	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		if err := token.encryptCredentials(); err != nil {
+			return err
+		}
 		_, err := tx.NewUpdate().Model(token).WherePK().Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to update access token, err:%w", err)
@@ -456,11 +591,27 @@ func (s *accessTokenStoreImpl) UpdateToken(ctx context.Context, token *AccessTok
 
 		// Sync the api_key on quota rows so they stay joined to the refreshed
 		// key value. token_id is the stable join key and never changes here.
-		_, err = tx.NewUpdate().
-			Model((*AccountAccessTokenQuota)(nil)).
-			Set("api_key = ?", token.Token).
-			Where("token_id = ?", token.ID).
-			Exec(ctx)
+		var quotas []AccountAccessTokenQuota
+		err = tx.NewSelect().Model(&quotas).Where("token_id = ?", token.ID).Scan(ctx)
+		if err == nil {
+			err = decryptQuotaCredentials(quotas)
+		}
+		if err == nil {
+			for i := range quotas {
+				quotas[i].APIKey = token.Token
+				if err = quotas[i].encryptCredentials(); err != nil {
+					break
+				}
+				// Persist only credentials, preserving concurrently updated quota
+				// business fields and timestamps.
+				_, err = tx.NewUpdate().Model(&quotas[i]).
+					Column("api_key", "credential_version").
+					WherePK().Exec(ctx)
+				if err != nil {
+					break
+				}
+			}
+		}
 		if err != nil {
 			return fmt.Errorf("failed to sync api_key on access token quota, err:%w", err)
 		}
@@ -468,4 +619,68 @@ func (s *accessTokenStoreImpl) UpdateToken(ctx context.Context, token *AccessTok
 		return nil
 	})
 	return errorx.HandleDBError(err, nil)
+}
+
+// prepareCredentialKind persists the personal/organization distinction so later
+// membership or namespace changes cannot change the key needed for decryption.
+func (t *AccessToken) prepareCredentialKind(ctx context.Context, db bun.IDB) error {
+	if t.CredentialKind != "" {
+		return nil
+	}
+	t.CredentialKind = string(t.Application)
+	if t.Application != types.AccessTokenAppAIGateway {
+		return nil
+	}
+	t.CredentialKind = "personal-api-key"
+	if t.NsUUID == "" {
+		return nil
+	}
+	var ns Namespace
+	err := db.NewSelect().Model(&ns).WhereAllWithDeleted().Where("uuid = ?", t.NsUUID).Limit(1).Scan(ctx)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err == nil && ns.NamespaceType == OrgNamespace {
+		t.CredentialKind = "organization-api-key"
+	}
+	return nil
+}
+
+// encryptCredentials prepares storage fields explicitly before a credential write.
+// Plaintext remains available in memory for existing callers and create responses.
+func (t *AccessToken) encryptCredentials() error {
+	if t.Token == "" {
+		return nil
+	}
+	if t.CredentialKind == "" {
+		t.CredentialKind = string(t.Application)
+	}
+	var err error
+	t.EncryptedToken, err = encryptStoredCredential(t.Token, "access-token/"+t.CredentialKind, credentialOwner(t.UserID), t.NsUUID)
+	if err != nil {
+		return err
+	}
+	t.TokenLookupHash, err = CredentialLookupHash(t.Token)
+	if err != nil {
+		return err
+	}
+	t.CredentialVersion = credentialEncryptionVersion
+	return nil
+}
+
+// decryptCredentials restores stored values explicitly after a successful query.
+func (t *AccessToken) decryptCredentials() error {
+	var err error
+	t.Token, err = decryptStoredCredential(t.EncryptedToken, t.CredentialVersion, "access-token/"+t.CredentialKind, credentialOwner(t.UserID), t.NsUUID)
+	return err
+}
+
+// decryptAccessTokens restores credentials in the rows loaded by an explicit store query.
+func decryptAccessTokens(rows []AccessToken) error {
+	for i := range rows {
+		if err := rows[i].decryptCredentials(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -151,3 +151,56 @@ func TestHandleOpenAIPlanError_QuotaExceeded(t *testing.T) {
 		t.Errorf("expected token_plan_quota_exceeded code, got %q", w.Body.String())
 	}
 }
+
+func TestHandleOpenAIPlanError_UserRateLimitExceeded(t *testing.T) {
+	c, w := newPlanErrorContext(t)
+	meta := &types.RequestMetadata{Model: "test-model"}
+	p := &types.RequestPlan{ErrorCode: types.PlanErrUserRateLimitExceeded}
+	rateLimitErr := &types.UserRateLimitExceededError{
+		Scope:             types.UserRateLimitScopeModel,
+		Dimension:         types.UserRateLimitDimensionRPM,
+		ModelID:           "test-model",
+		RetryAfterSeconds: 37,
+	}
+
+	handleOpenAIPlanError(c, meta, p, rateLimitErr, "")
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status %d, got %d", http.StatusTooManyRequests, w.Code)
+	}
+	if got := w.Header().Get("Retry-After"); got != "37" {
+		t.Errorf("expected Retry-After 37, got %q", got)
+	}
+	if !strings.Contains(w.Body.String(), "user_rate_limit_exceeded") {
+		t.Errorf("expected user_rate_limit_exceeded (model scope) code, got %q", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "rate_limit_error") {
+		t.Errorf("expected rate_limit_error type, got %q", w.Body.String())
+	}
+}
+
+// The gateway-global fallback must be distinguishable from a model's own
+// limit by the error code alone (mirrors the admission reason-in-code
+// convention).
+func TestHandleOpenAIPlanError_UserGlobalRateLimitExceeded(t *testing.T) {
+	c, w := newPlanErrorContext(t)
+	meta := &types.RequestMetadata{Model: "test-model"}
+	p := &types.RequestPlan{ErrorCode: types.PlanErrUserRateLimitExceeded}
+	rateLimitErr := &types.UserRateLimitExceededError{
+		Scope:             types.UserRateLimitScopeGlobal,
+		Dimension:         types.UserRateLimitDimensionTPM,
+		RetryAfterSeconds: 21,
+	}
+
+	handleOpenAIPlanError(c, meta, p, rateLimitErr, "")
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status %d, got %d", http.StatusTooManyRequests, w.Code)
+	}
+	if got := w.Header().Get("Retry-After"); got != "21" {
+		t.Errorf("expected Retry-After 21, got %q", got)
+	}
+	if !strings.Contains(w.Body.String(), "user_g_rate_limit_exceeded") {
+		t.Errorf("expected user_g_rate_limit_exceeded (global scope) code, got %q", w.Body.String())
+	}
+}

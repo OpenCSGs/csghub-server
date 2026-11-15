@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"time"
 
+	"opencsg.com/csghub-server/aigateway/httparchive"
 	"opencsg.com/csghub-server/moderation/checker"
 
 	"opencsg.com/csghub-server/builder/deploy"
@@ -68,6 +70,18 @@ var cmdLaunch = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}
+
+		// Video status polling runs in this process, not in the Gateway HTTP server.
+		archiveConfig := *cfg
+		if archiveConfig.HTTPArchive.Directory != "" {
+			archiveConfig.HTTPArchive.Directory = filepath.Join(cfg.HTTPArchive.Directory, "temporal-worker")
+		}
+		archiveCleanup, err := httparchive.Init(&archiveConfig)
+		if err != nil {
+			slog.Error("HTTP archive unavailable; worker continues without capture until restart", "error", err)
+			archiveCleanup = func() {}
+		}
+		defer archiveCleanup()
 
 		deploy.DeployWorkflow = func(buildTask, runTask *database.DeployTask) {
 			if err := serverworkflow.StartNewDeployTaskWithCancelOld(buildTask, runTask); err != nil {

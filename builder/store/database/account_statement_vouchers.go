@@ -95,12 +95,7 @@ func resolveVoucherUsage(ctx context.Context, tx bun.Tx, input AccountStatement)
 
 func resolveTokenUsage(input AccountStatement) (*voucherUsage, error) {
 	usage := &voucherUsage{tokenScene: true}
-	usage.modelID = types.ModelIDFromResourceID(input.ResourceID, false)
-	if len(usage.modelID) < 1 {
-		// legacy statements without a gateway resource id keep the
-		// customer id, which already carries the model id
-		usage.modelID = input.CustomerID
-	}
+	usage.modelID = types.VoucherModelID(input.ResourceID, input.CustomerID)
 	if len(usage.modelID) < 1 {
 		return nil, nil
 	}
@@ -238,6 +233,15 @@ func tokenVoucherSortKey(voucher AccountVoucher, usage voucherUsage) (voucherSor
 
 	specificity, ok := tokenRuleSpecificity(voucher.Rules.TokenLimits.Models, usage.modelID)
 	return voucherSortKey{specificity: specificity}, ok
+}
+
+// TokenVoucherMatchesModel uses the same eligibility rules as token billing.
+func TokenVoucherMatchesModel(voucher AccountVoucher, modelID string) bool {
+	if modelID == "" {
+		return false
+	}
+	_, ok := voucherSortKeyFor(voucher, voucherUsage{tokenScene: true, modelID: modelID})
+	return ok
 }
 
 func computeVoucherSortKey(voucher AccountVoucher, usage voucherUsage) (voucherSortKey, bool) {

@@ -42,6 +42,7 @@ var skipRoutes = []string{
 	"/csg",
 	"/hf",
 	"/api/v1/storage",
+	"/api/v1/relay",
 	"/v1/gateway/mcp",
 	"/v1/sandboxes",
 }

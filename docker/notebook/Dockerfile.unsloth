@@ -1,4 +1,4 @@
-FROM unsloth/unsloth:stable
+FROM unsloth/unsloth:nightly-2026.10.28
 LABEL maintainer="xzgan@opencsg.com"
 
 USER root

@@ -9,7 +9,8 @@ import (
 	"opencsg.com/csghub-server/user/handler"
 )
 
-func extendRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config, _ *handler.UserHandler) error {
+func extendRoutes(api *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config, h *handler.UserHandler) error {
+	api.DELETE("/user/:username/close_account", h.CloseAccount)
 	return nil
 }
 

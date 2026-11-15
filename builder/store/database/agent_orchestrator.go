@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,9 @@ import (
 const (
 	AgentInstanceKindLogical = "logical"
 	AgentInstanceKindRuntime = "runtime"
+
+	AgentInstanceSourcePlatform = "platform"
+	AgentInstanceSourceExternal = "external"
 
 	AgentServingModeReadOnly  = "read_only"
 	AgentServingModeReadWrite = "read_write"
@@ -143,6 +147,7 @@ type AgentExecutionLease struct {
 }
 
 type ReserveAgentAllocationInput struct {
+	ExpectedAllocationID     int64
 	LogicalInstanceID        int64
 	ActorKind                string
 	ActorID                  string
@@ -173,13 +178,17 @@ type ClaimAgentAllocationOperationsInput struct {
 	OperationID int64
 }
 
-type AgentOrchestratorStore interface {
+type AgentAllocationStore interface {
 	BeginLogicalAgentDeletion(ctx context.Context, logicalInstanceID int64, ownerUUID string) (*BeginLogicalAgentDeletionResult, error)
 	ReserveAllocation(ctx context.Context, input ReserveAgentAllocationInput) (*ReserveAgentAllocationResult, error)
 	FindAllocationByID(ctx context.Context, allocationID int64) (*AgentAllocation, error)
 	FindCallerAllocation(ctx context.Context, logicalInstanceID int64, actorKind, actorID string) (*AgentAllocation, error)
+	FindCallerAllocations(ctx context.Context, logicalInstanceIDs []int64, actorKind, actorID string) ([]AgentAllocation, error)
 	FindLiveAllocationSession(ctx context.Context, logicalInstanceID int64, actorKind, actorID, sessionUUID string) (*AgentAllocationSession, error)
 	FindLiveAllocationByResourceKey(ctx context.Context, resourceKey string) (*AgentAllocation, error)
+}
+
+type AgentAllocationLifecycleStore interface {
 	ClaimPendingOperations(ctx context.Context, input ClaimAgentAllocationOperationsInput) ([]AgentAllocationOperation, error)
 	MarkOperationDispatched(ctx context.Context, operationID int64, owner, workflowID string) error
 	FindOperationContext(ctx context.Context, operationID int64) (*AgentAllocationOperationContext, error)
@@ -189,20 +198,32 @@ type AgentOrchestratorStore interface {
 	MarkDeleteOperationRunning(ctx context.Context, operationID int64) error
 	CompleteDeleteOperation(ctx context.Context, operationID, deployID int64) error
 	FailDeleteOperation(ctx context.Context, operationID int64, message string) error
-	AcquireExecutionAdmission(ctx context.Context, input AcquireAgentExecutionAdmissionInput) (*AgentExecutionAdmission, error)
-	ConsumeGuestUsage(ctx context.Context, instanceID int64, guestActorID string, maxCount *int64) error
-	MarkExecutionAdmissionRunning(ctx context.Context, admissionID int64) error
-	CompleteExecutionAdmission(ctx context.Context, admissionID int64, status string, unknownCapacityHold time.Duration) error
-	HeartbeatExecutionAdmission(ctx context.Context, admissionID int64) error
 	BeginAllocationRecovery(ctx context.Context, allocationID int64, actor commontypes.AgentActor) (*AgentAllocationOperation, error)
 	MarkRestartOperationRunning(ctx context.Context, operationID int64) error
 	CompleteRestartOperation(ctx context.Context, operationID, deployID int64) error
 	FailRestartOperation(ctx context.Context, operationID int64, message string) error
 	RecordAllocationSuspended(ctx context.Context, deployID int64) error
+	BeginAllocationSuspend(ctx context.Context, allocationID int64, actor commontypes.AgentActor) (*AgentAllocationOperation, error)
+	MarkSuspendOperationRunning(ctx context.Context, operationID int64) error
+	CompleteSuspendOperation(ctx context.Context, operationID int64) error
 	BeginAllocationResume(ctx context.Context, allocationID int64, actor commontypes.AgentActor) (*AgentAllocationOperation, error)
 	MarkResumeOperationRunning(ctx context.Context, operationID int64) error
 	CompleteResumeOperation(ctx context.Context, operationID, deployID int64) error
 	FailResumeOperation(ctx context.Context, operationID int64, message string) error
+}
+
+type AgentExecutionStore interface {
+	AcquireExecutionAdmission(ctx context.Context, input AcquireAgentExecutionAdmissionInput) (*AgentExecutionAdmission, error)
+	ConsumeGuestUsage(ctx context.Context, instanceID int64, guestActorID string, maxCount *int64) error
+	MarkExecutionAdmissionRunning(ctx context.Context, admissionID int64) error
+	CompleteExecutionAdmission(ctx context.Context, admissionID int64, status string, unknownCapacityHold time.Duration) error
+	HeartbeatExecutionAdmission(ctx context.Context, admissionID int64) error
+}
+
+type AgentOrchestratorStore interface {
+	AgentAllocationStore
+	AgentAllocationLifecycleStore
+	AgentExecutionStore
 }
 
 type AcquireAgentExecutionAdmissionInput struct {
@@ -237,6 +258,26 @@ func NewAgentOrchestratorStore() AgentOrchestratorStore {
 
 func NewAgentOrchestratorStoreWithDB(db *DB) AgentOrchestratorStore {
 	return &agentOrchestratorStoreImpl{db: db}
+}
+
+// ListRunningAgentOperations returns a bounded page ordered by operation ID.
+func ListRunningAgentOperations(ctx context.Context, afterID int64, olderThan time.Time, limit int) ([]AgentAllocationOperation, error) {
+	var operations []AgentAllocationOperation
+	err := defaultDB.Core.NewSelect().Model(&operations).Where("status = 'running' AND updated_at < ? AND id > ?", olderThan, afterID).OrderExpr("id ASC").Limit(limit).Scan(ctx)
+	return operations, err
+}
+
+type AgentOperationBacklog struct {
+	Status string    `bun:"status"`
+	Count  int64     `bun:"count"`
+	Oldest time.Time `bun:"oldest"`
+}
+
+func AgentOperationBacklogSnapshot(ctx context.Context) ([]AgentOperationBacklog, error) {
+	var result []AgentOperationBacklog
+	err := defaultDB.Core.NewSelect().Model((*AgentAllocationOperation)(nil)).ColumnExpr("status, COUNT(*) AS count, MIN(created_at) AS oldest").
+		Where("status IN ('pending', 'dispatching', 'dispatched', 'running')").GroupExpr("status").Scan(ctx, &result)
+	return result, err
 }
 
 func (s *agentOrchestratorStoreImpl) BeginLogicalAgentDeletion(
@@ -389,10 +430,16 @@ func (s *agentOrchestratorStoreImpl) reserveAllocationAttempt(ctx context.Contex
 		}
 		existing, err := lockLiveAllocation(ctx, tx, input.LogicalInstanceID, input.ActorKind, input.ActorID)
 		if err == nil {
+			if input.ExpectedAllocationID > 0 && existing.ID != input.ExpectedAllocationID {
+				return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("sandbox allocation changed"), nil)
+			}
 			return loadReservedAllocationResult(ctx, tx, input, existing, result)
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
+		}
+		if input.ExpectedAllocationID > 0 {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("sandbox allocation is no longer active"), nil)
 		}
 		counter, err := lockAgentRuntimeCounter(
 			ctx, tx, input.RuntimePrincipal, input.InstanceQuota, input.UnboundedRuntimeCapacity,
@@ -861,6 +908,21 @@ func (s *agentOrchestratorStoreImpl) FindCallerAllocation(ctx context.Context, l
 		Where("logical_instance_id = ? AND actor_kind = ? AND actor_id = ? AND binding_ended_at IS NOT NULL", logicalInstanceID, actorKind, actorID).
 		OrderExpr("binding_ended_at DESC, id DESC").Limit(1).Scan(ctx)
 	return allocation, err
+}
+
+func (s *agentOrchestratorStoreImpl) FindCallerAllocations(ctx context.Context, logicalInstanceIDs []int64, actorKind, actorID string) ([]AgentAllocation, error) {
+	if len(logicalInstanceIDs) == 0 {
+		return nil, nil
+	}
+	if actorKind == "" || actorID == "" {
+		return nil, errorx.BadRequest(fmt.Errorf("invalid caller allocation lookup"), nil)
+	}
+	var allocations []AgentAllocation
+	err := s.db.Core.NewSelect().Model(&allocations).
+		ColumnExpr("DISTINCT ON (logical_instance_id) agent_allocation.*").
+		Where("logical_instance_id IN (?) AND actor_kind = ? AND actor_id = ?", bun.In(logicalInstanceIDs), actorKind, actorID).
+		OrderExpr("logical_instance_id, binding_ended_at DESC NULLS FIRST, id DESC").Scan(ctx)
+	return allocations, err
 }
 
 // FindLiveAllocationSession returns the caller's live allocation session.
@@ -1390,6 +1452,9 @@ func (s *agentOrchestratorStoreImpl) BeginAllocationRecovery(ctx context.Context
 	actorKind := normalizedActorKind(string(actor.Kind))
 	operation := new(AgentAllocationOperation)
 	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := lockRecoveryAgent(ctx, tx, allocationID); err != nil {
+			return err
+		}
 		allocation := new(AgentAllocation)
 		if err := tx.NewSelect().Model(allocation).Where("id = ?", allocationID).For("UPDATE").Scan(ctx); err != nil {
 			return err
@@ -1410,6 +1475,16 @@ func (s *agentOrchestratorStoreImpl) BeginAllocationRecovery(ctx context.Context
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
+		}
+		if allocation.ObservedState != "ready" && allocation.ObservedState != "failed" && allocation.ObservedState != "suspended" {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation has a lifecycle operation in progress"), nil)
+		}
+		suspending, err := tx.NewSelect().Model((*AgentAllocationOperation)(nil)).Where("allocation_id = ? AND operation_type = 'suspend' AND status IN ('pending', 'dispatching', 'dispatched', 'running')", allocation.ID).Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if suspending {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation suspension is still in progress"), nil)
 		}
 		runtimeGeneration := allocation.RuntimeGeneration + 1
 		operationSequence := allocation.OperationSequence + 1
@@ -1446,6 +1521,111 @@ func (s *agentOrchestratorStoreImpl) BeginAllocationRecovery(ctx context.Context
 		return nil, err
 	}
 	return operation, nil
+}
+
+// BeginAllocationSuspend fences new admissions under the allocation row lock.
+func (s *agentOrchestratorStoreImpl) BeginAllocationSuspend(ctx context.Context, allocationID int64, actor commontypes.AgentActor) (*AgentAllocationOperation, error) {
+	if allocationID <= 0 || actor.ID == "" {
+		return nil, errorx.BadRequest(fmt.Errorf("invalid allocation suspend request"), nil)
+	}
+	var operation *AgentAllocationOperation
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		allocation := new(AgentAllocation)
+		if err := tx.NewSelect().Model(allocation).Where("id = ?", allocationID).For("UPDATE").Scan(ctx); err != nil {
+			return err
+		}
+		if allocation.ActorKind != normalizedActorKind(string(actor.Kind)) || allocation.ActorID != actor.ID {
+			return errorx.ErrForbidden
+		}
+		if allocation.BindingEndedAt != nil || allocation.DesiredState != "running" {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation cannot suspend in its current lifecycle state"), nil)
+		}
+		if allocation.ObservedState == "suspended" || allocation.ObservedState == "suspending" {
+			existing := new(AgentAllocationOperation)
+			err := tx.NewSelect().Model(existing).Where("allocation_id = ? AND operation_type = 'suspend' AND status IN ('pending', 'dispatching', 'dispatched', 'running')", allocation.ID).Scan(ctx)
+			if err == nil {
+				operation = existing
+				return nil
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
+		if allocation.ObservedState == "suspended" {
+			return nil
+		}
+		if allocation.ObservedState == "suspending" {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation suspension has no active operation"), nil)
+		}
+		if allocation.ObservedState != "ready" || allocation.AcceptedGeneration == nil || *allocation.AcceptedGeneration != allocation.RuntimeGeneration {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation is not ready to suspend"), nil)
+		}
+		active, err := tx.NewSelect().Model((*AgentExecutionAdmission)(nil)).Where("allocation_id = ? AND status IN ('reserved', 'running', 'unknown')", allocation.ID).Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if active {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation has an active or uncertain execution"), nil)
+		}
+		sequence := allocation.OperationSequence + 1
+		operation = &AgentAllocationOperation{AllocationID: allocation.ID, OperationSequence: sequence, OperationKey: agentAllocationOperationKey(allocation.ResourceKey, sequence), OperationType: "suspend", Status: "pending", RuntimeGeneration: allocation.RuntimeGeneration, Payload: map[string]any{}}
+		if _, err := tx.NewUpdate().Model(allocation).Set("observed_state = 'suspending'").Set("operation_sequence = ?", sequence).WherePK().Exec(ctx); err != nil {
+			return err
+		}
+		_, err = tx.NewInsert().Model(operation).Exec(ctx)
+		return err
+	})
+	return operation, err
+}
+
+func (s *agentOrchestratorStoreImpl) MarkSuspendOperationRunning(ctx context.Context, operationID int64) error {
+	superseded := false
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		operation, allocation, err := lockAllocationOperation(ctx, tx, operationID, "suspend")
+		if err != nil {
+			return err
+		}
+		if operation.Status == "completed" {
+			return nil
+		}
+		if (operation.Status != "dispatched" && operation.Status != "running") || (allocation.ObservedState != "suspending" && allocation.ObservedState != "suspended") || allocation.BindingEndedAt != nil || allocation.DesiredState != "running" || allocation.RuntimeGeneration != operation.RuntimeGeneration {
+			superseded = true
+			if operation.Status == "dispatched" || operation.Status == "running" {
+				_, err = tx.NewUpdate().Model(operation).Set("status = 'canceled'").Set("completed_at = CURRENT_TIMESTAMP").WherePK().Exec(ctx)
+				return err
+			}
+			return nil
+		}
+		if operation.Status == "running" {
+			return nil
+		}
+		_, err = tx.NewUpdate().Model(operation).Set("status = 'running'").Set("dispatch_lease_owner = NULL").Set("dispatch_lease_expires_at = NULL").WherePK().Exec(ctx)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	if superseded {
+		return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("suspend operation is not current"), nil)
+	}
+	return nil
+}
+
+func (s *agentOrchestratorStoreImpl) CompleteSuspendOperation(ctx context.Context, operationID int64) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		operation, allocation, err := lockAllocationOperation(ctx, tx, operationID, "suspend")
+		if err != nil {
+			return err
+		}
+		if operation.Status == "completed" {
+			return nil
+		}
+		if operation.Status != "running" || allocation.ObservedState != "suspended" || allocation.DesiredState != "running" || allocation.RuntimeGeneration != operation.RuntimeGeneration {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("suspend operation is not ready to complete"), nil)
+		}
+		_, err = tx.NewUpdate().Model(operation).Set("status = 'completed'").Set("completed_at = CURRENT_TIMESTAMP").WherePK().Exec(ctx)
+		return err
+	})
 }
 
 func (s *agentOrchestratorStoreImpl) MarkRestartOperationRunning(ctx context.Context, operationID int64) error {
@@ -1553,7 +1733,7 @@ func (s *agentOrchestratorStoreImpl) RecordAllocationSuspended(ctx context.Conte
 		}
 		// Only a ready runtime can be suspended; provisioning, recovery, and
 		// deletion states own the row and must not be overwritten.
-		if allocation.DesiredState != "running" || allocation.ObservedState != "ready" {
+		if allocation.DesiredState != "running" || (allocation.ObservedState != "ready" && allocation.ObservedState != "suspending") {
 			return nil
 		}
 		// Admissions first, then leases: every writer follows this lock order.
@@ -1603,8 +1783,15 @@ func (s *agentOrchestratorStoreImpl) BeginAllocationResume(ctx context.Context, 
 		if allocation.BindingEndedAt != nil || allocation.DesiredState != "running" {
 			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation cannot resume in its current lifecycle state"), nil)
 		}
+		suspending, err := tx.NewSelect().Model((*AgentAllocationOperation)(nil)).Where("allocation_id = ? AND operation_type = 'suspend' AND status IN ('pending', 'dispatching', 'dispatched', 'running')", allocation.ID).Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if suspending {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation suspension is still in progress"), nil)
+		}
 		existing := new(AgentAllocationOperation)
-		err := tx.NewSelect().Model(existing).
+		err = tx.NewSelect().Model(existing).
 			Where("allocation_id = ? AND operation_type = 'resume' AND status IN ('pending', 'dispatching', 'dispatched', 'running')", allocation.ID).
 			Scan(ctx)
 		if err == nil {
@@ -1614,8 +1801,11 @@ func (s *agentOrchestratorStoreImpl) BeginAllocationResume(ctx context.Context, 
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		if allocation.ObservedState != "suspended" {
+		if allocation.ObservedState == "ready" {
 			return nil
+		}
+		if allocation.ObservedState != "suspended" {
+			return errorx.AgentAllocationLifecycleConflict(fmt.Errorf("allocation is not suspended"), nil)
 		}
 		operationSequence := allocation.OperationSequence + 1
 		operation = &AgentAllocationOperation{
@@ -1867,6 +2057,11 @@ func finalizeLogicalDeletion(ctx context.Context, tx bun.Tx, logicalInstanceID i
 	exists, err := tx.NewSelect().Model((*AgentAllocation)(nil)).
 		Where("logical_instance_id = ? AND binding_ended_at IS NULL", logicalInstanceID).Exists(ctx)
 	if err != nil || exists {
+		return err
+	}
+	if _, err = tx.NewDelete().Model((*AgentResourceCuration)(nil)).
+		Where("entity_type = ?", string(commontypes.AgentCurationEntityTypeAgentInstance)).
+		Where("entity_id = ?", strconv.FormatInt(logicalInstanceID, 10)).Exec(ctx); err != nil {
 		return err
 	}
 	_, err = tx.NewUpdate().Model((*AgentInstance)(nil)).Set("deleted_at = ?", now).

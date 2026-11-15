@@ -140,6 +140,7 @@ func NewXnetPublishRateLimiterWithDB(db *DB) XnetPublishRateLimiter {
 }
 
 type LfsMetaObject struct {
+	LatestCommitID       string             `bun:",notnull,default:''" json:"-"`
 	ID                   int64              `bun:",pk,autoincrement" json:"user_id"`
 	Oid                  string             `bun:",notnull" json:"oid"`
 	Size                 int64              `bun:",notnull" json:"size"`
@@ -232,6 +233,10 @@ func (s *lfsMetaObjectStoreImpl) BulkUpdateOrCreate(ctx context.Context, repoID 
 	}
 
 	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := invalidateLatestLFSSnapshotTx(ctx, tx, repoID); err != nil {
+			return err
+		}
+
 		var current []LfsMetaObject
 		query := tx.NewSelect().
 			Model(&current).

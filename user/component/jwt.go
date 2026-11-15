@@ -37,8 +37,16 @@ func NewJwtComponent(signKey string, validHour int) JwtComponent {
 	}
 }
 
+func (c *jwtComponentImpl) loginUser(ctx context.Context, uuid string) (*database.User, error) {
+	u, err := c.us.FindByUUID(ctx, uuid, types.UserWithAdminPermissions)
+	if err == nil && u.LoginFrozen {
+		return nil, errorx.ErrForbidden
+	}
+	return u, err
+}
+
 func (c *jwtComponentImpl) GenerateLoginToken(ctx context.Context, req types.CreateJWTReq) (claims *types.JWTClaims, signed string, err error) {
-	u, err := c.us.FindByUUID(ctx, req.UUID, types.UserWithAdminPermissions)
+	u, err := c.loginUser(ctx, req.UUID)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
 	}
@@ -53,7 +61,7 @@ func (c *jwtComponentImpl) GenerateLoginToken(ctx context.Context, req types.Cre
 }
 
 func (c *jwtComponentImpl) RefreshToken(ctx context.Context, req types.RefreshJWTReq) (claims *types.JWTClaims, signed string, err error) {
-	u, err := c.us.FindByUUID(ctx, req.UUID, types.UserWithAdminPermissions)
+	u, err := c.loginUser(ctx, req.UUID)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
 	}
@@ -74,7 +82,7 @@ func (c *jwtComponentImpl) GenerateToken(ctx context.Context, req types.CreateJW
 	if req.OldToken != "" {
 		return c.RefreshToken(ctx, types.RefreshJWTReq{UUID: req.UUID, OldToken: req.OldToken})
 	}
-	u, err := c.us.FindByUUID(ctx, req.UUID, types.UserWithAdminPermissions)
+	u, err := c.loginUser(ctx, req.UUID)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
 	}
@@ -96,9 +104,16 @@ func (c *jwtComponentImpl) ParseToken(ctx context.Context, token string) (user *
 		return nil, fmt.Errorf("parse jwt token failed: %w", err)
 	}
 
-	dbu, err := c.us.FindByUsername(ctx, claims.CurrentUser, types.UserWithAdminPermissions)
+	if claims.UUID == "" {
+		return nil, errorx.ErrInvalidJWT
+	}
+	dbu, err := c.us.FindByUUID(ctx, claims.UUID, types.UserWithAdminPermissions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by name '%s', %w", claims.CurrentUser, err)
+		return nil, fmt.Errorf("failed to find user by uuid '%s', %w", claims.UUID, err)
+	}
+
+	if dbu.LoginFrozen {
+		return nil, errorx.ErrInvalidJWT
 	}
 
 	// create new user object

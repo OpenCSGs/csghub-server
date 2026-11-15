@@ -3,10 +3,8 @@ package database
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -38,42 +36,19 @@ func NewUserVerifyStoreWithDB(db *DB) UserVerifyStore {
 
 // UserVerify stores the current manual or external identity verification for a user.
 type UserVerify struct {
-	Provider          string             `bun:",notnull,default:'manual'" json:"provider"`
-	VerificationID    string             `bun:",nullzero" json:"-"`
-	IDNumberEncrypted string             `bun:",nullzero,type:text" json:"-"`
-	IDNumberHash      string             `bun:",nullzero" json:"-"`
-	ID                int64              `bun:",pk,autoincrement" json:"id"`
-	UUID              string             `bun:",unique,notnull" json:"uuid"`
-	RealName          string             `bun:",notnull" json:"real_name"`
-	Username          string             `bun:",notnull" json:"username"`
-	IDCardFront       string             `bun:",nullzero" json:"id_card_front"`
-	IDCardBack        string             `bun:",nullzero" json:"id_card_back"`
-	Status            types.VerifyStatus `bun:",notnull,default:'pending'" json:"status"` // pending, approved, rejected
+	Provider string `bun:",notnull,default:'manual'" json:"provider"`
+	// IDNumberHash is an internal HMAC lookup token, not a uniqueness constraint or proof of approval.
+	IDNumberHash   string             `bun:",nullzero" json:"-"`
+	VerificationID string             `bun:",nullzero" json:"-"`
+	ID             int64              `bun:",pk,autoincrement" json:"id"`
+	UUID           string             `bun:",unique,notnull" json:"uuid"`
+	Username       string             `bun:",notnull" json:"username"`
+	IDCardFront    string             `bun:",nullzero" json:"id_card_front"`
+	IDCardBack     string             `bun:",nullzero" json:"id_card_back"`
+	Status         types.VerifyStatus `bun:",notnull,default:'pending'" json:"status"` // pending, approved, rejected
 	// Reason is manual review text or a USER-ERR code for an external verification result.
 	Reason string `bun:",nullzero" json:"reason,omitempty" i18n:"error"`
-	// IDNumberMasked is a response-only value populated by SaaS verification queries, never persisted.
-	IDNumberMasked string `bun:"-" json:"id_number,omitempty"`
 	times
-}
-
-// MaskedRealName preserves the first Unicode character and masks the remaining name.
-func (v UserVerify) MaskedRealName() string {
-	name := []rune(v.RealName)
-	if len(name) == 0 {
-		return ""
-	}
-	return string(name[0]) + strings.Repeat("*", len(name)-1)
-}
-
-// MarshalJSON masks external identity names in legacy endpoints that serialize this model.
-// Manual review retains its existing representation; sensitive new columns are always excluded.
-func (v UserVerify) MarshalJSON() ([]byte, error) {
-	type response UserVerify
-	value := response(v)
-	if v.Provider != "" && v.Provider != "manual" {
-		value.RealName = v.MaskedRealName()
-	}
-	return json.Marshal(value)
 }
 
 // CreateUserVerify upserts manual material without replacing an external flow.
@@ -83,7 +58,6 @@ func (uv *UserVerifyStoreImpl) CreateUserVerify(ctx context.Context, userVerify 
 	result, err := uv.db.Operator.Core.NewInsert().
 		Model(userVerify).
 		On("CONFLICT (uuid) DO UPDATE").
-		Set("real_name = EXCLUDED.real_name").
 		Set("username = EXCLUDED.username").
 		Set("id_card_front = EXCLUDED.id_card_front").
 		Set("id_card_back = EXCLUDED.id_card_back").
@@ -213,8 +187,8 @@ func (s *IdentityStore) Begin(ctx context.Context, proposed *UserVerify) (*UserV
 			// Raw updates intentionally preserve the explicitly selected generation timestamp.
 			_, err = tx.NewUpdate().Table("user_verifies").
 				Set("provider = ?", proposed.Provider).Set("verification_id = NULL").
-				Set("real_name = ?", proposed.RealName).Set("username = ?", proposed.Username).
-				Set("id_number_encrypted = ?", proposed.IDNumberEncrypted).Set("id_number_hash = ?", proposed.IDNumberHash).
+				Set("id_number_hash = ?", proposed.IDNumberHash).
+				Set("username = ?", proposed.Username).
 				Set("status = ?", proposed.Status).Set("reason = NULL").Set("id_card_front = NULL").Set("id_card_back = NULL").
 				Set("updated_at = ?", now).Where("id = ?", existing.ID).Exec(ctx)
 			if err != nil {
@@ -258,12 +232,28 @@ func (s *IdentityStore) complete(ctx context.Context, record *UserVerify, status
 	if status != types.VerifyStatusApproved && status != types.VerifyStatusRejected {
 		return nil, ErrIdentityConflict
 	}
-	completedAt := time.Now().Truncate(time.Microsecond)
+	var completedAt time.Time
 	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// Use the same lock order as Begin to serialize state changes across replicas.
 		var id int64
 		if err := tx.NewSelect().Table("users").Column("id").Where("uuid = ?", record.UUID).For("UPDATE").Scan(ctx, &id); err != nil {
 			return err
+		}
+		completedAt = time.Now().UTC().Truncate(time.Microsecond)
+		if status == types.VerifyStatusApproved && record.IDNumberHash != "" {
+			// Serialize approvals for one identity so later callbacks cannot become the first approval.
+			if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "identity-approval:"+record.IDNumberHash); err != nil {
+				return err
+			}
+			var latest sql.NullTime
+			if err := tx.NewSelect().Table("user_verifies").ColumnExpr("MAX(updated_at)").
+				Where("id_number_hash = ? AND status = ?", record.IDNumberHash, types.VerifyStatusApproved).Scan(ctx, &latest); err != nil {
+				return err
+			}
+			// Preserve completion order even after a clock adjustment or within one clock tick.
+			if latest.Valid && !completedAt.After(latest.Time) {
+				completedAt = latest.Time.Add(time.Microsecond)
+			}
 		}
 		result, err := tx.NewUpdate().Table("user_verifies").Set("status = ?", status).Set("reason = ?", reason).Set("updated_at = ?", completedAt).
 			Where("id = ? AND uuid = ? AND provider = ?", record.ID, record.UUID, record.Provider).
@@ -282,8 +272,10 @@ func (s *IdentityStore) complete(ctx context.Context, record *UserVerify, status
 		if affected != 1 {
 			return fmt.Errorf("affected %d row(s), want 1", affected)
 		}
-		_, err = tx.NewUpdate().Table("users").Set("verify_status = ?", status).Where("uuid = ?", record.UUID).Exec(ctx)
-		return err
+		if _, err = tx.NewUpdate().Table("users").Set("verify_status = ?", status).Where("uuid = ?", record.UUID).Exec(ctx); err != nil {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -291,4 +283,15 @@ func (s *IdentityStore) complete(ctx context.Context, record *UserVerify, status
 	completed := *record
 	completed.Status, completed.Reason, completed.UpdatedAt = status, reason, completedAt
 	return &completed, nil
+}
+
+// IsFirstIdentityVerification identifies the earliest approved record for a hash.
+// Approved records cannot be resubmitted; missing hashes and unfinished records are ineligible.
+func (s *IdentityStore) IsFirstIdentityVerification(ctx context.Context, uuid string) (bool, error) {
+	return s.db.Core.NewSelect().TableExpr("user_verifies AS v").
+		Where("v.uuid = ? AND v.status = ?", uuid, types.VerifyStatusApproved).
+		Where("v.id_number_hash IS NOT NULL AND v.id_number_hash <> ''").
+		Where(`NOT EXISTS (SELECT 1 FROM user_verifies AS earlier
+            WHERE earlier.id_number_hash = v.id_number_hash AND earlier.status = ?
+            AND (earlier.updated_at, earlier.id) < (v.updated_at, v.id))`, types.VerifyStatusApproved).Exists(ctx)
 }

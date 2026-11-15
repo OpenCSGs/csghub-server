@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"opencsg.com/csghub-server/aigateway/component/admission"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
@@ -48,7 +49,7 @@ func (a *contentSafetyAdapter) Check(ctx context.Context, req plan.ContentSafety
 	// safety entirely or use CheckImagePrompts directly in their Execute
 	// phase, which bypasses the SensitivePolicy gate intentionally.
 	switch req.Task {
-	case "chat", "responses", "messages", "systemone":
+	case "chat", "responses", "messages", "systemone", "decisions":
 		// fall through
 	default:
 		return false, "", nil
@@ -67,6 +68,14 @@ func (a *contentSafetyAdapter) Check(ctx context.Context, req plan.ContentSafety
 // newPlannerDeps builds the dependency set needed by plan.NewPlanner from
 // an OpenAIHandlerImpl. The openai component satisfies the balance interface.
 func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
+	// The per-user rate limiter is a capability of the concrete component,
+	// not of the shared OpenAIComponent interface: type-assert it so the
+	// interface (and its generated mock) stays untouched. A component
+	// without the capability simply disables the check.
+	var rateLimitChecker plan.UserRateLimitChecker
+	if comp, ok := h.openaiComponent.(admission.UserRateLimitComponent); ok {
+		rateLimitChecker = comp
+	}
 	return plan.PlannerDeps{
 		ModelResolver:         &modelResolverAdapter{handler: h},
 		BalanceChecker:        h.openaiComponent,
@@ -74,6 +83,7 @@ func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
 		AdmissionChecker:      newAdmissionChecker(h),
 		MetricsEnricher:       metricsEnricherAdapter{},
 		TokenPlanQuotaChecker: h.tokenPlanQuotaChecker,
+		UserRateLimitChecker:  rateLimitChecker,
 	}
 }
 

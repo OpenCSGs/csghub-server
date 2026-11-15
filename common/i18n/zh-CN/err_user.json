@@ -88,5 +88,8 @@
     },
     "error.USER-ERR-30": {
         "other": "认证未通过或已超时，请重新发起"
+    },
+    "error.USER-ERR-31": {
+        "other": "API Key 数量已达上限，请删除不再使用的 Key 后重试。"
     }
 }

@@ -113,7 +113,6 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 			User: types.User{
 				Username: dataset.Repository.User.Username,
 				Nickname: dataset.Repository.User.NickName,
-				Email:    dataset.Repository.User.Email,
 				Avatar:   dataset.Repository.User.Avatar,
 			},
 			MultiSource: types.MultiSource{
@@ -206,7 +205,6 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		User: types.User{
 			Username: dataset.Repository.User.Username,
 			Nickname: dataset.Repository.User.NickName,
-			Email:    dataset.Repository.User.Email,
 			Avatar:   dataset.Repository.User.Avatar,
 		},
 		Private:              dataset.Repository.Private,

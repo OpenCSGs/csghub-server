@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
+	"opencsg.com/csghub-server/api/httpbase"
 	commonType "opencsg.com/csghub-server/common/types"
 )
 
@@ -459,4 +460,52 @@ func (m *waitRerouteAdmissionChecker) CheckAdmission(_ context.Context, _ *types
 		QueueWaitMs: 500,
 		Queued:      true,
 	}}, nil
+}
+
+// userPriorityAdmissionChecker captures the user-tag priority the planner
+// injected into the metadata handed to admission.
+type userPriorityAdmissionChecker struct {
+	calls        int
+	userPriority *int
+}
+
+func (m *userPriorityAdmissionChecker) CheckAdmission(_ context.Context, meta *types.RequestMetadata, _ *types.ModelTarget) (*types.AdmissionOutcome, error) {
+	m.calls++
+	m.userPriority = meta.UserPriority
+	return &types.AdmissionOutcome{Decision: &types.AdmissionDecision{Action: types.AdmissionAdmit}}, nil
+}
+
+func TestPlan_InjectsUserPriorityFromContext(t *testing.T) {
+	admission := &userPriorityAdmissionChecker{}
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    &mockModelResolver{target: admissionPlanTestTarget()},
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    &mockContentSafetyChecker{},
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
+
+	meta := &types.RequestMetadata{
+		Protocol: string(types.ProtocolMessages),
+		Task:     "messages",
+		Model:    "test-model",
+		TenantID: "ns-123",
+	}
+
+	// No user-tag priority in the context: the metadata stays nil and the
+	// admission checker resolves from the API key scope alone.
+	_, err := p.Plan(newTestGinContext(), meta)
+	require.NoError(t, err)
+	require.Equal(t, 1, admission.calls)
+	require.Nil(t, admission.userPriority)
+
+	// The user-tags middleware resolved priority:<n> into the context; the
+	// planner must carry it onto the metadata for the admission checker.
+	c := newTestGinContext()
+	httpbase.SetCurrentUserPriority(c, 25)
+	_, err = p.Plan(c, meta)
+	require.NoError(t, err)
+	require.Equal(t, 2, admission.calls)
+	require.NotNil(t, admission.userPriority)
+	require.Equal(t, 25, *admission.userPriority)
 }

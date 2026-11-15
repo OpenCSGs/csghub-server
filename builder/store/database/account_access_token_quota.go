@@ -35,30 +35,41 @@ func NewAccountAccessTokenQuotaStoreWithDB(db *DB) AccountAccessTokenQuotaStore 
 }
 
 type AccountAccessTokenQuota struct {
-	ID          int64                          `bun:",pk,autoincrement" json:"id"`
-	APIKey      string                         `bun:",notnull" json:"api_key"`
-	QuotaType   types.AccountingQuotaType      `bun:",notnull" json:"quota_type"`
-	ValueType   types.AccountingQuotaValueType `bun:",notnull" json:"value_type"`
-	PeriodStart int64                          `bun:",notnull,default:0" json:"period_start"`
-	PeriodEnd   int64                          `bun:",notnull,default:0" json:"period_end"`
-	Usage       float64                        `bun:",notnull,default:0" json:"usage"`
-	Quota       float64                        `bun:",notnull,default:0" json:"quota"`
-	LastUsedAt  *time.Time                     `bun:",nullzero" json:"last_used_at"`
-	Allocation  string                         `bun:",notnull,default:''" json:"allocation"`
-	TokenID     int64                          `bun:",notnull,default:0" json:"token_id"`
+	ID                int64                          `bun:",pk,autoincrement" json:"id"`
+	APIKey            string                         `bun:"-" json:"api_key"`
+	EncryptedAPIKey   string                         `bun:"column:api_key,notnull" json:"-"`
+	CredentialVersion int                            `bun:",notnull,default:0" json:"-"`
+	QuotaType         types.AccountingQuotaType      `bun:",notnull" json:"quota_type"`
+	ValueType         types.AccountingQuotaValueType `bun:",notnull" json:"value_type"`
+	PeriodStart       int64                          `bun:",notnull,default:0" json:"period_start"`
+	PeriodEnd         int64                          `bun:",notnull,default:0" json:"period_end"`
+	Usage             float64                        `bun:",notnull,default:0" json:"usage"`
+	Quota             float64                        `bun:",notnull,default:0" json:"quota"`
+	LastUsedAt        *time.Time                     `bun:",nullzero" json:"last_used_at"`
+	Allocation        string                         `bun:",notnull,default:''" json:"allocation"`
+	TokenID           int64                          `bun:",notnull,default:0" json:"token_id"`
 	times
 }
 
+// Create explicitly encrypts the API-key copy before inserting the quota.
 func (s *accountAccessTokenQuotaStoreImpl) Create(ctx context.Context, quota *AccountAccessTokenQuota) error {
+	if err := quota.encryptCredentials(); err != nil {
+		return err
+	}
 	err := s.db.Operator.Core.NewInsert().Model(quota).Scan(ctx)
 	return errorx.HandleDBError(err, nil)
 }
 
+// Update explicitly encrypts the API-key copy before updating the quota.
 func (s *accountAccessTokenQuotaStoreImpl) Update(ctx context.Context, quota *AccountAccessTokenQuota) error {
+	if err := quota.encryptCredentials(); err != nil {
+		return err
+	}
 	_, err := s.db.Operator.Core.NewUpdate().Model(quota).WherePK().Exec(ctx)
 	return errorx.HandleDBError(err, nil)
 }
 
+// GetByID explicitly restores quota credentials after database reads.
 func (s *accountAccessTokenQuotaStoreImpl) GetByID(ctx context.Context, id int64) (*AccountAccessTokenQuota, error) {
 	var quota AccountAccessTokenQuota
 	err := s.db.Operator.Core.
@@ -66,12 +77,16 @@ func (s *accountAccessTokenQuotaStoreImpl) GetByID(ctx context.Context, id int64
 		Model(&quota).
 		Where("id = ?", id).
 		Scan(ctx)
+	if err == nil {
+		err = quota.decryptCredentials()
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &quota, nil
 }
 
+// FindByTokenID explicitly restores quota credentials after database reads.
 func (s *accountAccessTokenQuotaStoreImpl) FindByTokenID(ctx context.Context, tokenID int64) ([]AccountAccessTokenQuota, error) {
 	var quotas []AccountAccessTokenQuota
 	err := s.db.Operator.Core.
@@ -80,12 +95,16 @@ func (s *accountAccessTokenQuotaStoreImpl) FindByTokenID(ctx context.Context, to
 		Where("token_id = ?", tokenID).
 		Order("id DESC").
 		Scan(ctx)
+	if err == nil {
+		err = decryptQuotaCredentials(quotas)
+	}
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return quotas, nil
 }
 
+// UpdateAPIKeyUsage updates metering fields without rewriting credential copies.
 func UpdateAPIKeyUsage(ctx context.Context, tx bun.Tx, input AccountStatement) error {
 	if input.TokenID <= 0 {
 		return nil
@@ -96,6 +115,9 @@ func UpdateAPIKeyUsage(ctx context.Context, tx bun.Tx, input AccountStatement) e
 	q := tx.NewSelect().Model(&quotas).Where("token_id = ?", input.TokenID)
 
 	err := q.Scan(ctx)
+	if err == nil {
+		err = decryptQuotaCredentials(quotas)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to get account access id %d quota error: %w", input.TokenID, err)
 	}
@@ -127,7 +149,11 @@ func UpdateAPIKeyUsage(ctx context.Context, tx bun.Tx, input AccountStatement) e
 			}
 		}
 		quota.LastUsedAt = &now
-		_, err = tx.NewUpdate().Model(&quota).WherePK().Exec(ctx)
+		// A key refresh may have committed since the read; preserve its credential
+		// and all other non-metering fields instead of writing the snapshot back.
+		_, err = tx.NewUpdate().Model(&quota).
+			Column("usage", "period_start", "period_end", "last_used_at", "updated_at").
+			WherePK().Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("update account access %s quota, error:%w", input.APIKey, err)
 		}
@@ -153,4 +179,33 @@ func CalcCurrentDayPeriod() (int64, int64) {
 	// End of current day (start of next day minus 1 nanosecond)
 	end := start.AddDate(0, 0, 1).Add(-1)
 	return start.Unix(), end.Unix()
+}
+
+// encryptCredentials prepares storage fields explicitly before a credential write.
+// Plaintext remains available in memory for existing callers and create responses.
+func (t *AccountAccessTokenQuota) encryptCredentials() error {
+	var err error
+	t.EncryptedAPIKey, err = encryptStoredCredential(t.APIKey, "api-key-quota", credentialOwner(t.TokenID))
+	if err != nil {
+		return err
+	}
+	t.CredentialVersion = credentialEncryptionVersion
+	return nil
+}
+
+// decryptCredentials restores stored values explicitly after a successful query.
+func (t *AccountAccessTokenQuota) decryptCredentials() error {
+	var err error
+	t.APIKey, err = decryptStoredCredential(t.EncryptedAPIKey, t.CredentialVersion, "api-key-quota", credentialOwner(t.TokenID))
+	return err
+}
+
+// decryptQuotaCredentials restores credentials in the rows loaded by an explicit store query.
+func decryptQuotaCredentials(rows []AccountAccessTokenQuota) error {
+	for i := range rows {
+		if err := rows[i].decryptCredentials(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,6 +65,7 @@ func newUserRoutesTestRouter(t *testing.T) *gin.Engine {
 	// Start a local backend that the proxy handler will forward requests to.
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(r.URL.RequestURI()))
 	}))
 	t.Cleanup(backend.Close)
 
@@ -97,6 +99,7 @@ func TestUserRoutes_AnonymousAccess_Returns401(t *testing.T) {
 		{http.MethodDelete, "/api/v1/user/testuser"},
 		{http.MethodDelete, "/api/v1/user/testuser/close_account"},
 		{http.MethodGet, "/api/v1/user/testuser/tokens"},
+		{http.MethodGet, "/api/v1/user/testuser/tokens/display"},
 		{http.MethodPost, "/api/v1/admin/namespaces/lookup"},
 	}
 
@@ -158,18 +161,6 @@ func TestAdminRoutes_Admin_BatchNamespaceLookup_PassesThrough(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.Code,
 		"admin POST /api/v1/admin/namespaces/lookup should reach the proxy handler")
-}
-
-func TestUserRoutes_LoginUser_CloseAccount_PassesThrough(t *testing.T) {
-	router := newUserRoutesTestRouter(t)
-
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/user/testuser/close_account", nil)
-	req.Header.Set("X-Test-User", "testuser")
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
-
-	assert.Equal(t, http.StatusOK, resp.Code,
-		"logged-in user DELETE close_account should reach the proxy (ownership validated downstream)")
 }
 
 func TestUserRoutes_LoginUser_PutUser_PassesThrough(t *testing.T) {
@@ -445,4 +436,50 @@ func TestUsersListRoute_LoginUser_PassesThrough(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.Code,
 		"logged-in user GET /users should reach the proxy (component returns limited info for non-admin)")
+}
+
+// TestUserRoutes_TokenDisplayProxy preserves the application filter and login
+// requirement across the public API to user-service transport boundary.
+func TestUserRoutes_TokenDisplayProxy(t *testing.T) {
+	router := newUserRoutesTestRouter(t)
+	for _, app := range []string{"git", "starship", "mirror"} {
+		t.Run(app, func(t *testing.T) {
+			path := "/api/v1/user/testuser/tokens/display?app=" + app
+			// Real server requests are cancellable; this also keeps the proxy from
+			// using legacy CloseNotify on httptest's response recorder.
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			req := httptest.NewRequestWithContext(ctx, http.MethodGet, path, nil)
+			req.Header.Set("X-Test-User", "testuser")
+			resp := httptest.NewRecorder()
+			router.ServeHTTP(resp, req)
+			assert.Equal(t, http.StatusOK, resp.Code)
+			assert.Equal(t, path, resp.Body.String())
+		})
+	}
+}
+
+// TestUserRoutes_BuiltinKeyDisplayProxy verifies both JSON read routes are
+// registered behind login and forwarded without changing their paths.
+func TestUserRoutes_BuiltinKeyDisplayProxy(t *testing.T) {
+	router := newUserRoutesTestRouter(t)
+	for _, suffix := range []string{"", "/display"} {
+		for _, loggedIn := range []bool{false, true} {
+			path := "/api/v1/namespaces/namespace-uuid/apikeys/builtin" + suffix
+			ctx, cancel := context.WithCancel(context.Background())
+			req := httptest.NewRequestWithContext(ctx, http.MethodGet, path, nil)
+			if loggedIn {
+				req.Header.Set("X-Test-User", "alice")
+			}
+			resp := httptest.NewRecorder()
+			router.ServeHTTP(resp, req)
+			cancel()
+			if loggedIn {
+				assert.Equal(t, http.StatusOK, resp.Code)
+				assert.Equal(t, path, resp.Body.String())
+			} else {
+				assert.Equal(t, http.StatusUnauthorized, resp.Code)
+			}
+		}
+	}
 }

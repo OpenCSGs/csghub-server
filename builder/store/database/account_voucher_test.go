@@ -26,6 +26,53 @@ func createTestVoucher(targetUUID string, total float64) *database.AccountVouche
 	}
 }
 
+func TestAccountVoucherStore_ListVoucherCandidates(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	now := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name     string
+		mutate   func(*database.AccountVoucher)
+		eligible bool
+	}{
+		{"active token", func(v *database.AccountVoucher) {}, true},
+		{"started pending", func(v *database.AccountVoucher) { v.Status = types.VoucherStatusPending }, true},
+		{"universal", func(v *database.AccountVoucher) { v.VoucherType = types.VoucherTypeUniversal }, true},
+		{"begin boundary", func(v *database.AccountVoucher) { v.BeginDate = now }, true},
+		{"future", func(v *database.AccountVoucher) { v.BeginDate = now.Add(time.Second) }, false},
+		{"end boundary", func(v *database.AccountVoucher) { v.EndDate = now }, false},
+		{"revoked", func(v *database.AccountVoucher) { v.Status = types.VoucherStatusRevoked }, false},
+		{"expired status", func(v *database.AccountVoucher) { v.Status = types.VoucherStatusExpired }, false},
+		{"exhausted", func(v *database.AccountVoucher) { v.Used = -10 }, false},
+		{"positive used exhausted", func(v *database.AccountVoucher) { v.Used = 10 }, false},
+		{"compute candidate", func(v *database.AccountVoucher) { v.VoucherType = types.VoucherTypeCompute }, true},
+		{"unknown type candidate", func(v *database.AccountVoucher) { v.VoucherType = "future" }, true},
+		{"other namespace", func(v *database.AccountVoucher) { v.TargetUUID = "other" }, false},
+	}
+	var expected []string
+	for _, tc := range tests {
+		v := createTestVoucher("voucher-perf-test", 10)
+		v.VoucherNo = "perf-" + tc.name
+		v.VoucherType = types.VoucherTypeToken
+		v.Status = types.VoucherStatusActive
+		v.BeginDate, v.EndDate = now.Add(-time.Hour), now.Add(time.Hour)
+		tc.mutate(v)
+		_, err := db.Core.NewInsert().Model(v).Exec(ctx)
+		require.NoError(t, err)
+		if tc.eligible {
+			expected = append(expected, v.VoucherNo)
+		}
+	}
+	vouchers, err := database.NewAccountVoucherStoreWithDB(db).ListVoucherCandidates(ctx, "voucher-perf-test", now)
+	require.NoError(t, err)
+	var actual []string
+	for _, v := range vouchers {
+		actual = append(actual, v.VoucherNo)
+	}
+	require.ElementsMatch(t, expected, actual)
+}
+
 func TestAccountVoucherStore_Create(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

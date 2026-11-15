@@ -12,15 +12,16 @@ var ErrCSGClawAgentNameInvalid = errors.New("invalid CSGClaw manifest agent name
 
 // AgentCustomUIProxyInfo contains the trusted routing context needed by RProxy.
 type AgentCustomUIProxyInfo struct {
-	AgentContentID string
-	AgentName      string
-	ShareName      string
-	Kind           AgentInstanceKind
-	SpaceID        int64
-	SpaceSvcName   string
-	SpaceEndpoint  string
-	SpaceClusterID string
-	Available      bool
+	AgentContentID     string
+	AgentName          string
+	ShareName          string
+	Kind               AgentInstanceKind
+	GuestUsageMaxCount *int64
+	SpaceID            int64
+	SpaceSvcName       string
+	SpaceEndpoint      string
+	SpaceClusterID     string
+	Available          bool
 }
 
 func CSGClawAutomaticShareName(instanceID int64) string {
@@ -41,13 +42,20 @@ func CSGClawAgentName(metadata *map[string]any) (string, error) {
 		return "", fmt.Errorf("csgclaw template metadata.agent_file is required")
 	}
 	name, ok := agentFile["name"].(string)
-	if !ok || name == "." || name == ".." || !csgClawAgentNamePattern.MatchString(name) {
+	if !ok || ValidateCSGClawAgentName(name) != nil {
 		return "", ErrCSGClawAgentNameInvalid
 	}
 	return name, nil
 }
 
 var csgClawAgentNamePattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+func ValidateCSGClawAgentName(name string) error {
+	if name == "." || name == ".." || !csgClawAgentNamePattern.MatchString(name) {
+		return ErrCSGClawAgentNameInvalid
+	}
+	return nil
+}
 
 // CSGClawCustomUISpaceID reads the selected UI Space from CSGClaw provisioning metadata.
 func CSGClawCustomUISpaceID(metadata *map[string]any) (int64, error) {
@@ -110,16 +118,56 @@ const (
 	CSGBotHeaderSessionID = "X-CSG-Session-Id"
 
 	// Custom UI invocation context is set by RProxy after resolving the public agent.
-	CSGHubAgentBaseURLHeader     = "X-CSGHub-Agent-Base-URL"
-	CSGHubAgentAuthModeHeader    = "X-CSGHub-Agent-Auth-Mode"
-	CSGHubAgentKindHeader        = "X-CSGHub-Agent-Kind"
-	CSGHubAgentAuthModeAnonymous = "anonymous"
-	CSGHubAgentAuthModeUserToken = "user-token"
+	CSGHubBaseURLHeader            = "X-CSGHub-Base-URL"
+	CSGHubAgentBaseURLHeader       = "X-CSGHub-Agent-Base-URL"
+	CSGHubAgentAuthModeHeader      = "X-CSGHub-Agent-Auth-Mode"
+	CSGHubAgentKindHeader          = "X-CSGHub-Agent-Kind"
+	CSGHubAgentGuestMaxCountHeader = "X-CSGHub-Agent-Guest-Max-Count"
+	CSGHubAgentAuthModeAnonymous   = "anonymous"
+	CSGHubAgentAuthModeUserToken   = "user-token"
 
 	// CSGHubGuestIDHeader carries a client-generated UUIDv4 for anonymous
 	// logical-agent execution on the shared-sandbox responses path.
 	CSGHubGuestIDHeader = "X-CSG-Guest-ID"
+
+	// CSGRelay headers are forwarded to the relay service. The gateway
+	// overwrites the user UUID with the authenticated identity.
+	CSGRelayHeaderUserUUID  = "X-CSG-User-UUID"
+	CSGRelayHeaderClientID  = "X-CSG-Client-ID"
+	CSGRelayHeaderRequestID = "X-CSG-Request-Id"
 )
+
+// CSGRelayIdentityHeaderPattern matches CSGRelay identity header values:
+// 1-128 ASCII characters, starting with a letter or digit.
+var CSGRelayIdentityHeaderPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$`)
+
+// CSGRelayAgentIDPattern matches the stable agent ID minted by CSGRelay:
+// the "agt_" prefix followed by 24 lowercase hex characters.
+var CSGRelayAgentIDPattern = regexp.MustCompile(`^agt_[0-9a-f]{24}$`)
+
+// AgentInstanceRelayRegistrationMetadataKey is the server-managed metadata key
+// holding the relay registration of an agent instance.
+const AgentInstanceRelayRegistrationMetadataKey = "relay_registration"
+
+// AgentInstanceRelayRegistration is the CSGRelay runtime registration of an
+// agent instance. The CSGClaw worker reports it after it registers with
+// CSGRelay so callers can address the agent through the relay. Only the stable
+// agent ID is stored; the connect path is relay-owned and derivable from it.
+type AgentInstanceRelayRegistration struct {
+	AgentID string `json:"agent_id"`
+}
+
+// ValidateAgentInstanceRelayRegistration checks a relay registration reported
+// by a CSGClaw worker before it is persisted on the instance.
+func ValidateAgentInstanceRelayRegistration(relay *AgentInstanceRelayRegistration) error {
+	if relay == nil {
+		return nil
+	}
+	if !CSGRelayAgentIDPattern.MatchString(relay.AgentID) {
+		return fmt.Errorf("relay agent_id is invalid")
+	}
+	return nil
+}
 
 // GuestLogicalShareTarget is the minimal logical-agent identity needed for
 // anonymous shared-sandbox execution after visibility checks succeed.
@@ -188,6 +236,7 @@ type AgentTemplate struct {
 	Editable    bool            `json:"editable"`                                       // Whether the template is editable (only the owner can delete)
 	Metadata    *map[string]any `json:"metadata,omitempty"`                             // Template metadata
 	IsPinned    bool            `json:"is_pinned"`                                      // Whether the template is pinned by the user
+	Recommended bool            `json:"recommended"`                                    // Whether the template carries the admin recommended badge
 	CreatedAt   time.Time       `json:"created_at"`                                     // When the template was created
 	UpdatedAt   time.Time       `json:"updated_at"`                                     // When the template was last updated
 }
@@ -212,41 +261,55 @@ type UpdateAgentTemplateRequest struct {
 
 // AgentInstance represents an instance created from an agent template
 type AgentInstance struct {
-	ID            int64               `json:"id"`
-	TemplateID    *int64              `json:"template_id" binding:"omitempty,gte=1"` // Associated with the id in the template table
-	UserUUID      *string             `json:"-"`                                     // Will be set from HTTP header using httpbase.GetCurrentUserUUID
-	Name          *string             `json:"name"`                                  // Instance name
-	Description   *string             `json:"description" binding:"omitempty"`       // Instance description
-	Type          *string             `json:"type"`                                  // Possible values: langflow, agno, code, etc.
-	ContentID     *string             `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
-	Public        *bool               `json:"public"`                                // Whether the instance is public
-	Editable      bool                `json:"editable"`                              // Whether the instance is editable
-	IsRunning     bool                `json:"is_running"`                            // Whether the instance is running
-	BuiltIn       bool                `json:"built_in"`                              // Whether the instance is built-in
-	IsPinned      bool                `json:"is_pinned"`                             // Whether the instance is pinned by the user
-	IsShared      bool                `json:"is_shared"`                             // Whether the instance has been shared via agent_shares
-	Config        map[string]any      `json:"config,omitempty"`                      // Per-user instance configuration from user preferences
-	Metadata      *map[string]any     `json:"metadata,omitempty"`                    // Instance metadata
-	Data          json.RawMessage     `json:"-"`                                     // Request-only flow data; excluded from responses
-	Kind          AgentInstanceKind   `json:"kind"`
-	EffectiveMode *AgentServingMode   `json:"mode,omitempty"`
-	StoragePolicy *AgentStoragePolicy `json:"storage_policy,omitempty"`
-	CreatedAt     time.Time           `json:"created_at"` // When the instance was created
-	UpdatedAt     time.Time           `json:"updated_at"` // When the instance was last updated
+	ID                int64                           `json:"id"`
+	Name              *string                         `json:"name"`                                  // Instance name
+	Type              *string                         `json:"type"`                                  // Possible values: langflow, agno, code, etc.
+	Description       *string                         `json:"description" binding:"omitempty"`       // Instance description
+	TemplateID        *int64                          `json:"template_id" binding:"omitempty,gte=1"` // Associated with the id in the template table
+	UserUUID          *string                         `json:"-"`                                     // Will be set from HTTP header using httpbase.GetCurrentUserUUID
+	WorkerName        string                          `json:"worker_name,omitempty"`
+	BuiltinTemplateID string                          `json:"-"`
+	Endpoint          string                          `json:"endpoint,omitempty"`
+	CredentialMode    string                          `json:"credential_mode,omitempty"`
+	AutoSuspend       *bool                           `json:"auto_suspend,omitempty"`
+	ContentID         *string                         `json:"content_id" binding:"omitempty"` // Used to specify the unique id of the instance resource
+	Public            *bool                           `json:"public"`                         // Whether the instance is public
+	Editable          bool                            `json:"editable"`                       // Whether the instance is editable
+	IsRunning         bool                            `json:"is_running"`                     // Whether the instance is running
+	BuiltIn           bool                            `json:"built_in"`                       // Whether the instance is built-in
+	IsPinned          bool                            `json:"is_pinned"`                      // Whether the instance is pinned by the user
+	IsShared          bool                            `json:"is_shared"`                      // Whether the instance has been shared via agent_shares
+	Recommended       bool                            `json:"recommended"`                    // Whether the instance carries the admin recommended badge
+	Config            map[string]any                  `json:"config,omitempty"`               // Per-user instance configuration from user preferences
+	Metadata          *map[string]any                 `json:"metadata,omitempty"`             // Instance metadata
+	Relay             *AgentInstanceRelayRegistration `json:"relay,omitempty"`                // CSGRelay runtime registration reported by the worker
+	Data              json.RawMessage                 `json:"-"`                              // Request-only flow data; excluded from responses
+	Kind              AgentInstanceKind               `json:"kind"`
+	Source            AgentInstanceSource             `json:"source"` // Runtime provenance: platform or external
+	EffectiveMode     *AgentServingMode               `json:"mode,omitempty"`
+	StoragePolicy     *AgentStoragePolicy             `json:"storage_policy,omitempty"`
+	CreatedAt         time.Time                       `json:"created_at"` // When the instance was created
+	UpdatedAt         time.Time                       `json:"updated_at"` // When the instance was last updated
 }
 
 // CreateAgentInstanceRequest represents a request to create an agent instance.
 type CreateAgentInstanceRequest struct {
-	Name                    *string            `json:"name"`
-	Description             *string            `json:"description,omitempty"`
-	Type                    *string            `json:"type"`
-	ContentID               *string            `json:"content_id,omitempty"` // Generated for logical agents when omitted.
-	Public                  *bool              `json:"public"`
-	Metadata                *map[string]any    `json:"metadata,omitempty"`
-	TemplateID              *int64             `json:"template_id" binding:"omitempty,gte=1"`
-	Data                    json.RawMessage    `json:"data,omitempty"`
-	Kind                    *AgentInstanceKind `json:"kind,omitempty"`
-	Mode                    *AgentServingMode  `json:"mode,omitempty"`
+	BuiltinTemplateID       string                          `json:"builtin_template_id,omitempty"`
+	AutoSuspend             *bool                           `json:"auto_suspend,omitempty"`
+	WorkerName              string                          `json:"worker_name,omitempty"`
+	CredentialMode          string                          `json:"credential_mode,omitempty"`
+	Name                    *string                         `json:"name"`
+	Description             *string                         `json:"description,omitempty"`
+	Type                    *string                         `json:"type"`
+	ContentID               *string                         `json:"content_id,omitempty"` // Generated for logical agents when omitted.
+	Public                  *bool                           `json:"public"`
+	Metadata                *map[string]any                 `json:"metadata,omitempty"`
+	TemplateID              *int64                          `json:"template_id" binding:"omitempty,gte=1"`
+	Data                    json.RawMessage                 `json:"data,omitempty"`
+	Kind                    *AgentInstanceKind              `json:"kind,omitempty"`
+	Mode                    *AgentServingMode               `json:"mode,omitempty"`
+	Source                  AgentInstanceSource             `json:"source,omitempty"`
+	Relay                   *AgentInstanceRelayRegistration `json:"relay,omitempty"`
 	clientBlueprintProvided bool
 }
 
@@ -273,6 +336,8 @@ func (r CreateAgentInstanceRequest) HasClientBlueprint() bool {
 // a logical agent. Runtime identity and PVC ownership are always supplied by
 // the allocation workflow, never by the publisher.
 type AgentRuntimeBlueprint struct {
+	BuiltinTemplateID    string                 `json:"builtin_template_id,omitempty"`
+	TemplateFree         bool                   `json:"template_free,omitempty"`
 	ImageID              string                 `json:"image_id"`
 	TemplateIdentifier   string                 `json:"template_identifier"`
 	Model                string                 `json:"model,omitempty"`
@@ -299,6 +364,7 @@ type UseAgentInstanceRequest struct {
 type UseAgentInstanceResponse struct {
 	Status            string `json:"status"`
 	RetryAfterSeconds int    `json:"retry_after_seconds,omitempty"`
+	Endpoint          string `json:"endpoint,omitempty"`
 }
 
 // UseAgentInstanceResult carries the public use status together with the
@@ -311,12 +377,20 @@ type UseAgentInstanceResult struct {
 	RuntimeGeneration int64                    `json:"-"`
 	// Resuming marks that the allocation was suspended and a resume operation
 	// is in flight, so callers can apply the resume wait timeout.
-	Resuming bool `json:"-"`
+	Resuming          bool  `json:"-"`
+	ResumeOperationID int64 `json:"-"`
 }
 
 type AgentRuntimeStatusResponse struct {
 	Status            string `json:"status"`
 	RetryAfterSeconds int    `json:"retry_after_seconds,omitempty"`
+}
+
+type AgentRuntimeResumeRequest struct {
+	InstanceID  int64
+	DeployID    int64
+	UserUUID    string
+	SandboxName string
 }
 
 // AgentActorKind identifies whether an orchestrated actor is a signed-in user
@@ -349,6 +423,8 @@ type AgentExecutionAdmissionRequest struct {
 // AgentAllocationProxyRequest authorizes a pinned allocation for proxy resolution.
 type AgentAllocationProxyRequest struct {
 	AllocationID             int64
+	LogicalInstanceID        int64
+	ObservedState            string
 	Actor                    AgentActor
 	ExpectedRuntimePrincipal string
 	PinnedRuntimeGeneration  int64
@@ -381,14 +457,14 @@ type AgentAllocationProvisionPrepareResult struct {
 
 const (
 	DefaultAgentOrchestratorReadinessTimeoutSeconds   = 30 * 60
-	DefaultAgentOrchestratorGatewayWaitTimeoutSeconds = 30
+	DefaultAgentOrchestratorGatewayWaitTimeoutSeconds = 120
 	// Temporary static defaults until load-aware admission is available.
-	DefaultAgentOrchestratorMaxConcurrentExecutionsPerAllocation = 4
+	DefaultAgentOrchestratorMaxConcurrentExecutionsPerAllocation = 32
 	DefaultAgentOrchestratorExecutionReservedTimeoutSeconds      = 60
 	DefaultAgentOrchestratorExecutionHeartbeatIntervalSeconds    = 30
 	DefaultAgentOrchestratorExecutionHeartbeatTimeoutSeconds     = 90
 	DefaultAgentOrchestratorExecutionUnknownCapacityHoldSeconds  = 3600
-	DefaultAgentOrchestratorResumeWaitTimeoutSeconds             = 60
+	DefaultAgentOrchestratorResumeWaitTimeoutSeconds             = 120
 	AgentAllocationDispatchTaskQueue                             = "workflow_cron_queue"
 	AgentAllocationProvisionTaskQueue                            = "agent-allocation-task-queue"
 	AgentAllocationImmediateDispatchWorkflowName                 = "AgentAllocationImmediateDispatchWorkflow"
@@ -413,6 +489,19 @@ type AgentInstanceKind string
 const (
 	AgentInstanceKindLogical AgentInstanceKind = "logical"
 	AgentInstanceKindRuntime AgentInstanceKind = "runtime"
+)
+
+// AgentInstanceSource is the provenance of an agent instance's runtime.
+type AgentInstanceSource string
+
+const (
+	// AgentInstanceSourcePlatform means the runtime is hosted by the platform
+	// (sandbox-backed runtime instances and logical agent allocations).
+	AgentInstanceSourcePlatform AgentInstanceSource = "platform"
+	// AgentInstanceSourceExternal means the runtime runs outside the platform
+	// (a user's local machine, their own server, or third-party infrastructure)
+	// and is reachable through CSGRelay.
+	AgentInstanceSourceExternal AgentInstanceSource = "external"
 )
 
 type AgentServingMode string
@@ -472,11 +561,14 @@ func (t AgentType) String() string {
 type AgentInstanceFilter struct {
 	Search     string
 	Type       string
-	TemplateID *int64             `json:"template_id,omitempty"`
-	BuiltIn    *bool              `json:"built_in"`
-	Public     *bool              `json:"public"`
-	Editable   *bool              `json:"editable"`
-	Kind       *AgentInstanceKind `json:"kind,omitempty"`
+	TemplateID *int64               `json:"template_id,omitempty"`
+	BuiltIn    *bool                `json:"built_in"`
+	Public     *bool                `json:"public"`
+	Editable   *bool                `json:"editable"`
+	Kind       *AgentInstanceKind   `json:"kind,omitempty"`
+	Source     *AgentInstanceSource `json:"source,omitempty"`
+	// Registered filters by whether a CSGRelay agent id has been reported.
+	Registered *bool `json:"registered,omitempty"`
 }
 
 type AgentUIOption struct {
@@ -514,10 +606,15 @@ type AgentUISpace struct {
 }
 
 type UpdateAgentInstanceRequest struct {
+	AutoSuspend *bool           `json:"auto_suspend,omitempty"`
 	Name        *string         `json:"name,omitempty"`
 	Description *string         `json:"description,omitempty"`
 	Public      *bool           `json:"public,omitempty"`
 	Metadata    *map[string]any `json:"metadata,omitempty"`
+	// Relay reports the CSGRelay registration minted for this instance's
+	// CSGClaw worker. It is server-managed metadata and cannot be set through
+	// the free-form Metadata field.
+	Relay *AgentInstanceRelayRegistration `json:"relay,omitempty"`
 }
 
 type AgentInstanceCreationResult struct {
@@ -575,8 +672,9 @@ type AgentInstanceSession struct {
 }
 
 type AgentInstanceSessionFilter struct {
-	InstanceID *int64
-	Search     string
+	InstanceID        *int64
+	IncludeInstanceID *int64
+	Search            string
 }
 
 type CreateAgentInstanceSessionRequest struct {
@@ -967,6 +1065,7 @@ type InspectMCPServerRequest struct {
 
 // AgentMCPServerListItem represents an MCP server in list responses
 type AgentMCPServerListItem struct {
+	Recommended  bool           `bun:",scanonly" json:"recommended"`
 	ID           string         `json:"id"` // String ID (format: "builtin:{id}" or "user:{id}")
 	Name         string         `json:"name"`
 	Description  string         `json:"description"`
@@ -1139,12 +1238,13 @@ type AgentKnowledgeBaseResourceState map[string]json.RawMessage
 
 // AgentKnowledgeBaseFilter represents the filter for listing agent knowledge bases
 type AgentKnowledgeBaseFilter struct {
-	Search        string                 `json:"search,omitempty"`   // Search term for name field
-	Type          AgentKnowledgeBaseType `json:"type,omitempty"`     // Filter by knowledge base type
-	NsUUID        string                 `json:"-"`                  // Filter by namespace UUID
-	AuthorizedIDs []int64                `json:"-"`                  // ReBAC-authorized knowledge base IDs
-	Public        *bool                  `json:"public,omitempty"`   // Filter by public status
-	Editable      *bool                  `json:"editable,omitempty"` // Filter by editable status (true = owned by user, false = not owned by user)
+	Search           string                 `json:"search,omitempty"` // Search term for name field
+	Type             AgentKnowledgeBaseType `json:"type,omitempty"`   // Filter by knowledge base type
+	NsUUID           string                 `json:"-"`                // Filter by namespace UUID
+	CurationAdminIDs []int64                `json:"-"`
+	AuthorizedIDs    []int64                `json:"-"`                  // ReBAC-authorized knowledge base IDs
+	Public           *bool                  `json:"public,omitempty"`   // Filter by public status
+	Editable         *bool                  `json:"editable,omitempty"` // Filter by editable status (true = owned by user, false = not owned by user)
 }
 
 // UpdateAgentKnowledgeBaseRequest represents a request to update an agent knowledge base
@@ -1157,6 +1257,7 @@ type UpdateAgentKnowledgeBaseRequest struct {
 
 // AgentKnowledgeBaseListItem represents a knowledge base in list responses
 type AgentKnowledgeBaseListItem struct {
+	Recommended bool                   `bun:",scanonly" json:"recommended"`
 	ID          int64                  `json:"id"`
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
@@ -1184,6 +1285,7 @@ type AgentKnowledgeBaseListItem struct {
 
 // AgentPromptListItem represents a prompt in list responses
 type AgentPromptListItem struct {
+	Recommended bool      `bun:",scanonly" json:"recommended"`
 	ID          int64     `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
@@ -1273,6 +1375,7 @@ type AgentUserPreferenceRequest struct {
 // AgentSkillListItem represents a skill in the agent skills list response.
 // Used for both bun scan (List query) and API JSON; Private is scan-only, Public is set after scan.
 type AgentSkillListItem struct {
+	Recommended   bool       `bun:",scanonly" json:"recommended"`
 	ID            int64      `bun:",scanonly" json:"id"`
 	RepositoryID  int64      `bun:",scanonly" json:"repository_id"`
 	Name          string     `bun:",scanonly" json:"name"`

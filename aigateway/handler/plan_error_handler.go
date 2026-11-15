@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -45,6 +46,24 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 			// a client-facing 429, not an outage (which stays PlanErrInternal).
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": types.Error{
 				Code: types.ErrCodeTokenPlanQuotaExceeded, Message: err.Error(), Type: types.ErrTypeRateLimit,
+			}})
+			return
+		case types.PlanErrUserRateLimitExceeded:
+			// The USER's own per-user RPM/TPM limit (model-level or
+			// gateway-global) is spent for the current window: a client-facing
+			// 429 with a Retry-After hint at the window rollover.
+			retryAfter := int64(1)
+			code := types.ErrCodeUserRateLimitExceeded
+			var rateLimitErr *types.UserRateLimitExceededError
+			if errors.As(err, &rateLimitErr) {
+				code = rateLimitErr.ErrorCode()
+				if rateLimitErr.RetryAfterSeconds > 0 {
+					retryAfter = rateLimitErr.RetryAfterSeconds
+				}
+			}
+			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": types.Error{
+				Code: code, Message: err.Error(), Type: types.ErrTypeRateLimit,
 			}})
 			return
 		case types.PlanErrQueueTimeout:

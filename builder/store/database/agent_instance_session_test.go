@@ -111,6 +111,40 @@ func TestAgentInstanceSessionStore_CRUD(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestAgentInstanceSessionStoreListIncludesAnotherInstance(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewAgentInstanceSessionStoreWithDB(db)
+	user := uuid.NewString()
+	primary, related := int64(135791), int64(135792)
+	var ids []int64
+	for _, item := range []struct {
+		instance    int64
+		owner, name string
+	}{
+		{primary, user, "matching first"}, {related, user, "matching second"},
+		{related, user, "other"}, {related, uuid.NewString(), "matching private"},
+	} {
+		session, err := store.Create(ctx, &database.AgentInstanceSession{UUID: uuid.NewString(), Name: item.name, InstanceID: item.instance, UserUUID: item.owner, Type: "code"})
+		require.NoError(t, err)
+		ids = append(ids, session.ID)
+	}
+	_, err := db.Core.NewUpdate().Model((*database.AgentInstanceSession)(nil)).Set("updated_at = ?", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)).Where("user_uuid = ?", user).Exec(ctx)
+	require.NoError(t, err)
+	filter := types.AgentInstanceSessionFilter{InstanceID: &primary, IncludeInstanceID: &related, Search: "matching"}
+	first, total, err := store.List(ctx, user, filter, 1, 1)
+	require.NoError(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, first, 1)
+	require.Equal(t, ids[1], first[0].ID)
+	second, total, err := store.List(ctx, user, filter, 1, 2)
+	require.NoError(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, second, 1)
+	require.Equal(t, ids[0], second[0].ID)
+}
+
 func TestAgentInstanceSessionStore_ListByInstanceID_MultipleSessions(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

@@ -276,6 +276,7 @@ func lockOrganizationAdminUserIDs(ctx context.Context, tx bun.Tx, organizationID
 	err := tx.NewSelect().Model((*Member)(nil)).
 		Column("user_id").
 		Where("organization_id = ? AND role = ? AND deleted_at IS NULL", organizationID, types.UserAdmin).
+		Where("user_id IN (?)", tx.NewSelect().Model((*User)(nil)).Column("id").Where("NOT login_frozen")).
 		Order("user_id ASC").
 		For("UPDATE").
 		Scan(ctx, &userIDs)
@@ -393,7 +394,7 @@ func (s *organizationUnitMemberStoreImpl) UpdateMemberRole(ctx context.Context, 
 			if err != nil {
 				return err
 			}
-			if len(adminUserIDs) == 1 {
+			if len(adminUserIDs) == 1 && adminUserIDs[0] == input.UserID {
 				return errorx.ErrLastOrgAdmin
 			}
 		}

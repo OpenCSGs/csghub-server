@@ -170,7 +170,7 @@ func TestRepoComponentCreateForkWritesOwnerTuple(t *testing.T) {
 		Name:           "source",
 		Nickname:       "Source",
 		DefaultBranch:  "main",
-		Private:        true,
+		Private:        false,
 		RepositoryType: types.ModelRepo,
 	}
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "source-ns", "source").Return(sourceRepo, nil).Once()
@@ -196,7 +196,7 @@ func TestRepoComponentCreateForkWritesOwnerTuple(t *testing.T) {
 		Object:   rebac.NamespaceObject("alice-namespace-uuid"),
 	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	createdRepo := &database.Repository{ID: 100, RepositoryType: types.ModelRepo}
-	repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, mock.AnythingOfType("database.Repository")).Return(createdRepo, nil).Once()
+	repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, mock.MatchedBy(func(got database.Repository) bool { return !got.Private })).Return(createdRepo, nil).Once()
 
 	repo.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).Return(nil).Once()
 	repo.mocks.gitServer.EXPECT().CreateFork(ctx, mock.AnythingOfType("gitserver.CreateForkReq")).Return(nil).Once()
@@ -212,6 +212,40 @@ func TestRepoComponentCreateForkWritesOwnerTuple(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, createdRepo, got)
+}
+
+func TestCopyForkLFSObjects(t *testing.T) {
+	for _, failCopy := range []bool{false, true} {
+		t.Run(fmt.Sprintf("copy_failure_%t", failCopy), func(t *testing.T) {
+			ctx := context.Background()
+			repo := initializeTestRepoComponent(ctx, t)
+			meta := database.LfsMetaObject{Oid: "test-oid", Size: 42, RepositoryID: 10, Existing: true}
+			repo.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, int64(10)).Return([]database.LfsMetaObject{meta}, nil).Once()
+			repo.mocks.stores.RepoMock().EXPECT().FindById(ctx, int64(10)).Return(&database.Repository{ID: 10}, nil).Once()
+			repo.mocks.stores.RepoMock().EXPECT().FindById(ctx, int64(20)).Return(&database.Repository{ID: 20}, nil).Once()
+			var copyErr error
+			if failCopy {
+				copyErr = errors.New("copy failed")
+			}
+			repo.mocks.s3Client.EXPECT().CopyObject(ctx, mock.Anything, mock.Anything).Return(minio.UploadInfo{}, copyErr).Once()
+			err := repo.copyLfsObjects(ctx, 10, 20)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCopyForkLFSObjectsContinuesAfterCopyError(t *testing.T) {
+	ctx := context.Background()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, int64(10)).Return([]database.LfsMetaObject{
+		{Oid: "first", Size: 1}, {Oid: "second", Size: 2},
+	}, nil).Once()
+	repo.mocks.stores.RepoMock().EXPECT().FindById(ctx, int64(10)).Return(&database.Repository{ID: 10}, nil).Once()
+	repo.mocks.stores.RepoMock().EXPECT().FindById(ctx, int64(20)).Return(&database.Repository{ID: 20}, nil).Once()
+	copyErr := errors.New("copy failed")
+	repo.mocks.s3Client.EXPECT().CopyObject(ctx, mock.Anything, mock.Anything).Return(minio.UploadInfo{}, copyErr).Once()
+	repo.mocks.s3Client.EXPECT().CopyObject(ctx, mock.Anything, mock.Anything).Return(minio.UploadInfo{}, nil).Once()
+	require.NoError(t, repo.copyLfsObjects(ctx, 10, 20))
 }
 
 // TestRepoComponent_CreateForkRejectsUnreadableSource verifies private source access is enforced.
@@ -2274,29 +2308,35 @@ func TestRepoComponent_AllowAccessEndpoint_PrivateForbidden(t *testing.T) {
 
 // TestRepoComponent_AllowAccessEndpoint_PrivateOrgMemberAllowed checks the expected user query options.
 func TestRepoComponent_AllowAccessEndpoint_PrivateOrgMemberAllowed(t *testing.T) {
-	ctx := context.TODO()
-	repo := initializeTestRepoComponent(ctx, t)
-	repo.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(123)).Return(database.User{
-		ID:       123,
-		Username: "owner",
-	}, nil)
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{
-		ID:   456,
-		UUID: "member-uuid",
-	}, nil)
-	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{
-		UUID: "ns-uuid-1",
-	}, nil)
-	expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, true)
+	for _, removed := range []bool{false, true} {
+		ctx := context.TODO()
+		repo := initializeTestRepoComponent(ctx, t)
+		if removed {
+			repo.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(123)).Return(database.User{}, sql.ErrNoRows)
+		} else {
+			repo.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(123)).Return(database.User{
+				ID:       123,
+				Username: "owner",
+			}, nil)
+		}
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{
+			ID:   456,
+			UUID: "member-uuid",
+		}, nil)
+		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{
+			UUID: "ns-uuid-1",
+		}, nil)
+		expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, true)
 
-	allow, err := repo.AllowAccessEndpoint(ctx, "member", &database.Deploy{
-		SecureLevel:    types.EndpointPrivate,
-		UserID:         123,
-		RepoID:         456,
-		OwnerNamespace: "org1",
-	})
-	require.Nil(t, err)
-	require.True(t, allow)
+		allow, err := repo.AllowAccessEndpoint(ctx, "member", &database.Deploy{
+			SecureLevel:    types.EndpointPrivate,
+			UserID:         123,
+			RepoID:         456,
+			OwnerNamespace: "org1",
+		})
+		require.Nil(t, err)
+		require.True(t, allow)
+	}
 }
 
 func TestRepoComponent_AllowAccessDeploy(t *testing.T) {
@@ -4653,6 +4693,7 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 				Action:  types.CommitActionUpdate,
 				Content: "content",
 			},
+			{Path: "old.go", Action: types.CommitActionDelete},
 		},
 	}
 	repoComp.mocks.gitServer.EXPECT().GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
@@ -4665,6 +4706,7 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 			Path: "a.go",
 			Size: 1024 * 1024 * 1024 * 1024,
 		},
+		{Path: "old.go"},
 	}, nil)
 
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
@@ -4682,6 +4724,7 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 				Content: "content=",
 				Action:  gitserver.CommitActionUpdate,
 			},
+			{Path: "old.go", Action: gitserver.CommitActionDelete},
 		},
 	}).Return(nil)
 

@@ -12,7 +12,7 @@ import (
 // TestMirrorComponentListMirrorSyncs verifies database pagination and task-based attempt fields.
 func TestMirrorComponentListMirrorSyncs(t *testing.T) {
 	ctx := context.Background()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.config.Mirror.MaxRetryCount = 3
 	first := mirrorWithCurrentTask(types.MirrorRepoSyncStart, 11, 0)
 	first.CurrentTask.Priority = types.HighMirrorPriority
@@ -47,7 +47,7 @@ func TestMirrorComponentListMirrorSyncs(t *testing.T) {
 // TestMirrorComponentListMirrorSyncsUsesTaskStatusFilter verifies filtering is delegated to the database.
 func TestMirrorComponentListMirrorSyncsUsesTaskStatusFilter(t *testing.T) {
 	ctx := context.Background()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.config.Mirror.MaxRetryCount = 3
 	mirror := mirrorWithCurrentTask(types.MirrorRepoSyncFailed, 11, 0)
 	mirror.CurrentTask.RetryCount = 2
@@ -76,7 +76,7 @@ func TestMirrorComponentListMirrorSyncsUsesTaskStatusFilter(t *testing.T) {
 // TestMirrorComponentListMirrorSyncsReturnsEmptyPage verifies empty database pages remain empty.
 func TestMirrorComponentListMirrorSyncsReturnsEmptyPage(t *testing.T) {
 	ctx := context.Background()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.mocks.stores.MirrorMock().EXPECT().IndexSyncWithPagination(ctx, database.MirrorSyncListQuery{
 		Page: 1, Per: 10,
 	}).Return(nil, 0, nil)

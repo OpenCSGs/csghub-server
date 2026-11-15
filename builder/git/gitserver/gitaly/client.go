@@ -17,11 +17,13 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 var _ gitserver.GitServer = (*Client)(nil)
 
 type Client struct {
+	sourcePolicy        common.PublicHTTPPolicy
 	config              *config.Config
 	sidechannelRegistry *gitalyclient.SidechannelRegistry
 	repoClient          gitalypb.RepositoryServiceClient
@@ -96,6 +98,7 @@ func NewClient(config *config.Config) (*Client, error) {
 	treeTimeoutTime := time.Duration(config.Git.TreeOperationTimeout) * time.Second
 	gitFetchTimeout := time.Duration(config.Git.FetchTimeout) * time.Second
 	return &Client{
+		sourcePolicy:        common.PublicHTTPPolicy{TrustedDomains: config.Mirror.TrustedDomains},
 		config:              config,
 		sidechannelRegistry: sidechannelRegistry,
 		repoClient:          repoClient,

@@ -94,6 +94,9 @@ func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to get deploy task %d in Deploy activity error: %w", taskId, err)
 	}
+	if task.Status == common.TaskStatusCancelled {
+		return nil
+	}
 	a.reportLog(types.DeployInProgress.String(), types.StepDeploying, task)
 
 	// Sandboxes skip the build phase (image already exists) and repo lookup; they create the
@@ -126,12 +129,20 @@ func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 		}
 	}
 
+	return a.submitDeploy(ctx, task, deployRequest)
+}
+
+func (a *DeployActivity) submitDeploy(ctx context.Context, task *database.DeployTask, deployRequest *types.RunRequest) error {
 	updatedTask, err := a.ds.GetDeployTask(ctx, task.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get deploy by task id %d error: %w", task.ID, err)
 	}
 
-	if updatedTask.Status == common.Pending {
+	if updatedTask.Status != common.Pending {
+		return nil
+	}
+
+	return a.dispatch(ctx, updatedTask, func(a *DeployActivity) error {
 		runResponse, err := a.ir.Run(ctx, deployRequest)
 		if err != nil {
 			a.reportLog(types.DeployFailed.String()+": \n"+err.Error(), types.StepDeploying, task)
@@ -140,13 +151,16 @@ func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 			}
 			return fmt.Errorf("failed to call image runner by deploy task id %d error: %w", task.ID, err)
 		}
-		serviceName := runResponse.Message
-		if err := a.updateDeployTaskStatus(task, serviceName); err != nil {
-			return err
-		}
-	}
+		return a.updateDeployTaskStatus(task, runResponse.Message)
+	})
+}
 
-	return nil
+func (a *DeployActivity) dispatch(ctx context.Context, task *database.DeployTask, submit func(*DeployActivity) error) error {
+	return a.ds.DispatchPendingTask(ctx, task, func(store database.DeployTaskStore) error {
+		scoped := *a
+		scoped.ds = store
+		return submit(&scoped)
+	})
 }
 
 func (a *DeployActivity) Build(ctx context.Context, taskId int64) error {
@@ -154,7 +168,7 @@ func (a *DeployActivity) Build(ctx context.Context, taskId int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to get build task %d error: %w", taskId, err)
 	}
-	if task.Status == common.TaskStatusBuildSkip {
+	if task.Status == common.TaskStatusBuildSkip || task.Status == common.TaskStatusCancelled {
 		return nil
 	}
 	repoInfo, err := a.getRepositoryInfo(ctx, task)
@@ -230,23 +244,24 @@ func (a *DeployActivity) checkBuildTaskStatus(ctx context.Context, task *databas
 	}
 
 	switch {
+	case updatedTask.Status == common.TaskStatusCancelled:
+		return false, nil
 	case updatedTask.Status == common.TaskStatusBuildPending:
-		if err := a.ib.Build(ctx, buildRequest); err != nil {
-			if herr := a.handleBuildError(task, err); herr != nil {
-				a.getLogger(ctx).Error("handle error status for failed to start pending build task", "task_id", task.ID, "error", err)
-				return false, herr
+		err := a.dispatch(ctx, updatedTask, func(a *DeployActivity) error {
+			if err := a.ib.Build(ctx, buildRequest); err != nil {
+				if herr := a.handleBuildError(task, err); herr != nil {
+					return herr
+				}
+				a.reportLog(types.BuildFailed.String()+": \n"+err.Error(), types.StepBuildFailed, task)
+				return fmt.Errorf("start pending build task %d failed: %w", task.ID, err)
 			}
-
-			a.getLogger(ctx).Error("start pending build task failed", "task_id", task.ID, "error", err)
-			a.reportLog(types.BuildFailed.String()+": \n"+err.Error(), types.StepBuildFailed, task)
-			return false, fmt.Errorf("start pending build task %d failed: %w", updatedTask.ID, err)
-		}
-		if err := a.handleBuildTaskToBuildInQueue(task); err != nil {
-			a.getLogger(ctx).Error("Failed to handle build task to build in queue status", "task_id", task.ID, "error", err)
-			return false, err
-		}
-		a.reportLog(types.BuildInProgress.String(), types.StepBuildInProgress, task)
-		return true, nil
+			if err := a.handleBuildTaskToBuildInQueue(task); err != nil {
+				return err
+			}
+			a.reportLog(types.BuildInProgress.String(), types.StepBuildInProgress, task)
+			return nil
+		})
+		return err == nil, err
 	case updatedTask.Status == common.TaskStatusBuildFailed:
 		a.getLogger(ctx).Info("Build task failed", "task_id", task.ID, "status", updatedTask.Status)
 		return false, fmt.Errorf("build task failed: %s", updatedTask.Message)
@@ -1000,8 +1015,10 @@ func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, e
 	}
 	// Issue #1489: explicitly enabled --async-scheduling combined with
 	// speculative decoding can reduce or negate the speedup on conflicting
-	// vLLM versions; surface the combination as a server-side warning.
-	if specState.Active && asyncSchedulingEnabled(deployInfo.EngineArgs) {
+	// vLLM versions; surface the combination as a server-side warning. ngram is
+	// excluded because composition strips the flag (issue #1659), so the
+	// combination no longer reaches the engine.
+	if specState.Active && method != specMethodNgram && asyncSchedulingEnabled(deployInfo.EngineArgs) {
 		logger.Warn("--async-scheduling is explicitly enabled together with speculative decoding, which may reduce its benefit",
 			"deploy_id", deployInfo.ID)
 	}

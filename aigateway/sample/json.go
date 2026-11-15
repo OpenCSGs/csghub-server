@@ -23,6 +23,7 @@ const (
 	batchSpeechRoute               = "/audio/speech/batch"
 	videoGenerationsRoute          = "/video/generations"
 	systemoneRoute                 = "/systemone"
+	decisionsRoute                 = "/decisions"
 	responsesSampleMaxOutputTokens = 16
 	defaultAnthropicVersion        = "2023-06-01"
 )
@@ -179,6 +180,23 @@ func batchSpeechRequest(input types.SampleInput) (*types.SampleRequest, error) {
 func videoGenerationsRequest(input types.SampleInput) (*types.SampleRequest, error) {
 	dto := types.VideoGenerationRequest{Model: input.Model, Prompt: sampleText(input)}
 	return jsonRequest(input, dto)
+}
+
+// decisionsRequest builds a minimal OpenAI Decisions inference sample: one
+// text input and one predicate question.  Input and questions are opaque to
+// the gateway, so the probe uses the smallest documented shapes.
+func decisionsRequest(input types.SampleInput) (*types.SampleRequest, error) {
+	text, err := json.Marshal(sampleText(input))
+	if err != nil {
+		return nil, fmt.Errorf("marshal decisions sample input: %w", err)
+	}
+	dto := types.DecisionRequest{
+		Model: input.Model,
+		Input: json.RawMessage(`[{"role":"user","content":[{"type":"input_text","text":` + string(text) + `}]}]`),
+		Questions: json.RawMessage(
+			`[{"type":"predicate","name":"sample","instructions":"Is this a normal customer message?"}]`),
+	}
+	return jsonRequest(input, &dto)
 }
 
 // systemoneRequest builds a minimal Jev (System One) inference sample: one

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"opencsg.com/csghub-server/aigateway/httparchive"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/llm"
 )
@@ -21,7 +22,7 @@ func newVllmTokenizerImpl(endpoint, host, model string) Tokenizer {
 		endpoint: endpoint,
 		host:     host,
 		model:    model,
-		hc:       llm.NewClient(),
+		hc:       llm.NewClientWithTransport(httparchive.WrapTransport),
 	}
 }
 

@@ -158,12 +158,15 @@ func (c *casdoorClientImpl) DeleteUser(ctx context.Context, uuid string) error {
 	if id == nil {
 		return nil
 	}
-	_, err = c.casClient.DeleteUser(id)
+	deleted, err := c.casClient.DeleteUser(id)
 	if err != nil {
 		slog.Error("DeleteUser failed from casdoor", "err", err, "uuid", uuid)
 		return errorx.ErrRemoteServiceFail
 	}
 
+	if !deleted {
+		return fmt.Errorf("Casdoor did not confirm user deletion")
+	}
 	return nil
 }
 

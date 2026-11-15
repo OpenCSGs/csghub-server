@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"testing"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -208,6 +211,66 @@ func TestCodeHandler_Show(t *testing.T) {
 	tester.mocks.code.EXPECT().Show(tester.Ctx(), "u", "r", "u", false, false).Return(&types.Code{Name: "c"}, nil)
 	tester.WithUser().Execute()
 	tester.ResponseEq(t, 200, tester.OKText, &types.Code{Name: "c"})
+}
+
+// captureSlog redirects the default slog logger into a buffer and restores the
+// original logger when the test finishes.
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var logs bytes.Buffer
+	original := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(original) })
+	return &logs
+}
+
+func TestCodeHandler_ShowNeedMultiSync(t *testing.T) {
+	t.Run("absent param defaults to false without error log", func(t *testing.T) {
+		logs := captureSlog(t)
+		tester := NewCodeTester(t).WithHandleFunc(func(cp *CodeHandler) gin.HandlerFunc {
+			return cp.Show
+		})
+		tester.mocks.code.EXPECT().Show(tester.Ctx(), "u", "r", "", false, false).Return(&types.Code{Name: "c"}, nil)
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusOK)
+		require.NotContains(t, logs.String(), "bad need_multi_sync params")
+	})
+
+	t.Run("empty param defaults to false without error log", func(t *testing.T) {
+		logs := captureSlog(t)
+		tester := NewCodeTester(t).WithHandleFunc(func(cp *CodeHandler) gin.HandlerFunc {
+			return cp.Show
+		})
+		tester.WithQuery("need_multi_sync", "")
+		tester.mocks.code.EXPECT().Show(tester.Ctx(), "u", "r", "", false, false).Return(&types.Code{Name: "c"}, nil)
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusOK)
+		require.NotContains(t, logs.String(), "bad need_multi_sync params")
+	})
+
+	t.Run("valid param is passed through without error log", func(t *testing.T) {
+		logs := captureSlog(t)
+		tester := NewCodeTester(t).WithHandleFunc(func(cp *CodeHandler) gin.HandlerFunc {
+			return cp.Show
+		})
+		tester.WithQuery("need_multi_sync", "true")
+		tester.mocks.code.EXPECT().Show(tester.Ctx(), "u", "r", "", false, true).Return(&types.Code{Name: "c"}, nil)
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusOK)
+		require.NotContains(t, logs.String(), "bad need_multi_sync params")
+	})
+
+	t.Run("invalid param defaults to false and logs error", func(t *testing.T) {
+		logs := captureSlog(t)
+		tester := NewCodeTester(t).WithHandleFunc(func(cp *CodeHandler) gin.HandlerFunc {
+			return cp.Show
+		})
+		tester.WithQuery("need_multi_sync", "abc")
+		tester.mocks.code.EXPECT().Show(tester.Ctx(), "u", "r", "", false, false).Return(&types.Code{Name: "c"}, nil)
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusOK)
+		require.Contains(t, logs.String(), "bad need_multi_sync params")
+	})
 }
 
 func TestCodeHandler_Relations(t *testing.T) {

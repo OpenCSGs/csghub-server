@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
@@ -135,6 +136,8 @@ func TestAgentTemplateStore_ListByUserUUID_WithPublicTemplates(t *testing.T) {
 		Public:      false,
 	}
 	_, err = store.Create(ctx, user2Template)
+	require.NoError(t, err)
+	_, err = store.Create(ctx, &database.AgentTemplate{Type: "csgclaw", UserUUID: userUUID1, Name: "hidden", IsInternal: true})
 	require.NoError(t, err)
 
 	// Test ListByUserUUID for user1 - should return both private and public templates
@@ -375,4 +378,86 @@ func TestAgentTemplateStore_ListByUserUUID_WithEditableFilter(t *testing.T) {
 	require.Len(t, templates, 1)
 	require.Equal(t, 1, total)
 	require.Equal(t, user1Public.ID, templates[0].ID, "Only user1's public template should match the search")
+}
+
+func TestAgentTemplateStore_Curation(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentTemplateStoreWithDB(db)
+	curationStore := database.NewAgentResourceCurationStoreWithDB(db)
+
+	ownerUUID := uuid.New().String()
+	otherUUID := uuid.New().String()
+
+	mkPublic := func(name string) *database.AgentTemplate {
+		tmpl := &database.AgentTemplate{
+			Type:     "langflow",
+			UserUUID: ownerUUID,
+			Name:     name,
+			Public:   true,
+		}
+		_, err := store.Create(ctx, tmpl)
+		require.NoError(t, err)
+		return tmpl
+	}
+	tmplA := mkPublic("curation-tmpl-a")
+	tmplB := mkPublic("curation-tmpl-b")
+	internal := &database.AgentTemplate{Type: "csgclaw", UserUUID: ownerUUID, Name: "curation-internal", Public: true, IsInternal: true}
+	_, err := store.Create(ctx, internal)
+	require.NoError(t, err)
+	idA := strconv.FormatInt(tmplA.ID, 10)
+	idB := strconv.FormatInt(tmplB.ID, 10)
+
+	listedByID := func(userUUID string) map[int64]database.AgentTemplate {
+		templates, _, err := store.ListByUserUUID(ctx, userUUID, types.AgentTemplateFilter{}, 100, 1)
+		require.NoError(t, err)
+		byID := make(map[int64]database.AgentTemplate, len(templates))
+		for _, tmpl := range templates {
+			byID[tmpl.ID] = tmpl
+		}
+		return byID
+	}
+
+	// Unlisted hides the template from non-owners but not from the owner
+	unlisted := true
+	require.NoError(t, curationStore.UpsertFields(ctx, "agent_template", idA, database.AgentResourceCurationFields{Unlisted: &unlisted}))
+	require.NotContains(t, listedByID(otherUUID), tmplA.ID, "unlisted template must be hidden from non-owners")
+	require.Contains(t, listedByID(otherUUID), tmplB.ID)
+	require.Contains(t, listedByID(ownerUUID), tmplA.ID, "owner still sees own unlisted template")
+
+	// Admin list includes unlisted templates with curation state
+	adminItems, adminTotal, err := store.ListPublicWithCuration(ctx, "", 100, 1)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, adminTotal, 2)
+	adminByID := make(map[int64]database.AgentTemplate, len(adminItems))
+	for _, tmpl := range adminItems {
+		adminByID[tmpl.ID] = tmpl
+	}
+	require.True(t, adminByID[tmplA.ID].Unlisted)
+	require.False(t, adminByID[tmplB.ID].Unlisted)
+	require.NotContains(t, adminByID, internal.ID)
+
+	// Visible order excludes unlisted templates
+	visible, err := store.ListVisiblePublicOrder(ctx)
+	require.NoError(t, err)
+	visibleIDs := make(map[int64]bool, len(visible))
+	for _, item := range visible {
+		visibleIDs[item.ID] = true
+	}
+	require.False(t, visibleIDs[tmplA.ID])
+	require.True(t, visibleIDs[tmplB.ID])
+	require.False(t, visibleIDs[internal.ID])
+
+	// Recommended badge shows on the user list
+	recommended := true
+	require.NoError(t, curationStore.UpsertFields(ctx, "agent_template", idB, database.AgentResourceCurationFields{Recommended: &recommended}))
+	require.True(t, listedByID(otherUUID)[tmplB.ID].Recommended)
+
+	// Deleting a template removes its curation row
+	require.NoError(t, store.Delete(ctx, tmplA.ID))
+	curation, err := curationStore.GetByEntity(ctx, "agent_template", idA)
+	require.NoError(t, err)
+	require.Nil(t, curation)
 }

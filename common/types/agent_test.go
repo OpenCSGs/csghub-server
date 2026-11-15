@@ -6,6 +6,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestValidateAgentInstanceRelayRegistration(t *testing.T) {
+	const agentID = "agt_0123456789abcdef01234567"
+
+	tests := []struct {
+		name    string
+		relay   *AgentInstanceRelayRegistration
+		wantErr string
+	}{
+		{name: "nil registration"},
+		{name: "valid", relay: &AgentInstanceRelayRegistration{AgentID: agentID}},
+		{name: "invalid prefix", relay: &AgentInstanceRelayRegistration{AgentID: "agent_0123456789abcdef01234567"}, wantErr: "relay agent_id is invalid"},
+		{name: "short id", relay: &AgentInstanceRelayRegistration{AgentID: "agt_0123"}, wantErr: "relay agent_id is invalid"},
+		{name: "uppercase hex", relay: &AgentInstanceRelayRegistration{AgentID: "agt_0123456789ABCDEF01234567"}, wantErr: "relay agent_id is invalid"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateAgentInstanceRelayRegistration(tt.relay)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestCSGClawHasCustomUI(t *testing.T) {
 	tests := []struct {
 		name     string

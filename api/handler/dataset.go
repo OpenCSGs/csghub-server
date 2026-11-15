@@ -296,11 +296,7 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 	if err != nil {
 		needOpWeight = false
 	}
-	qNeedMultiSync := ctx.Query("need_multi_sync")
-	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
-	if err != nil {
-		needMultiSync = false
-	}
+	needMultiSync := queryBool(ctx, "need_multi_sync")
 	detail, err := h.dataset.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
 		if errors.Is(err, errorx.ErrRepoNotFound) {

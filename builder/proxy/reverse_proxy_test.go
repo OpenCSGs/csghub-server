@@ -3,8 +3,10 @@ package proxy
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -278,3 +280,35 @@ func serveHTTPWithError(t *testing.T, rp ReverseProxy, w http.ResponseWriter, r 
 // 	header.Set("Content-Type", "text/event-stream;charset=utf-8")
 // 	require.False(t, rp.isTextContent(header))
 // }
+
+// The transport observes the finalized upstream exchange, before response modifiers.
+func TestReverseProxyTransportSeesFinalRequestAndRawResponse(t *testing.T) {
+	payload := `{ "model":"jev", "unknown":{"nested":[1,2]} }`
+	called := false
+	rp, err := NewReverseProxy("http://upstream.invalid/base?version=2",
+		WithoutAcceptEncoding(), WithTransport(archiveTestTransport(func(req *http.Request) (*http.Response, error) {
+			called = true
+			require.Equal(t, "/v1/systemone", req.URL.Path)
+			require.Equal(t, "model.internal", req.Host)
+			require.Equal(t, "identity", req.Header.Get("Accept-Encoding"))
+			body, readErr := io.ReadAll(req.Body)
+			require.NoError(t, readErr)
+			require.Equal(t, payload, string(body))
+			return &http.Response{StatusCode: 200, Header: http.Header{"X-Raw": []string{"yes"}}, Body: io.NopCloser(strings.NewReader("raw-response")), Request: req}, nil
+		})), WithResponseModifier(func(resp *http.Response) error {
+			require.True(t, called)
+			require.Equal(t, "yes", resp.Header.Get("X-Raw"))
+			resp.Header.Set("X-Modified", "yes")
+			return nil
+		}))
+	require.NoError(t, err)
+	w := httptest.NewRecorder()
+	require.NoError(t, rp.(ErrorReportingReverseProxy).ServeHTTPWithError(w, httptest.NewRequest(http.MethodPost, "/client", strings.NewReader(payload)), "/v1/systemone", "model.internal"))
+	require.True(t, called)
+	require.Equal(t, "raw-response", w.Body.String())
+	require.Equal(t, "yes", w.Header().Get("X-Modified"))
+}
+
+type archiveTestTransport func(*http.Request) (*http.Response, error)
+
+func (f archiveTestTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

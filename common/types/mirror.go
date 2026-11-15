@@ -403,9 +403,11 @@ const (
 )
 
 type Mirror struct {
-	ID           int64        `json:"id"`
-	SourceUrl    string       `json:"source_url"`
-	MirrorSource MirrorSource `json:"mirror_source"`
+	// LatestLFSReady reports whether all LFS objects of the current sync snapshot exist. Omitted in CE.
+	LatestLFSReady *bool        `json:"latest_lfs_ready,omitempty"`
+	ID             int64        `json:"id"`
+	SourceUrl      string       `json:"source_url"`
+	MirrorSource   MirrorSource `json:"mirror_source"`
 	//source user name
 	Username string `json:"username"`
 	// source access token

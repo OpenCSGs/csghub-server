@@ -1,4 +1,4 @@
-"""Patch vLLM-Omni v0.31.0rc1 to expose generated TTS duration.
+"""Patch vLLM-Omni v0.32.0 to expose generated TTS duration.
 
 The patch is intentionally version-locked. It must fail during the image
 build when vLLM-Omni changes, rather than silently producing an image without
@@ -12,12 +12,12 @@ from pathlib import Path
 def replace_once(path: Path, old: str, new: str) -> None:
     content = path.read_text()
     if content.count(old) != 1:
-        raise RuntimeError(f"unexpected vLLM-Omni v0.31.0rc1 source in {path}")
+        raise RuntimeError(f"unexpected vLLM-Omni v0.32.0 source in {path}")
     path.write_text(content.replace(old, new))
 
 
-# Do not import vllm_omni: v0.31.0rc1 loads CUDA libcudart at import time,
-# which is missing in the ROCm image.
+# Do not import vllm_omni: this script also runs while building the ROCm image,
+# where the CUDA runtime that vllm_omni loads at import time is absent.
 spec = importlib.util.find_spec("vllm_omni")
 if spec is None or spec.origin is None:
     raise RuntimeError("vllm_omni is not installed")
@@ -25,22 +25,18 @@ serving_path = Path(spec.origin).resolve().parent / "entrypoints/openai/serving_
 
 replace_once(
     serving_path,
-    """        first_audio_chunk_s: float | None = None
-        first_audio_packet_ts: float | None = None
-        ttfp_observed = False
+    """        ttfp_observed = False
         stream_start_s = request_start_s if request_start_s is not None else time.perf_counter()
-        artifact_ready = False
+        audio_chunk_arrivals_s: list[float] = []
 """,
-    """        first_audio_chunk_s: float | None = None
-        first_audio_packet_ts: float | None = None
-        ttfp_observed = False
+    """        ttfp_observed = False
         total_audio_samples = 0
         stream_start_s = request_start_s if request_start_s is not None else time.perf_counter()
-        artifact_ready = False
+        audio_chunk_arrivals_s: list[float] = []
 """,
 )
 
-# v0.31.0rc1 slices the cumulative tensor and resamples *after* the squeeze
+# v0.32.0 slices the cumulative tensor and resamples *after* the squeeze
 # above, so the sample tally is taken once the chunk that is actually encoded
 # is final. Resampling preserves duration, so counting source-rate samples and
 # dividing by ``sample_rate_val`` stays exact (the resampler's held-back tail
@@ -64,7 +60,7 @@ replace_once(
 replace_once(
     serving_path,
     """            else:
-                logger.info(
+                self._log_request(
                     "[SpeechE2E] request_id=%s stream=true status=ok total_ms=%.2f first_chunk_ms=NA",
                     request_id,
                     total_ms,
@@ -74,7 +70,7 @@ replace_once(
             raise
 """,
     """            else:
-                logger.info(
+                self._log_request(
                     "[SpeechE2E] request_id=%s stream=true status=ok total_ms=%.2f first_chunk_ms=NA",
                     request_id,
                     total_ms,
@@ -144,31 +140,31 @@ replace_once(
 
 replace_once(
     serving_path,
-    """            audio_obj = CreateAudio(
-                audio_tensor=audio_tensor,
-                sample_rate=sample_rate,
-                output_sample_rate=request.sample_rate,
-                response_format=request.response_format or "wav",
-                speed=self._audio_encode_speed(request),
-                base64_encode=base64_encode,
-            )
+    """        audio_obj = CreateAudio(
+            audio_tensor=audio_tensor,
+            sample_rate=sample_rate,
+            output_sample_rate=request.sample_rate,
+            response_format=request.response_format or "wav",
+            speed=self._audio_encode_speed(request),
+            base64_encode=base64_encode,
+        )
 """,
-    """            audio_duration_s = None
-            if sample_rate > 0:
-                audio_array = np.asarray(audio_tensor)
-                audio_channels = _infer_audio_num_channels(audio_array)
-                audio_duration_s = audio_array.size / max(audio_channels, 1) / sample_rate
-                if raw_request is not None and audio_duration_s > 0:
-                    raw_request.state.audio_duration_s = audio_duration_s
+    """        audio_duration_s = None
+        if sample_rate > 0:
+            audio_array = np.asarray(audio_tensor)
+            audio_channels = _infer_audio_num_channels(audio_array)
+            audio_duration_s = audio_array.size / max(audio_channels, 1) / sample_rate
+            if raw_request is not None and audio_duration_s > 0:
+                raw_request.state.audio_duration_s = audio_duration_s
 
-            audio_obj = CreateAudio(
-                audio_tensor=audio_tensor,
-                sample_rate=sample_rate,
-                output_sample_rate=request.sample_rate,
-                response_format=request.response_format or "wav",
-                speed=self._audio_encode_speed(request),
-                base64_encode=base64_encode,
-            )
+        audio_obj = CreateAudio(
+            audio_tensor=audio_tensor,
+            sample_rate=sample_rate,
+            output_sample_rate=request.sample_rate,
+            response_format=request.response_format or "wav",
+            speed=self._audio_encode_speed(request),
+            base64_encode=base64_encode,
+        )
 """,
 )
 

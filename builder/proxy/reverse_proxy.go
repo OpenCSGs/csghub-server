@@ -25,6 +25,7 @@ type ErrorReportingReverseProxy interface {
 
 type reverseProxyImpl struct {
 	target                 *url.URL
+	transport              http.RoundTripper
 	acceptEncoding         *string
 	requestHeadersToRemove []string
 	responseModifiers      []func(*http.Response) error
@@ -33,6 +34,11 @@ type reverseProxyImpl struct {
 var DefaultResponseStreamContentType openai.ChatCompletionChunk
 
 type ReverseProxyOption func(*reverseProxyImpl)
+
+// WithTransport preserves the caller's transport and connection pool. Nil uses Go's default.
+func WithTransport(transport http.RoundTripper) ReverseProxyOption {
+	return func(rp *reverseProxyImpl) { rp.transport = transport }
+}
 
 func WithAcceptEncoding(encoding string) ReverseProxyOption {
 	return func(rp *reverseProxyImpl) {
@@ -85,6 +91,7 @@ func (rp *reverseProxyImpl) ServeHTTPWithError(w http.ResponseWriter, r *http.Re
 		}
 	}()
 	proxy := httputil.NewSingleHostReverseProxy(rp.target)
+	proxy.Transport = rp.transport
 	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
 		proxyErr = err
 		if errors.Is(err, context.Canceled) {

@@ -51,3 +51,19 @@ func TestInitLocalizersFromEmbedFile_ImportErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestAPIKeyLimitTranslations verifies the fixed message in every supported locale.
+func TestAPIKeyLimitTranslations(t *testing.T) {
+	InitLocalizersFromEmbedFile()
+	for lang, want := range map[string]string{
+		"en-US": "API key limit reached. Delete an unused key and try again.",
+		"zh-CN": "API Key 数量已达上限，请删除不再使用的 Key 后重试。",
+		"zh-HK": "API Key 數量已達上限，請刪除不再使用的 Key 後重試。",
+	} {
+		t.Run(lang, func(t *testing.T) {
+			got, ok := TranslateText(lang, "error.USER-ERR-31", "missing")
+			require.True(t, ok)
+			require.Equal(t, want, got)
+		})
+	}
+}

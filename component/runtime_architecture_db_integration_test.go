@@ -40,7 +40,7 @@ func TestRuntimeFrameworkSyncPersistsMergedEngineArgsPerImage(t *testing.T) {
 		computeType string
 		imageArgs   []string
 	}{
-		{"opencsghq/vllm:v0.31.0", "gpu", []string{"async-scheduling", "spec-decode-method", "spec-num-tokens", "spec-draft-model", "spec-decode-scene"}},
+		{"opencsghq/vllm:v0.32.0", "gpu", []string{"async-scheduling", "spec-decode-method", "spec-num-tokens", "spec-draft-model", "spec-decode-scene"}},
 		{"opencsghq/vllm-cpu:v0.24.0", "cpu", []string{"async-scheduling"}},
 		{"opencsghq/vllm:v0.9.2-cu118", "gpu", []string{"guided-decoding-backend", "swap-space"}},
 		{"opencsghq/vllm:v0.8.5-dtk25.04", "dcu", []string{"guided-decoding-backend", "swap-space"}},
@@ -61,11 +61,25 @@ func TestRuntimeFrameworkSyncPersistsMergedEngineArgsPerImage(t *testing.T) {
 
 	// The two groups of images end up with different stored args, which is what
 	// separates this from the single shared template.
-	newer, err := c.runtimeFrameworksStore.FindByFrameImageAndComputeType(ctx, "opencsghq/vllm:v0.31.0", "gpu")
+	newer, err := c.runtimeFrameworksStore.FindByFrameImageAndComputeType(ctx, "opencsghq/vllm:v0.32.0", "gpu")
 	require.NoError(t, err)
 	older, err := c.runtimeFrameworksStore.FindByFrameImageAndComputeType(ctx, "opencsghq/vllm:v0.9.2-cu118", "gpu")
 	require.NoError(t, err)
 	require.NotEqual(t, newer.EngineArgs, older.EngineArgs)
+
+	// The async-scheduling x spec-decode mutual-exclusion hint must survive the
+	// per-image merge, otherwise the deploy form never sees it (issue #1659).
+	var newerArgs []types.EngineArg
+	require.NoError(t, json.Unmarshal([]byte(newer.EngineArgs), &newerArgs))
+	foundAsync := false
+	for _, arg := range newerArgs {
+		if arg.Name != "async-scheduling" {
+			continue
+		}
+		foundAsync = true
+		require.Equal(t, []string{"spec-decode-method"}, arg.ConflictsWith)
+	}
+	require.True(t, foundAsync, "async-scheduling missing from the stored v0.31.0 engine args")
 
 	// The upgraded images must register every architecture they declare, and the
 	// deploy path must resolve each of them to an inference engine. Otherwise a
@@ -76,7 +90,7 @@ func TestRuntimeFrameworkSyncPersistsMergedEngineArgsPerImage(t *testing.T) {
 		computeType string
 		file        string
 	}{
-		{"opencsghq/vllm:v0.31.0", "gpu", "vllm.json"},
+		{"opencsghq/vllm:v0.32.0", "gpu", "vllm.json"},
 		{"opencsghq/sglang:v0.5.22-cu130", "gpu", "sglang.json"},
 		// llama.cpp shares one architecture list between its GPU and CPU images,
 		// so both rows must register the full declared set.

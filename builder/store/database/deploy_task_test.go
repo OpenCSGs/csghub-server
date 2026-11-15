@@ -152,13 +152,15 @@ func TestDeployTaskStore_DeployTaskCRUD(t *testing.T) {
 
 	store := database.NewDeployTaskStoreWithDB(db)
 
+	deploy := &database.Deploy{}
+	require.NoError(t, store.CreateDeploy(ctx, deploy))
 	err := store.CreateDeployTask(ctx, &database.DeployTask{
-		DeployID: 1,
+		DeployID: deploy.ID,
 		Message:  "foo",
 	})
 	require.Nil(t, err)
 	dp := &database.DeployTask{}
-	err = db.Core.NewSelect().Model(dp).Where("deploy_id=?", 1).Scan(ctx)
+	err = db.Core.NewSelect().Model(dp).Where("deploy_id=?", deploy.ID).Scan(ctx)
 	require.Nil(t, err)
 	require.Equal(t, dp.Message, "foo")
 
@@ -169,11 +171,11 @@ func TestDeployTaskStore_DeployTaskCRUD(t *testing.T) {
 	dp.Message = "bar"
 	err = store.UpdateDeployTask(ctx, dp)
 	require.Nil(t, err)
-	err = db.Core.NewSelect().Model(dp).Where("deploy_id=?", 1).Scan(ctx)
+	err = db.Core.NewSelect().Model(dp).Where("deploy_id=?", deploy.ID).Scan(ctx)
 	require.Nil(t, err)
 	require.Equal(t, dp.Message, "bar")
 
-	tasks, err := store.GetDeployTasksOfDeploy(ctx, 1)
+	tasks, err := store.GetDeployTasksOfDeploy(ctx, deploy.ID)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(tasks))
 	require.Equal(t, "bar", tasks[0].Message)

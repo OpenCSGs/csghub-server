@@ -21,7 +21,7 @@ type InvitationStore interface {
 	CreateInvitationActivity(ctx context.Context, req types.CreateInvitationActivityReq) error
 	UpdateInviteeStatus(ctx context.Context, inviteeUUID string, status types.InvitationActivityStatus) error
 	AwardCreditToInviter(ctx context.Context, activityID int64) error
-	MarkInviterCreditAsFailed(ctx context.Context, activityID int64) error
+	ExpireStaleInviterAward(ctx context.Context, activityID int64) error
 }
 
 type InvitationStoreImpl struct {
@@ -279,13 +279,16 @@ func (s *InvitationStoreImpl) AwardCreditToInviter(ctx context.Context, activity
 	})
 }
 
-func (s *InvitationStoreImpl) MarkInviterCreditAsFailed(ctx context.Context, activityID int64) error {
+// ExpireStaleInviterAward terminally expires a pending inviter award and
+// releases its pending credit. It is a no-op when the activity is no longer
+// pending, so a concurrent award always wins.
+func (s *InvitationStoreImpl) ExpireStaleInviterAward(ctx context.Context, activityID int64) error {
 	return s.db.RunInTx(ctx, func(ctx context.Context, tx Operator) error {
 		var activity InvitationActivity
 		err := tx.Core.NewSelect().Model(&activity).
 			Where("id = ?", activityID).
-			Where("inviter_status = ?", types.InvitationActivityStatusAwarded).
-			Where("award_at IS NOT NULL").
+			Where("inviter_status = ?", types.InvitationActivityStatusPending).
+			Where("award_at IS NULL or award_at = '0001-01-01 00:00:00'").
 			For("UPDATE NOWAIT").
 			Scan(ctx)
 		if err != nil {
@@ -296,7 +299,7 @@ func (s *InvitationStoreImpl) MarkInviterCreditAsFailed(ctx context.Context, act
 		}
 		if err := assertAffectedOneRow(tx.Core.NewUpdate().Model((*InvitationActivity)(nil)).
 			Where("id = ?", activity.ID).
-			Set("inviter_status = ?", types.InvitationActivityStatusFailed).
+			Set("inviter_status = ?", types.InvitationActivityStatusExpired).
 			Set("updated_at = now()").
 			Exec(ctx)); err != nil {
 			return err
@@ -312,8 +315,7 @@ func (s *InvitationStoreImpl) MarkInviterCreditAsFailed(ctx context.Context, act
 
 		err = assertAffectedOneRow(tx.Core.NewUpdate().Model(&inv).
 			Where("id = ?", inv.ID).
-			Set("pending_credit = pending_credit + ?", activity.InviterCreditAmount).
-			Set("total_credit = total_credit - ?", activity.InviterCreditAmount).
+			Set("pending_credit = pending_credit - ?", activity.InviterCreditAmount).
 			Set("updated_at = now()").
 			Exec(ctx))
 		if err != nil {

@@ -201,3 +201,17 @@ func TestDeleteXnetMessagesByFilterReturnsUnexpectedReadAndDeleteErrors(t *testi
 	stream.deleteErr[1] = deleteErr
 	require.ErrorIs(t, deleteXnetMessagesByFilter(context.Background(), stream, func([]byte) bool { return true }), deleteErr)
 }
+
+func TestHTTPArchiveRetentionIsIsolated(t *testing.T) {
+	original := jetstream.StreamConfig{Name: "llmLogStream", MaxAge: 7 * 24 * time.Hour, MaxBytes: 2 << 30}
+	legacy := original
+	applyHTTPArchiveRetention(&legacy, LLMLogGroup)
+	require.Equal(t, original, legacy)
+	archive := original
+	archive.Name = HTTPArchiveGroup.StreamName
+	applyHTTPArchiveRetention(&archive, HTTPArchiveGroup)
+	require.Equal(t, jetstream.WorkQueuePolicy, archive.Retention)
+	require.Equal(t, jetstream.DiscardNew, archive.Discard)
+	require.Zero(t, archive.MaxAge)
+	require.Equal(t, original.MaxBytes, archive.MaxBytes)
+}

@@ -17,6 +17,7 @@ import (
 // AgentMCPServerView represents a row from the agent_mcp_server_views view
 // This view combines built-in servers from mcp_resources and user-created servers from agent_mcp_servers
 type AgentMCPServerView struct {
+	Recommended  bool           `bun:",scanonly" json:"recommended"`
 	ID           string         `bun:",pk" json:"id"` // String ID (format: "builtin:{id}" or "user:{id}")
 	Name         string         `json:"name"`
 	Description  string         `json:"description"`
@@ -411,6 +412,7 @@ func (s *agentMCPServerStoreImpl) List(ctx context.Context, filter types.AgentMC
           AND pin_pref.entity_id = amsv.id
      `, filter.UserUUID, types.AgentUserPreferenceActionPin, types.AgentUserPreferenceEntityTypeAgentMCPServer)
 
+		query = applyAgentMCPCuration(query)
 		query = s.applyAgentMCPServerFilters(query, filter)
 
 		// Get total count
@@ -422,7 +424,7 @@ func (s *agentMCPServerStoreImpl) List(ctx context.Context, filter types.AgentMC
 		}
 
 		err = query.
-			OrderExpr("pin_pref.created_at DESC NULLS LAST, amsv.updated_at DESC").
+			Apply(orderAgentMCPCuration).
 			Limit(per).
 			Offset((page-1)*per).
 			Scan(ctx, &servers)

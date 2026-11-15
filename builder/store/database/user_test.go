@@ -442,6 +442,7 @@ func TestUserStore_ChangeUserName(t *testing.T) {
 	require.Equal(t, "u-bar", user.Username)
 }
 
+// TestUserStore_FindByAccessToken verifies authentication with a store-created credential.
 func TestUserStore_FindByAccessToken(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -456,7 +457,7 @@ func TestUserStore_FindByAccessToken(t *testing.T) {
 	err := us.Create(ctx, user1, &database.Namespace{Path: "u-foo"})
 	require.Nil(t, err)
 
-	//create access token for user u-foo
+	// Create through the store because Token is an in-memory field.
 	at := &database.AccessToken{
 		GitID:       1,
 		Name:        "test_token",
@@ -467,8 +468,8 @@ func TestUserStore_FindByAccessToken(t *testing.T) {
 		IsActive:    true,
 		ExpiredAt:   time.Now().Add(time.Hour * 24),
 	}
-	_, err = db.Core.NewInsert().Model(at).Exec(ctx)
-	require.Nil(t, err)
+	err = database.NewAccessTokenStoreWithDB(db).Create(ctx, at, nil)
+	require.NoError(t, err)
 
 	user, err := us.FindByGitAccessToken(ctx, at.Token)
 	require.NoError(t, err)

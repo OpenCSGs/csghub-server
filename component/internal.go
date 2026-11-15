@@ -177,6 +177,7 @@ func (c *internalComponentImpl) GetCommitDiff(ctx context.Context, req types.Get
 		LeftCommitId:  req.LeftCommitId,
 		RightCommitId: req.RightCommitId,
 		Private:       repo.Private,
+		DefaultBranch: repo.DefaultBranch,
 	})
 	if err != nil {
 		return nil, err

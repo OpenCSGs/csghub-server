@@ -219,13 +219,13 @@ func TestJevRequest_PromptText_StructuredState(t *testing.T) {
 	assert.Equal(t, `{"order":{"id":"A-1"},"tags":["refund"]}`, req.PromptText())
 }
 
-func TestJevJSONToText(t *testing.T) {
-	assert.Equal(t, "plain", JevJSONToText(json.RawMessage(`"plain"`)))
-	assert.Equal(t, "{}", JevJSONToText(json.RawMessage(`{ }`)))
-	assert.Equal(t, `[1,2]`, JevJSONToText(json.RawMessage(`[1, 2]`)))
-	assert.Equal(t, "42", JevJSONToText(json.RawMessage(`42`)))
-	assert.Empty(t, JevJSONToText(nil))
-	assert.Empty(t, JevJSONToText(json.RawMessage(`null`)), "JSON null renders as empty")
+func TestJSONToText(t *testing.T) {
+	assert.Equal(t, "plain", JSONToText(json.RawMessage(`"plain"`)))
+	assert.Equal(t, "{}", JSONToText(json.RawMessage(`{ }`)))
+	assert.Equal(t, `[1,2]`, JSONToText(json.RawMessage(`[1, 2]`)))
+	assert.Equal(t, "42", JSONToText(json.RawMessage(`42`)))
+	assert.Empty(t, JSONToText(nil))
+	assert.Empty(t, JSONToText(json.RawMessage(`null`)), "JSON null renders as empty")
 }
 
 func TestJevResponse_Parse(t *testing.T) {

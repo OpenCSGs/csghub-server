@@ -53,6 +53,17 @@ func TestTextFileChecker_Run(t *testing.T) {
 		}
 	})
 
+	t.Run("empty file passes", func(t *testing.T) {
+		mockContentChecker := mocksens.NewMockSensitiveChecker(t)
+		contentChecker = mockContentChecker
+
+		checker := NewTextFileChecker()
+		status, message := checker.Run(context.Background(), FileCheckContext{Reader: bytes.NewReader(nil)})
+		if status != types.SensitiveCheckPass || message != "" {
+			t.Errorf("Expected (%v, %v), Got (%v, %v)", types.SensitiveCheckPass, "", status, message)
+		}
+	})
+
 	t.Run("failed to read file content", func(t *testing.T) {
 		checker := NewTextFileChecker()
 

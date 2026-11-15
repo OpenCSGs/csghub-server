@@ -24,6 +24,8 @@ func (uc UpstreamConfig) SDKBaseURL(format ApiFormat) string {
 		return uc.openaiSDKBaseURL(ApiFormatChat)
 	case ApiFormatResponses:
 		return uc.openaiSDKBaseURL(ApiFormatResponses)
+	case ApiFormatDecisions:
+		return uc.openaiSDKBaseURL(ApiFormatDecisions)
 	case ApiFormatMessages:
 		return uc.anthropicSDKBaseURL()
 	default:
@@ -35,6 +37,8 @@ func (uc UpstreamConfig) openaiSDKBaseURL(format ApiFormat) string {
 	resourceTail := PathSegResponses
 	if format == ApiFormatChat {
 		resourceTail = PathSegChat + "/" + PathSegCompletions
+	} else if format == ApiFormatDecisions {
+		resourceTail = PathSegDecisions
 	}
 	if override := uc.DeclaredProtocolEndpoint(format); override != "" {
 		return openaiBaseFromEndpoint(override, resourceTail)

@@ -306,8 +306,9 @@ func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.Get
 	callback := &types.GiteaCallbackPushReq{
 		Ref: req.Ref,
 		Repository: types.GiteaCallbackPushReq_Repository{
-			FullName: fmt.Sprintf("%s_%s/%s", repoType, req.Namespace, req.Name),
-			Private:  req.Private,
+			FullName:      fmt.Sprintf("%s_%s/%s", repoType, req.Namespace, req.Name),
+			Private:       req.Private,
+			DefaultBranch: req.DefaultBranch,
 		},
 	}
 	repository := &gitalypb.Repository{

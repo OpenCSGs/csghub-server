@@ -26,7 +26,7 @@ func TestRepoComponent_UpdateRepo_VisibilityWithWrite(t *testing.T) {
 // TestMirrorComponent_PublicModelRepoNoop preserves CE's original lack of automatic publication.
 func TestMirrorComponent_PublicModelRepoNoop(t *testing.T) {
 	ctx := context.Background()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	require.NoError(t, mc.PublicModelRepo(ctx))
 }
 

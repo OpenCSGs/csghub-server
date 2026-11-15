@@ -32,6 +32,8 @@ import (
 )
 
 type mirrorComponentImpl struct {
+	latestLFSReady              func(context.Context, int64, int64) (bool, error)
+	sourcePolicy                common.PublicHTTPPolicy
 	repoComp                    RepoComponent
 	createRepoForAuthorizedUser authorizedRepoCreator
 	accessTokenStore            database.AccessTokenStore
@@ -338,6 +340,7 @@ func (m *mirrorComponentImpl) buildMirrorSyncSummaries(mirrors []database.Mirror
 func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	var err error
 	c := &mirrorComponentImpl{}
+	c.initLatestLFSReady()
 
 	repoComponent, err := NewRepoComponentImpl(config)
 	if err != nil {
@@ -370,6 +373,7 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	c.userStore = database.NewUserStore()
 	c.memberStore = database.NewMemberStore()
 	c.config = config
+	c.sourcePolicy.TrustedDomains = config.Mirror.TrustedDomains
 	c.mirrorNamespaceMappingStore = database.NewMirrorNamespaceMappingStore()
 	c.mirrorMetadataClientFactory = multisync.FromOpenCSG
 	return c, nil
@@ -400,6 +404,9 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 	req.Priority = priority
 	sourceURL, username, accessToken, err := normalizeMirrorSource(req.SourceUrl, req.Username, req.AccessToken)
 	if err != nil {
+		return nil, err
+	}
+	if err := m.validateMirrorDestination(ctx, sourceURL); err != nil {
 		return nil, err
 	}
 	req.SourceUrl = sourceURL
@@ -704,6 +711,9 @@ func (m *mirrorComponentImpl) GetMirror(ctx context.Context, req types.GetMirror
 		CreatedAt:       mirror.CreatedAt,
 		UpdatedAt:       mirror.UpdatedAt,
 	}
+	if err := m.populateLatestLFSReady(ctx, repo.ID, mirror, resMirror); err != nil {
+		return nil, fmt.Errorf("check latest LFS readiness: %w", err)
+	}
 	return resMirror, nil
 }
 
@@ -711,6 +721,9 @@ func (m *mirrorComponentImpl) GetMirror(ctx context.Context, req types.GetMirror
 func (m *mirrorComponentImpl) UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error) {
 	sourceURL, username, accessToken, err := normalizeMirrorSource(req.SourceUrl, req.Username, req.AccessToken)
 	if err != nil {
+		return nil, err
+	}
+	if err := m.validateMirrorDestination(ctx, sourceURL); err != nil {
 		return nil, err
 	}
 	req.SourceUrl = sourceURL

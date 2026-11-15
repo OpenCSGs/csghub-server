@@ -46,9 +46,18 @@ const (
 	// Capacity-admission rejections propagate the AdmissionReason* values
 	// (queue_full, queue_timeout, queue_cancelled, capacity_exceeded) into
 	// the code field; AdmissionReason is their single definition point.
-	ErrCodeContentPolicyViolation      = "content_policy_violation"
-	ErrCodeUnsupportedFeature          = "unsupported_feature"
-	ErrCodeTokenPlanQuotaExceeded      = "token_plan_quota_exceeded"
+	ErrCodeContentPolicyViolation = "content_policy_violation"
+	ErrCodeUnsupportedFeature     = "unsupported_feature"
+	ErrCodeTokenPlanQuotaExceeded = "token_plan_quota_exceeded"
+	// Per-user rate limit codes carry the SCOPE so clients can tell the
+	// gateway-global fallback (user_g_*) from a model's own limit
+	// (user_rate_limit_exceeded), and both from the upstream admission
+	// codes above; the message distinguishes the rpm/tpm dimension.
+	ErrCodeUserGlobalRateLimitExceeded = "user_g_rate_limit_exceeded"
+	// ErrCodeUserRateLimitExceeded is the model-scope code and also the
+	// fallback when a rejection reaches the renderer without its typed
+	// error.
+	ErrCodeUserRateLimitExceeded       = "user_rate_limit_exceeded"
 	ErrCodeModeration                  = "moderation_error"
 	ErrCodeUpstreamResponse            = "upstream_response_error"
 	ErrCodeTransform                   = "transform_error"

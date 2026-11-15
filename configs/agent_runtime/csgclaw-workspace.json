@@ -1,7 +1,7 @@
 {
   "agent_type": "csgclaw-workspace",
-  "version": "v0.9.0",
-  "image": "opencsghq/csgclaw-server-sandbox:2026102302",
+  "version": "v0.10.0-beta.7",
+  "image": "opencsghq/csgclaw-server-sandbox:2026110605",
   "port": 18080,
   "command": [
     "/sbin/tini",

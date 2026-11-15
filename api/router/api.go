@@ -583,6 +583,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating xnet routes:%w", err)
 	}
 
+	err = createCSGRelayRoutes(apiGroup, middlewareCollection, config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating csgrelay routes:%w", err)
+	}
+
 	// Dataset viewer proxy
 	dataViewerAddr := fmt.Sprintf("%s:%d", config.DataViewer.Host, config.DataViewer.Port)
 	dsViewerHandler, err := handler.NewInternalServiceProxyHandler(dataViewerAddr)
@@ -1062,6 +1067,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	keysGroup.Use(middlewareCollection.Auth.NeedLogin)
 	{
 		keysGroup.GET("/:uuid/apikeys/builtin", userProxyHandler.Proxy)
+		keysGroup.GET("/:uuid/apikeys/builtin/display", userProxyHandler.Proxy)
 		keysGroup.GET("/:uuid/apikeys", userProxyHandler.Proxy)
 		keysGroup.POST("/:uuid/apikeys", userProxyHandler.Proxy)
 		keysGroup.PUT("/:uuid/apikeys/:id", userProxyHandler.Proxy)
@@ -1083,7 +1089,6 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.POST("/user/verify", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.PUT("/user/verify/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminAccountUser), userProxyHandler.ProxyToApi("/api/v1/user/verify/%s", "id"))
 		apiGroup.GET("/user/verify/:id", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/user/verify/%s", "id"))
-		apiGroup.DELETE("/user/:username/close_account", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.POST("/user/email-verification-code/:email", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 	}
 
@@ -1128,6 +1133,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	apiGroup.DELETE("/user/:username/likes/collections/:id", middlewareCollection.Auth.NeedLogin, userHandler.UnLikeCollection)
 	// user owned tokens
 	apiGroup.GET("/user/:username/tokens", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
+	apiGroup.GET("/user/:username/tokens/display", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens/display", "username"))
 
 	// serverless list
 	apiGroup.GET("/user/:username/run/serverless", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), userHandler.GetRunServerless)
@@ -1150,6 +1156,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 
 	// Register separately from the legacy global-admin group so module grants are sufficient.
 	apiGroup.POST("/admin/namespaces/lookup", middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayTokenPlan), (&adminSharedRouteHandler{target: userProxyHandler.Proxy}).TokenPlanNamespaces)
+	createAccountClosureRoutes(apiGroup, middlewareCollection, userProxyHandler)
 	createExtendedUserRoutes(apiGroup, middlewareCollection, userProxyHandler)
 }
 

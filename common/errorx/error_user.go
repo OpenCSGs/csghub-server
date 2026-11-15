@@ -37,6 +37,7 @@ const (
 	identityInitializationTimeout
 	identityResultPending
 	identityExpired
+	apiKeyLimitReached
 )
 
 var (
@@ -325,6 +326,15 @@ var (
 	ErrIdentityResultPending = CustomError{prefix: errUserPrefix, code: identityResultPending}
 	// ErrIdentityExpired identifies an authenticated provider expiry result.
 	ErrIdentityExpired = CustomError{prefix: errUserPrefix, code: identityExpired}
+
+	// ErrAPIKeyLimitReached reports that a namespace cannot create another custom API key.
+	//
+	// en-US: API key limit reached. Delete an unused key and try again.
+	//
+	// zh-CN: API Key 数量已达上限，请删除不再使用的 Key 后重试。
+	//
+	// zh-HK: API Key 數量已達上限，請刪除不再使用的 Key 後重試。
+	ErrAPIKeyLimitReached error = CustomError{prefix: errUserPrefix, code: apiKeyLimitReached}
 )
 
 // UsernameExists creates a specific error for username conflicts with the conflicting username

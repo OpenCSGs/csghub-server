@@ -13,28 +13,15 @@ import (
 )
 
 func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirrorRepoReq) (int64, error) {
-	var (
-		remoteCheckReq *gitalypb.FindRemoteRepositoryRequest
-		authorHeader   string
-		err            error
-	)
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-
-	if req.MirrorToken == "" {
-		remoteCheckReq = &gitalypb.FindRemoteRepositoryRequest{
-			Remote:      req.CloneUrl,
-			StorageName: c.config.GitalyServer.Storage,
-		}
-
-		resp, err := c.remoteClient.FindRemoteRepository(ctx, remoteCheckReq)
-		if err != nil {
-			return 0, err
-		}
-		if !resp.Exists {
-			return 0, fmt.Errorf("invalid clone url")
-		}
+	resolvedAddresses, err := c.sourcePolicy.ResolveURLAddresses(ctx, req.CloneUrl)
+	if err != nil {
+		return 0, err
 	}
+	// FindRemoteRepository cannot pin DNS. The pinned clone below performs
+	// remote validation as well, without an unprotected preliminary request.
+	var authorHeader string
 
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -61,7 +48,11 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 		gitalyReq.HttpAuthorizationHeader = ""
 	}
 
-	_, err = c.repoClient.CreateRepositoryFromURL(ctx, gitalyReq)
+	err = retryMirrorAddresses(ctx, resolvedAddresses, func(address string) error {
+		gitalyReq.ResolvedAddress = address
+		_, callErr := c.repoClient.CreateRepositoryFromURL(ctx, gitalyReq)
+		return callErr
+	})
 	if err != nil {
 		return 0, errorx.ErrGitCreateMirrorFailed(err, errorx.Ctx())
 	}
@@ -72,6 +63,10 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 	var authorHeader string
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	resolvedAddresses, err := c.sourcePolicy.ResolveURLAddresses(ctx, req.CloneUrl)
+	if err != nil {
+		return err
+	}
 
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -97,7 +92,7 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = authorHeader
 	}
 
-	_, err = c.repoClient.FetchRemote(ctx, fetchRemoteReq)
+	err = c.fetchMirrorRemote(ctx, fetchRemoteReq, resolvedAddresses)
 	if err != nil {
 		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
 	}
@@ -109,6 +104,10 @@ func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) er
 	stagingPrefix := "refs/staging"
 	ctx, cancel := context.WithTimeout(ctx, c.gitFetchTimeout)
 	defer cancel()
+	resolvedAddresses, err := c.sourcePolicy.ResolveURLAddresses(ctx, req.CloneUrl)
+	if err != nil {
+		return err
+	}
 
 	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -141,7 +140,7 @@ func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) er
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = ""
 	}
 
-	_, err = c.repoClient.FetchRemote(ctx, fetchRemoteReq)
+	err = c.fetchMirrorRemote(ctx, fetchRemoteReq, resolvedAddresses)
 	if err != nil {
 		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
 	}

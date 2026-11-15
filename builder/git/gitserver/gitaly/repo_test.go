@@ -245,11 +245,15 @@ func TestGitalyMirrorOperationsUseExplicitRelativePath(t *testing.T) {
 			},
 		)).Return(nil, nil)
 
-		_, err := tester.GetDiffBetweenTwoCommits(context.Background(), gitserver.GetDiffBetweenTwoCommitsReq{
+		callback, err := tester.GetDiffBetweenTwoCommits(context.Background(), gitserver.GetDiffBetweenTwoCommitsReq{
 			RepoType: types.ModelRepo, LeftCommitId: "left", RightCommitId: "right", RelativePath: relativePath,
+			Ref: "refs/heads/master", Private: true, DefaultBranch: "master",
 		})
 
 		require.NoError(t, err)
+		require.Equal(t, "refs/heads/master", callback.Ref)
+		require.Equal(t, true, callback.Repository.Private)
+		require.Equal(t, "master", callback.Repository.DefaultBranch)
 	})
 
 	t.Run("update ref", func(t *testing.T) {

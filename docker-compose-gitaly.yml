@@ -53,13 +53,18 @@ services:
   gitaly:
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/gitaly:v16.4.6
     command:
-      ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && touch /srv/gitlab-shell/.gitlab_shell_secret && exec /usr/bin/env GITALY_CONFIG_FILE=/home/gitaly.config.toml /scripts/process-wrapper"]
+      ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && touch /srv/gitlab-shell/.gitlab_shell_secret && exec /bin/sh /etc/csghub/direct-egress.sh /scripts/process-wrapper"]
     environment:
       - GITALY_CONFIG_FILE=/home/gitaly.config.toml
+      # Git must connect directly so resolved-address pinning cannot be bypassed
+      # by an HTTP proxy resolving the mirror hostname again.
+      - NO_PROXY=*
+      - no_proxy=*
     user: "root"
     ports:
       - '8075:8075'
     volumes:
+      - ./docker/gitaly/direct-egress.sh:/etc/csghub/direct-egress.sh:ro
       - ./data/gitaly/git/repositories:/home/git/repositories
       - ./data/gitaly/git/hooks:/home/git/hooks
       - ./data/gitaly/gitaly.config.toml:/home/gitaly.config.toml

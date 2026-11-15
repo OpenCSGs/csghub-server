@@ -153,7 +153,10 @@ func globalAdminRoleGrantQuery(db bun.IDB) *bun.SelectQuery {
 // A revoked assignment remains historical; a later grant creates a new row.
 func (s *userRoleStoreImpl) AssignAdminRole(ctx context.Context, req types.AdminUserRoleRequest) error {
 	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		operatorID, err := adminRoleOperator(ctx, tx, req)
+		if err := lockAdminRoleRevocation(ctx, tx); err != nil {
+			return err
+		}
+		operatorID, err := adminRoleOperator(ctx, tx, req, true)
 		if err != nil {
 			return err
 		}
@@ -174,7 +177,7 @@ func (s *userRoleStoreImpl) RemoveAdminRole(ctx context.Context, req types.Admin
 		if err := lockAdminRoleRevocation(ctx, tx); err != nil {
 			return err
 		}
-		operatorID, err := adminRoleOperator(ctx, tx, req)
+		operatorID, err := adminRoleOperator(ctx, tx, req, false)
 		if err != nil {
 			return err
 		}
@@ -210,7 +213,7 @@ func accountAdminAssignmentsQuery(tx bun.Tx, candidates []string) *bun.SelectQue
 		Join("JOIN users AS u ON u.id = ur.user_id").
 		Join("JOIN roles AS ar ON ar.role_code = ur.role_code").
 		Join("JOIN admin_role_permissions AS arp ON arp.role_code = ar.role_code").
-		Where("u.deleted_at IS NULL").Where("ur.deleted_at IS NULL").
+		Where("u.deleted_at IS NULL AND NOT u.login_frozen").Where("ur.deleted_at IS NULL").
 		Where("ar.is_admin = ?", true).
 		Where("arp.permission_code IN (?)", bun.In(candidates))
 }
@@ -280,7 +283,7 @@ func protectAdministratorFromUserDeletion(ctx context.Context, tx bun.Tx, userID
 		Join("JOIN users AS u ON u.id = ur.user_id").
 		Join("JOIN roles AS ar ON ar.role_code = ur.role_code").
 		Where("ur.user_id = ? AND ur.deleted_at IS NULL", userID).
-		Where("u.deleted_at IS NULL AND ar.is_admin = ?", true).Exists(ctx)
+		Where("u.deleted_at IS NULL AND NOT u.login_frozen AND ar.is_admin = ?", true).Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("check administrator membership before user deletion: %w", err)
 	}
@@ -291,8 +294,12 @@ func protectAdministratorFromUserDeletion(ctx context.Context, tx bun.Tx, userID
 }
 
 // adminRoleOperator validates mutation references and any global-grant requirement in the transaction before writes.
-func adminRoleOperator(ctx context.Context, tx bun.Tx, req types.AdminUserRoleRequest) (int64, error) {
-	exists, err := tx.NewSelect().Model((*User)(nil)).ColumnExpr("1").Where("id = ?", req.UserID).Exists(ctx)
+func adminRoleOperator(ctx context.Context, tx bun.Tx, req types.AdminUserRoleRequest, granting bool) (int64, error) {
+	target := tx.NewSelect().Model((*User)(nil)).ColumnExpr("1").Where("id = ?", req.UserID)
+	if granting {
+		target.Where("NOT login_frozen")
+	}
+	exists, err := target.Exists(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("find administrator target user %d: %w", req.UserID, err)
 	}

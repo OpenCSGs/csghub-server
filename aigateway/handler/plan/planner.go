@@ -37,6 +37,10 @@ type plannerImpl struct {
 	// tenant's active token plan subscription. Nil disables the check (the
 	// CE build, or a gateway with no accounting service configured).
 	tokenPlanQuotaChecker TokenPlanQuotaChecker
+	// userRateLimitChecker enforces the per-user RPM/TPM rate limits
+	// configured at the model or gateway-global level. Nil disables the
+	// check (no policy configured anywhere).
+	userRateLimitChecker UserRateLimitChecker
 	// queueMaxRePlans bounds the re-plans triggered by an admission reroute
 	// (an upstream turned unavailable while the request waited in its
 	// reservation queue). The queue never picks another upstream itself;
@@ -56,6 +60,7 @@ type PlannerDeps struct {
 	MetricsEnricher       MetricsEnricher
 	AutoModelSelector     AutoModelSelector
 	TokenPlanQuotaChecker TokenPlanQuotaChecker
+	UserRateLimitChecker  UserRateLimitChecker
 }
 
 // PlannerOption customizes optional planner behavior.
@@ -83,6 +88,7 @@ func NewPlanner(deps PlannerDeps, opts ...PlannerOption) Planner {
 		metricsEnricher:       deps.MetricsEnricher,
 		autoModelSelector:     deps.AutoModelSelector,
 		tokenPlanQuotaChecker: deps.TokenPlanQuotaChecker,
+		userRateLimitChecker:  deps.UserRateLimitChecker,
 		queueMaxRePlans:       1,
 	}
 	for _, opt := range opts {
@@ -106,6 +112,13 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	if p.metricsEnricher != nil {
 		p.metricsEnricher.SetRequestModel(c, meta.RequestModel)
 	}
+	// User-tag queue priority: the user-tags middleware resolved the caller's
+	// upstream channel priority into the request context; carry it onto the
+	// metadata so the admission checker can merge it with the API key's
+	// priority scope (the tag dominates in both directions, see
+	// ResolveQueuePriority). Set once here — meta is the same struct across
+	// the re-plan loop below.
+	meta.UserPriority = httpbase.GetCurrentUserPriority(c)
 
 	routed := &types.RequestPlan{}
 	if err := p.applyAutoModel(c, meta, routed); err != nil {
@@ -113,7 +126,7 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	}
 
 	for attempt := 0; ; attempt++ {
-		pl, err, reroute := p.planOnce(c, meta)
+		pl, err, reroute := p.planOnce(c, meta, attempt)
 		// planOnce builds a fresh plan each time, so the decision taken
 		// above is carried onto whichever plan is returned.
 		if pl != nil {
@@ -135,7 +148,7 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	}
 }
 
-func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl *types.RequestPlan, err error, reroute bool) {
+func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata, attempt int) (pl *types.RequestPlan, err error, reroute bool) {
 	ctx := c.Request.Context()
 	pl = &types.RequestPlan{}
 
@@ -190,12 +203,27 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 
 	// 4. Balance check (respects SkipBalance).
 	if !mt.Model.SkipBalance() {
-		if err := p.balanceChecker.CheckBalance(ctx, meta.TenantID); err != nil {
+		if err := p.balanceChecker.CheckBalance(ctx, meta.TenantID, mt.Model); err != nil {
 			pl.ErrorCode = categorizePlanError(err)
 			return pl, err, false
 		}
 	}
 	pl.BalanceOK = true
+
+	// 5. Per-user rate limit (RPM/TPM) — only on the FIRST plan round, so an
+	// admission-queue reroute re-plan never double-counts the request. The
+	// check atomically CONSUMES one unit of the user's RPM budget when
+	// allowed (hard limit) and runs BEFORE capacity admission: a user over
+	// their own limit must not occupy upstream capacity. The consumption is
+	// final regardless of the admission outcome (deliberate product
+	// trade-off: charging every attempt against a saturated upstream damps
+	// retry storms — see the admission package documentation). TPM commits
+	// after Execute from the actual usage (RecordUsageFromTokenUsage).
+	if attempt == 0 {
+		if err := p.checkUserRateLimit(ctx, pl, meta, mt); err != nil {
+			return pl, err, false
+		}
+	}
 
 	// 7. Capacity admission control — the first backpressure layer in front
 	// of the runtimes. It runs BEFORE the content-safety check for two
@@ -300,6 +328,29 @@ func (p *plannerImpl) checkTokenPlanQuota(ctx context.Context, pl *types.Request
 	return err
 }
 
+// checkUserRateLimit enforces the per-user RPM/TPM rate limit configured at
+// the model or gateway-global level for the plan's resolved target. It
+// returns nil when the request may proceed; otherwise it sets the plan's
+// ErrorCode -- PlanErrUserRateLimitExceeded for an exhausted user limit,
+// PlanErrInternal for an unexpected checker failure (which the limiter
+// itself should never produce: Redis outages fail open) -- and returns the
+// error for the caller to propagate.
+func (p *plannerImpl) checkUserRateLimit(ctx context.Context, pl *types.RequestPlan, meta *types.RequestMetadata, mt *types.ModelTarget) error {
+	if p.userRateLimitChecker == nil {
+		return nil
+	}
+	err := p.userRateLimitChecker.CheckUserRateLimit(ctx, meta, mt)
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*types.UserRateLimitExceededError](err); ok {
+		pl.ErrorCode = types.PlanErrUserRateLimitExceeded
+	} else {
+		pl.ErrorCode = types.PlanErrInternal
+	}
+	return err
+}
+
 // applyAdmissionOutcome folds one admission decision into the plan. It
 // returns the (plan, effective model target, error, reroute) tuple for
 // planOnce:
@@ -374,7 +425,7 @@ func shouldAdmitCapacity(task string) bool {
 	switch task {
 	case "chat", "responses", "messages", "text-to-image",
 		"embedding", "rerank", "speech",
-		"audio", "ocr", "text-to-video", "systemone":
+		"audio", "ocr", "text-to-video", "systemone", "decisions":
 		return true
 	default:
 		return false

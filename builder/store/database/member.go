@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
 	"opencsg.com/csghub-server/builder/rebac"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -87,6 +88,19 @@ func (s *memberStoreImpl) Add(ctx context.Context, orgID, userID int64, role str
 	})
 }
 
+// Called with the organization locked so a concurrent freeze or departure cannot
+// invalidate the remaining administrator check before the membership write.
+func ensureOtherOrganizationAdmin(ctx context.Context, tx bun.Tx, orgID, userID int64) error {
+	last, err := soleAdminOrganizations(tx).Where("member.organization_id = ? AND member.user_id = ?", orgID, userID).Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if last {
+		return errorx.ErrLastOrgAdmin
+	}
+	return nil
+}
+
 // Update changes membership and its role projection in one transaction.
 func (s *memberStoreImpl) Update(ctx context.Context, orgID, userID int64, role string) error {
 	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -95,6 +109,11 @@ func (s *memberStoreImpl) Update(ctx context.Context, orgID, userID int64, role 
 		}
 		if err := lockTupleOrganization(ctx, tx, orgID); err != nil {
 			return err
+		}
+		if role != string(types.UserAdmin) && role != "owner" {
+			if err := ensureOtherOrganizationAdmin(ctx, tx, orgID, userID); err != nil {
+				return err
+			}
 		}
 		if err := assertAffectedOneRow(tx.NewUpdate().Model((*Member)(nil)).Where("organization_id=? and user_id=?", orgID, userID).Set("role=?", role).Exec(ctx)); err != nil {
 			return err
@@ -110,6 +129,9 @@ func (s *memberStoreImpl) Delete(ctx context.Context, orgID, userID int64) error
 			return err
 		}
 		if err := lockTupleOrganization(ctx, tx, orgID); err != nil {
+			return err
+		}
+		if err := ensureOtherOrganizationAdmin(ctx, tx, orgID, userID); err != nil {
 			return err
 		}
 		if _, err := tx.NewDelete().Model((*Member)(nil)).Where("organization_id=? and user_id=?", orgID, userID).ForceDelete().Exec(ctx); err != nil {
@@ -152,6 +174,9 @@ func (s *memberStoreImpl) OrganizationMembers(ctx context.Context, orgID int64, 
 		Where("organization_id=?", orgID)
 	if role != "" {
 		q = q.Where("role = ?", role)
+	}
+	if role == string(types.UserAdmin) {
+		q = q.Where("NOT u.login_frozen")
 	}
 
 	total, err := q.Count(ctx)

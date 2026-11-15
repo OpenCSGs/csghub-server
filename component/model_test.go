@@ -290,7 +290,7 @@ func TestModelComponent_Show(t *testing.T) {
 		RepositoryID: 123,
 		Repository: &database.Repository{ID: 123, Name: "n", Path: "foo/bar", Metadata: database.Metadata{
 			Architecture: "llama",
-		}, Tags: []database.Tag{{Name: "safetensors", Category: "framework"}}},
+		}, Tags: []database.Tag{{Name: "safetensors", Category: "framework"}}, User: database.User{Username: "owner", Email: "owner@lgdg.cc"}},
 	}
 
 	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(m, nil)
@@ -302,6 +302,7 @@ func TestModelComponent_Show(t *testing.T) {
 		Metadata: database.Metadata{
 			Architecture: "llama",
 		},
+		User: database.User{Username: "owner", Email: "owner@lgdg.cc"},
 	}).Return(
 		&types.UserRepoPermission{CanRead: true, CanWrite: true}, nil,
 	)
@@ -340,7 +341,7 @@ func TestModelComponent_Show(t *testing.T) {
 		CanWrite:       true,
 		CanRead:        true,
 		IsOrganization: true,
-		User:           &types.User{},
+		User:           &types.User{Username: "owner"},
 		Path:           "foo/bar",
 		Repository: types.Repository{
 			HTTPCloneURL: "https://foo.com/s/foo/bar.git",

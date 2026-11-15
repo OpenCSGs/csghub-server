@@ -12,10 +12,12 @@ import (
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/workflow/v1"
 	"go.temporal.io/api/workflowservice/v1"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"opencsg.com/csghub-server/api/workflow/activity"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 
@@ -24,8 +26,42 @@ import (
 	mockrunner "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/imagerunner"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mocktemporal "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	mockReporter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter"
 )
+
+// TestStartNewDeployTaskWithCancelOld_PreservesWorkflowReplacementPolicy checks ID reuse and conflict handling.
+func TestStartNewDeployTaskWithCancelOld_PreservesWorkflowReplacementPolicy(t *testing.T) {
+	temporalClient := mocktemporal.NewMockClient(t)
+	oldGetClient := GetClientFunc
+	GetClientFunc = func() temporal.Client { return temporalClient }
+	t.Cleanup(func() { GetClientFunc = oldGetClient })
+
+	buildTask := &database.DeployTask{ID: 11}
+	runTask := &database.DeployTask{ID: 12, Deploy: &database.Deploy{ID: 42, Type: 0}}
+	const workflowID = "deploy-space-42"
+	temporalClient.EXPECT().DescribeWorkflowExecution(mock.Anything, workflowID, "").Return(
+		&workflowservice.DescribeWorkflowExecutionResponse{
+			WorkflowExecutionInfo: &workflow.WorkflowExecutionInfo{
+				Status: enums.WORKFLOW_EXECUTION_STATUS_COMPLETED,
+			},
+		}, nil,
+	).Once()
+	temporalClient.EXPECT().ExecuteWorkflow(
+		mock.Anything,
+		mock.MatchedBy(func(options client.StartWorkflowOptions) bool {
+			return options.ID == workflowID &&
+				options.TaskQueue == DeployWorkflowQueue &&
+				options.WorkflowIDReusePolicy == enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE &&
+				options.WorkflowIDConflictPolicy == enums.WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING
+		}),
+		mock.Anything,
+		buildTask.ID,
+		runTask.ID,
+	).Return(nil, nil).Once()
+
+	require.NoError(t, StartNewDeployTaskWithCancelOld(buildTask, runTask))
+}
 
 func TestIsWorkflowNotFoundError(t *testing.T) {
 	// Test with nil error
@@ -148,6 +184,10 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 	mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, runTask.Deploy.ID, runTask.TaskType).Return(runTask, nil)
 
 	runTask.Status = common.Pending
+	mockDeployTaskStore.EXPECT().DispatchPendingTask(mock.Anything, runTask, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ *database.DeployTask, submit func(database.DeployTaskStore) error) error {
+			return submit(mockDeployTaskStore)
+		}).Once()
 	mockImageRunner.EXPECT().Run(mock.Anything, mock.Anything).Return(&types.RunResponse{
 		DeployID: 0,
 		Code:     0,

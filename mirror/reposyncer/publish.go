@@ -49,6 +49,7 @@ func PublishCommitAndTriggerCallback(
 		LeftCommitId:  gitaly.SHA1EmptyTreeID,
 		RightCommitId: newCommitID,
 		Private:       repo.Private,
+		DefaultBranch: branch,
 		RelativePath:  relativePath,
 	})
 	if err != nil {

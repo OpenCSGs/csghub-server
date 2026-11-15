@@ -234,7 +234,7 @@ func (h *OpenAIHandlerImpl) proxyVoicesRequest(c *gin.Context, modelID string, m
 		slog.WarnContext(ctx, "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 
-	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
+	rp, err := newArchiveProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{

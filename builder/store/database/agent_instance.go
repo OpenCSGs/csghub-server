@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,18 +14,23 @@ import (
 
 // AgentTemplate represents the template for an agent
 type AgentTemplate struct {
-	ID          int64          `bun:",pk,autoincrement" json:"id"`
-	Type        string         `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
-	UserUUID    string         `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
-	Name        string         `bun:",notnull" json:"name"`         // Agent template name
-	Nickname    string         `bun:",nullzero" json:"nickname"`    // Agent template display name
-	Description string         `bun:",nullzero" json:"description"` // Agent template description
-	Content     string         `bun:",type:text" json:"content"`    // Used to store the complete content of the template
-	Public      bool           `bun:",notnull" json:"public"`       // Whether the template is public
-	Metadata    map[string]any `bun:",type:jsonb" json:"metadata"`  // Template metadata
-	DeletedAt   time.Time      `bun:",soft_delete,nullzero" json:"deleted_at"`
-	IsPinned    bool           `bun:",scanonly" json:"is_pinned"` // Whether the template is pinned (from LEFT JOIN)
-	PinnedAt    *time.Time     `bun:",scanonly" json:"pinned_at"` // When the template was pinned (from LEFT JOIN)
+	ID             int64          `bun:",pk,autoincrement" json:"id"`
+	Type           string         `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
+	UserUUID       string         `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
+	Name           string         `bun:",notnull" json:"name"`         // Agent template name
+	Nickname       string         `bun:",nullzero" json:"nickname"`    // Agent template display name
+	Description    string         `bun:",nullzero" json:"description"` // Agent template description
+	Content        string         `bun:",type:text" json:"content"`    // Used to store the complete content of the template
+	Public         bool           `bun:",notnull" json:"public"`       // Whether the template is public
+	IsInternal     bool           `bun:",notnull,default:false" json:"is_internal"`
+	Metadata       map[string]any `bun:",type:jsonb" json:"metadata"` // Template metadata
+	DeletedAt      time.Time      `bun:",soft_delete,nullzero" json:"deleted_at"`
+	IsPinned       bool           `bun:",scanonly" json:"is_pinned"`       // Whether the template is pinned (from LEFT JOIN)
+	PinnedAt       *time.Time     `bun:",scanonly" json:"pinned_at"`       // When the template was pinned (from LEFT JOIN)
+	Recommended    bool           `bun:",scanonly" json:"recommended"`     // Admin curation badge (from agent_resource_curations LEFT JOIN)
+	Unlisted       bool           `bun:",scanonly" json:"unlisted"`        // Hidden from non-owner public lists (admin list only)
+	CurationWeight int64          `bun:",scanonly" json:"curation_weight"` // Admin ordering weight (admin list only)
+	NamespacePath  string         `bun:",scanonly" json:"namespace_path"`
 	times
 }
 
@@ -41,11 +47,17 @@ type AgentInstance struct {
 	BuiltIn           bool           `bun:",notnull" json:"built_in"`     // Whether the instance is built-in
 	Metadata          map[string]any `bun:",type:jsonb" json:"metadata"`  // Instance metadata
 	DeletedAt         time.Time      `bun:",soft_delete,nullzero" json:"deleted_at"`
-	IsPinned          bool           `bun:",scanonly" json:"is_pinned"` // Whether the instance is pinned (from LEFT JOIN, scanonly means not used in INSERT/UPDATE)
-	PinnedAt          *time.Time     `bun:",scanonly" json:"pinned_at"` // When the instance was pinned (from LEFT JOIN)
-	Config            map[string]any `bun:",scanonly" json:"config"`    // Per-user config from agent_user_preferences (config-instance action)
-	IsShared          bool           `bun:",scanonly" json:"is_shared"` // Whether the instance has an agent_shares record (from EXISTS subquery)
+	IsPinned          bool           `bun:",scanonly" json:"is_pinned"`       // Whether the instance is pinned (from LEFT JOIN, scanonly means not used in INSERT/UPDATE)
+	PinnedAt          *time.Time     `bun:",scanonly" json:"pinned_at"`       // When the instance was pinned (from LEFT JOIN)
+	Config            map[string]any `bun:",scanonly" json:"config"`          // Per-user config from agent_user_preferences (config-instance action)
+	IsShared          bool           `bun:",scanonly" json:"is_shared"`       // Whether the instance has an agent_shares record (from EXISTS subquery)
+	Recommended       bool           `bun:",scanonly" json:"recommended"`     // Admin curation badge (from agent_resource_curations LEFT JOIN)
+	Unlisted          bool           `bun:",scanonly" json:"unlisted"`        // Hidden from non-owner public lists (admin list only)
+	CurationWeight    int64          `bun:",scanonly" json:"curation_weight"` // Admin ordering weight (admin list only)
+	NamespacePath     string         `bun:",scanonly" json:"namespace_path"`
 	Kind              string         `bun:",notnull,default:'runtime'" json:"kind"`
+	Source            string         `bun:",notnull,default:'platform'" json:"source"`
+	RelayAgentID      string         `bun:",nullzero" json:"relay_agent_id"`
 	DeletionStartedAt *time.Time     `bun:"deletion_started_at" json:"-"`
 	EffectiveMode     *string        `bun:"effective_mode" json:"effective_mode,omitempty"`
 	StoragePolicy     *string        `bun:"storage_policy" json:"storage_policy,omitempty"`
@@ -60,6 +72,8 @@ type AgentTemplateStore interface {
 	FindByID(ctx context.Context, id int64) (*AgentTemplate, error)
 	FindByTypeAndName(ctx context.Context, agentType, name string) ([]AgentTemplate, error)
 	ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentTemplateFilter, per int, page int) ([]AgentTemplate, int, error)
+	ListPublicWithCuration(ctx context.Context, search string, per int, page int) ([]AgentTemplate, int, error)
+	ListVisiblePublicOrder(ctx context.Context) ([]types.AgentCurationOrderItem, error)
 	Update(ctx context.Context, template *AgentTemplate) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -73,6 +87,8 @@ type AgentInstanceStore interface {
 	FindByContentID(ctx context.Context, instanceType string, contentID string) (*AgentInstance, error)
 	IsInstanceExistsByContentID(ctx context.Context, instanceType string, contentID string) (bool, error)
 	ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentInstanceFilter, per int, page int) ([]AgentInstance, int, error)
+	ListPublicWithCuration(ctx context.Context, search string, per int, page int) ([]AgentInstance, int, error)
+	ListVisiblePublicOrder(ctx context.Context) ([]types.AgentCurationOrderItem, error)
 	Update(ctx context.Context, instance *AgentInstance) error
 	Delete(ctx context.Context, id int64) error
 	CountByUserAndType(ctx context.Context, userUUID string, instanceType string) (int, error)
@@ -184,6 +200,7 @@ func (s *agentTemplateStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 		ColumnExpr("at.*").
 		ColumnExpr("(pin_pref.id IS NOT NULL) AS is_pinned").
 		ColumnExpr("pin_pref.created_at AS pinned_at").
+		ColumnExpr("COALESCE(cur.recommended, false) AS recommended").
 		Join(`
          LEFT JOIN agent_user_preferences pin_pref
            ON pin_pref.user_uuid = ?
@@ -191,8 +208,14 @@ func (s *agentTemplateStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
           AND pin_pref.entity_type = ?
           AND pin_pref.entity_id = CAST(at.id AS TEXT)
      `, userUUID, types.AgentUserPreferenceActionPin, types.AgentUserPreferenceEntityTypeAgentTemplate).
+		Join(`
+        LEFT JOIN agent_resource_curations cur
+          ON cur.entity_type = ?
+         AND cur.entity_id = CAST(at.id AS TEXT)
+    `, string(types.AgentCurationEntityTypeAgentTemplate)).
 		Where("at.deleted_at IS NULL").
-		Where("at.user_uuid = ? OR at.public = ?", userUUID, true)
+		Where("at.is_internal = ?", false).
+		Where("at.user_uuid = ? OR (at.public = ? AND COALESCE(cur.unlisted, false) = ?)", userUUID, true, false)
 
 	query = s.applyAgentTemplateFilters(query, userUUID, filter)
 
@@ -204,7 +227,7 @@ func (s *agentTemplateStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 	}
 
 	err = query.
-		OrderExpr("pin_pref.created_at DESC NULLS LAST, at.updated_at DESC").
+		OrderExpr("pin_pref.created_at DESC NULLS LAST, recommended DESC, cur.weight DESC NULLS LAST, at.updated_at DESC").
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &templates)
@@ -214,6 +237,77 @@ func (s *agentTemplateStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 		})
 	}
 	return templates, total, nil
+}
+
+// ListPublicWithCuration lists public templates with their admin curation state
+// (including unlisted ones) in canonical curation order for the admin console.
+func (s *agentTemplateStoreImpl) ListPublicWithCuration(ctx context.Context, search string, per int, page int) ([]AgentTemplate, int, error) {
+	var templates []AgentTemplate
+
+	query := s.db.Core.NewSelect().
+		TableExpr("agent_templates AS at").
+		ColumnExpr("at.*").
+		ColumnExpr("COALESCE(owner_ns.path, '') AS namespace_path").
+		Join("LEFT JOIN users AS owner_u ON owner_u.uuid = at.user_uuid").
+		Join("LEFT JOIN namespaces AS owner_ns ON owner_ns.user_id = owner_u.id AND owner_ns.namespace_type = ? AND owner_ns.deleted_at IS NULL", UserNamespace).
+		ColumnExpr("COALESCE(cur.weight, 0) AS curation_weight").
+		ColumnExpr("COALESCE(cur.recommended, false) AS recommended").
+		ColumnExpr("COALESCE(cur.unlisted, false) AS unlisted").
+		Join(`
+        LEFT JOIN agent_resource_curations cur
+          ON cur.entity_type = ?
+         AND cur.entity_id = CAST(at.id AS TEXT)
+    `, string(types.AgentCurationEntityTypeAgentTemplate)).
+		Where("at.deleted_at IS NULL").
+		Where("at.is_internal = ?", false).
+		Where("at.public = ?", true)
+
+	search = strings.TrimSpace(search)
+	if search != "" {
+		searchPattern := "%" + search + "%"
+		query = query.Where("LOWER(at.name) LIKE LOWER(?) OR LOWER(at.description) LIKE LOWER(?)", searchPattern, searchPattern)
+	}
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, nil)
+	}
+
+	err = query.
+		OrderExpr("recommended DESC, cur.weight DESC NULLS LAST, at.updated_at DESC").
+		Limit(per).
+		Offset((page-1)*per).
+		Scan(ctx, &templates)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, nil)
+	}
+	return templates, total, nil
+}
+
+// ListVisiblePublicOrder returns the IDs and recommended flags of all public,
+// non-deleted, listed templates in canonical curation order for the admin
+// move/position algorithm.
+func (s *agentTemplateStoreImpl) ListVisiblePublicOrder(ctx context.Context) ([]types.AgentCurationOrderItem, error) {
+	var items []types.AgentCurationOrderItem
+	err := s.db.Core.NewSelect().
+		TableExpr("agent_templates AS at").
+		ColumnExpr("at.id").
+		ColumnExpr("COALESCE(cur.recommended, false) AS recommended").
+		Join(`
+        LEFT JOIN agent_resource_curations cur
+          ON cur.entity_type = ?
+         AND cur.entity_id = CAST(at.id AS TEXT)
+    `, string(types.AgentCurationEntityTypeAgentTemplate)).
+		Where("at.deleted_at IS NULL").
+		Where("at.is_internal = ?", false).
+		Where("at.public = ?", true).
+		Where("COALESCE(cur.unlisted, false) = ?", false).
+		OrderExpr("recommended DESC, cur.weight DESC NULLS LAST, at.updated_at DESC").
+		Scan(ctx, &items)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return items, nil
 }
 
 // Update updates an existing AgentTemplate
@@ -228,14 +322,28 @@ func (s *agentTemplateStoreImpl) Update(ctx context.Context, template *AgentTemp
 }
 
 // Delete removes an AgentTemplate from the database
+// It also removes the template's admin curation row.
 func (s *agentTemplateStoreImpl) Delete(ctx context.Context, id int64) error {
-	res, err := s.db.Core.NewDelete().Model((*AgentTemplate)(nil)).Where("id = ?", id).Exec(ctx)
-	if err = assertAffectedOneRow(res, err); err != nil {
-		return errorx.HandleDBError(err, map[string]any{
-			"template_id": id,
-		})
-	}
-	return nil
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewDelete().
+			Model((*AgentResourceCuration)(nil)).
+			Where("entity_type = ?", string(types.AgentCurationEntityTypeAgentTemplate)).
+			Where("entity_id = ?", normalizeEntityID(strconv.FormatInt(id, 10))).
+			Exec(ctx)
+		if err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"template_id": id,
+				"operation":   "delete_curation",
+			})
+		}
+		res, err := tx.NewDelete().Model((*AgentTemplate)(nil)).Where("id = ?", id).Exec(ctx)
+		if err = assertAffectedOneRow(res, err); err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"template_id": id,
+			})
+		}
+		return nil
+	})
 }
 
 // Create inserts a new AgentInstance into the database
@@ -370,6 +478,23 @@ func (s *agentInstanceStoreImpl) applyAgentInstanceFilters(query *bun.SelectQuer
 		query = query.Where("ai.kind = ?", string(*filter.Kind))
 	}
 
+	// External agents are excluded from the default listing and only surface
+	// once the caller asks for a specific source or the registered view.
+	switch {
+	case filter.Source != nil:
+		query = query.Where("ai.source = ?", string(*filter.Source))
+	case filter.Registered == nil:
+		query = query.Where("ai.source = ?", AgentInstanceSourcePlatform)
+	}
+
+	if filter.Registered != nil {
+		if *filter.Registered {
+			query = query.Where("ai.relay_agent_id IS NOT NULL AND ai.relay_agent_id <> ''")
+		} else {
+			query = query.Where("(ai.relay_agent_id IS NULL OR ai.relay_agent_id = '')")
+		}
+	}
+
 	return query
 }
 
@@ -384,6 +509,7 @@ func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 		ColumnExpr("pin_pref.created_at AS pinned_at").
 		ColumnExpr("config_pref.value AS config").
 		ColumnExpr("(EXISTS(SELECT 1 FROM agent_shares ash WHERE ash.instance_id = ai.id)) AS is_shared").
+		ColumnExpr("COALESCE(cur.recommended, false) AS recommended").
 		Join(`
         LEFT JOIN agent_user_preferences pin_pref
           ON pin_pref.user_uuid = ?
@@ -398,8 +524,13 @@ func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
          AND config_pref.entity_type = ?
          AND config_pref.entity_id = CAST(ai.id AS TEXT)
     `, userUUID, types.AgentUserPreferenceActionConfigInstance, types.AgentUserPreferenceEntityTypeAgentInstance).
+		Join(`
+        LEFT JOIN agent_resource_curations cur
+          ON cur.entity_type = ?
+         AND cur.entity_id = CAST(ai.id AS TEXT)
+    `, string(types.AgentCurationEntityTypeAgentInstance)).
 		Where("ai.deleted_at IS NULL").
-		Where("ai.user_uuid = ? OR ai.public = ?", userUUID, true)
+		Where("ai.user_uuid = ? OR (ai.public = ? AND COALESCE(cur.unlisted, false) = ?)", userUUID, true, false)
 
 	query = s.applyAgentInstanceFilters(query, userUUID, filter)
 
@@ -411,7 +542,7 @@ func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 	}
 
 	err = query.
-		OrderExpr("pin_pref.created_at DESC NULLS LAST, ai.updated_at DESC").
+		OrderExpr("pin_pref.created_at DESC NULLS LAST, recommended DESC, cur.weight DESC NULLS LAST, ai.updated_at DESC").
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &instances)
@@ -421,6 +552,77 @@ func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 		})
 	}
 	return instances, total, nil
+}
+
+// ListPublicWithCuration lists public instances with their admin curation state
+// (including unlisted ones) in canonical curation order for the admin console.
+func (s *agentInstanceStoreImpl) ListPublicWithCuration(ctx context.Context, search string, per int, page int) ([]AgentInstance, int, error) {
+	var instances []AgentInstance
+
+	query := s.db.Core.NewSelect().
+		TableExpr("agent_instances AS ai").
+		ColumnExpr("ai.*").
+		ColumnExpr("COALESCE(owner_ns.path, '') AS namespace_path").
+		Join("LEFT JOIN users AS owner_u ON owner_u.uuid = ai.user_uuid").
+		Join("LEFT JOIN namespaces AS owner_ns ON owner_ns.user_id = owner_u.id AND owner_ns.namespace_type = ? AND owner_ns.deleted_at IS NULL", UserNamespace).
+		ColumnExpr("COALESCE(cur.weight, 0) AS curation_weight").
+		ColumnExpr("COALESCE(cur.recommended, false) AS recommended").
+		ColumnExpr("COALESCE(cur.unlisted, false) AS unlisted").
+		Join(`
+        LEFT JOIN agent_resource_curations cur
+          ON cur.entity_type = ?
+         AND cur.entity_id = CAST(ai.id AS TEXT)
+    `, string(types.AgentCurationEntityTypeAgentInstance)).
+		Where("ai.deleted_at IS NULL").
+		Where("ai.public = ?", true).
+		Where("ai.built_in = ? AND ai.source = ?", false, AgentInstanceSourcePlatform)
+
+	search = strings.TrimSpace(search)
+	if search != "" {
+		searchPattern := "%" + search + "%"
+		query = query.Where("LOWER(ai.name) LIKE LOWER(?) OR LOWER(ai.description) LIKE LOWER(?)", searchPattern, searchPattern)
+	}
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, nil)
+	}
+
+	err = query.
+		OrderExpr("recommended DESC, cur.weight DESC NULLS LAST, ai.updated_at DESC").
+		Limit(per).
+		Offset((page-1)*per).
+		Scan(ctx, &instances)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, nil)
+	}
+	return instances, total, nil
+}
+
+// ListVisiblePublicOrder returns the IDs and curation state of all public,
+// non-deleted, listed instances in canonical curation order. It feeds the
+// admin move/position algorithm, which rewrites weights densely.
+func (s *agentInstanceStoreImpl) ListVisiblePublicOrder(ctx context.Context) ([]types.AgentCurationOrderItem, error) {
+	var items []types.AgentCurationOrderItem
+	err := s.db.Core.NewSelect().
+		TableExpr("agent_instances AS ai").
+		ColumnExpr("ai.id").
+		ColumnExpr("COALESCE(cur.recommended, false) AS recommended").
+		Join(`
+        LEFT JOIN agent_resource_curations cur
+          ON cur.entity_type = ?
+         AND cur.entity_id = CAST(ai.id AS TEXT)
+    `, string(types.AgentCurationEntityTypeAgentInstance)).
+		Where("ai.deleted_at IS NULL").
+		Where("ai.public = ?", true).
+		Where("ai.built_in = ? AND ai.source = ?", false, AgentInstanceSourcePlatform).
+		Where("COALESCE(cur.unlisted, false) = ?", false).
+		OrderExpr("recommended DESC, cur.weight DESC NULLS LAST, ai.updated_at DESC").
+		Scan(ctx, &items)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return items, nil
 }
 
 // Update updates an existing AgentInstance
@@ -490,6 +692,19 @@ func (s *agentInstanceStoreImpl) Delete(ctx context.Context, id int64) error {
 			})
 		}
 
+		// Remove the admin curation row; curation is meaningless for a deleted instance
+		_, err = tx.NewDelete().
+			Model((*AgentResourceCuration)(nil)).
+			Where("entity_type = ?", string(types.AgentCurationEntityTypeAgentInstance)).
+			Where("entity_id = ?", normalizeEntityID(strconv.FormatInt(id, 10))).
+			Exec(ctx)
+		if err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"instance_id": id,
+				"operation":   "delete_curation",
+			})
+		}
+
 		// Finally, soft-delete the instance itself
 		res, err := tx.NewDelete().
 			Model((*AgentInstance)(nil)).
@@ -512,7 +727,7 @@ func (s *agentInstanceStoreImpl) Delete(ctx context.Context, id int64) error {
 func (s *agentInstanceStoreImpl) CountByUserAndType(ctx context.Context, userUUID string, instanceType string) (int, error) {
 	count, err := s.db.Core.NewSelect().
 		Model((*AgentInstance)(nil)).
-		Where("user_uuid = ? AND type = ? AND kind = ? AND built_in = ?", userUUID, instanceType, AgentInstanceKindRuntime, false).
+		Where("user_uuid = ? AND type = ? AND kind = ? AND built_in = ? AND source = ?", userUUID, instanceType, AgentInstanceKindRuntime, false, AgentInstanceSourcePlatform).
 		Count(ctx)
 	if err != nil {
 		return 0, errorx.HandleDBError(err, map[string]any{

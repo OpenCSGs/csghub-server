@@ -888,10 +888,10 @@ var engineArgsUnsupportedByVersion = map[string]map[string][]string{
 		"v0.8.5":  {"async-scheduling"},
 		"v0.9.2":  {"async-scheduling"},
 		"v0.24.0": {"swap-space", "guided-decoding-backend"},
-		"v0.31.0": {"swap-space", "guided-decoding-backend"},
+		"v0.32.0": {"swap-space", "guided-decoding-backend"},
 	},
 	"amd-vllm.json": {
-		"0.31.0": {"swap-space", "guided-decoding-backend"},
+		"0.32.0": {"swap-space", "guided-decoding-backend"},
 	},
 	"ascend-vllm.json": {
 		"v0.27.1rc1":      {"swap-space"},
@@ -912,7 +912,7 @@ var engineArgsSupportedByVersion = map[string]map[string][]string{
 		"v0.8.5":  {"swap-space", "guided-decoding-backend"},
 		"v0.9.2":  {"swap-space", "guided-decoding-backend"},
 		"v0.24.0": {"async-scheduling"},
-		"v0.31.0": {"async-scheduling"},
+		"v0.32.0": {"async-scheduling"},
 	},
 }
 

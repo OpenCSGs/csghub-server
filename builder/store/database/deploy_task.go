@@ -18,6 +18,8 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+var finishedDeployStatuses = []int{common.Stopped, common.Deleted, common.BuildFailed, common.DeployFailed}
+
 type Deploy struct {
 	ID int64 `bun:",pk,autoincrement" json:"id"`
 	// space_id to deploy, it's 0 if deploy model
@@ -116,8 +118,8 @@ type DeployTaskStore interface {
 	UpdateDeploySpec(ctx context.Context, deploy *Deploy) error
 	// UpdateDeployColumnsIfNotDeleted writes the given deploy columns (plus
 	// updated_at, and status_update_at when "status" is included) but only
-	// while the row has not been deleted. It returns false when the row is
-	// Deleted: the caller must treat its operation as cancelled instead of
+	// while the row has not been deleted. Status writes also skip stopped deploys.
+	// When no row matches, the caller must treat its operation as cancelled instead of
 	// resurrecting the terminal row — e.g. a sandbox created on the runner
 	// while a concurrent delete finalized the deploy must be cleaned up, not
 	// persisted.
@@ -126,6 +128,8 @@ type DeployTaskStore interface {
 	GetLatestDeploysBySpaceIDs(ctx context.Context, spaceIDs []int64) (map[int64]*Deploy, error)
 	CreateDeployTask(ctx context.Context, deployTask *DeployTask) error
 	UpdateDeployTask(ctx context.Context, deployTask *DeployTask) error
+	// DispatchPendingTask runs submit only for eligible work. Use the supplied store to persist its result.
+	DispatchPendingTask(ctx context.Context, task *DeployTask, submit func(DeployTaskStore) error) error
 	GetDeployTask(ctx context.Context, id int64) (*DeployTask, error)
 	GetDeployTasksOfDeploy(ctx context.Context, deployID int64) ([]*DeployTask, error)
 	// GetNewTaskAfter return the first task of the next deploy
@@ -133,9 +137,7 @@ type DeployTaskStore interface {
 	// GetNewTaskFirst returns the first task which has  not end
 	GetNewTaskFirst(ctx context.Context) (*DeployTask, error)
 	// UpdateInTx updates a deploy and its tasks in one transaction. The deploy
-	// write carries a status != Deleted predicate: a Deleted row is never
-	// updated, so failure/status events landing after a concurrent delete are
-	// dropped instead of resurrecting the terminal row.
+	// status write skips finished deploys, and cancelled tasks keep their status.
 	UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error
 	// ListDeploy returns deploys of the repo visible to the user: the ones the
 	// user created plus the ones owned by a namespace the user belongs to
@@ -208,15 +210,21 @@ func NewLatestDeployBySvcNameStoreWithDB(db *DB) LatestDeployBySvcNameStore {
 }
 
 func (s *deployTaskStoreImpl) CreateDeploy(ctx context.Context, deploy *Deploy) error {
-	_, err := s.db.Core.NewInsert().Model(deploy).Exec(ctx, deploy)
-	err = errorx.HandleDBError(err, nil)
-	return err
+	return s.writeDeployAdmission(ctx, deploy, func(db bun.IDB) error {
+		_, err := db.NewInsert().Model(deploy).Exec(ctx, deploy)
+		return errorx.HandleDBError(err, nil)
+	})
 }
 
 func (s *deployTaskStoreImpl) UpdateDeploy(ctx context.Context, deploy *Deploy) error {
-	_, err := s.db.Core.NewUpdate().Model(deploy).WherePK().Exec(ctx)
-	err = errorx.HandleDBError(err, nil)
-	return err
+	update := func(db bun.IDB) error {
+		_, err := db.NewUpdate().Model(deploy).WherePK().Exec(ctx)
+		return errorx.HandleDBError(err, nil)
+	}
+	if deploy.Status == common.Pending {
+		return s.writeDeployAdmission(ctx, deploy, update)
+	}
+	return update(s.db.Core)
 }
 
 func (s *deployTaskStoreImpl) UpdateDeployStatusCAS(ctx context.Context, deploy *Deploy, expectedStatus int) (bool, error) {
@@ -269,15 +277,13 @@ func (s *deployTaskStoreImpl) UpdateDeployColumnsIfNotDeleted(ctx context.Contex
 	cols = append(cols, columns...)
 	cols = append(cols, "updated_at")
 	deploy.UpdatedAt = time.Now()
+	q := s.db.Core.NewUpdate().Model(deploy).WherePK().Where("status != ?", common.Deleted)
 	if slices.Contains(columns, "status") {
 		cols = append(cols, "status_update_at")
 		deploy.StatusUpdateAt = time.Now()
+		q.Where("status != ?", common.Stopped)
 	}
-	res, err := s.db.Core.NewUpdate().Model(deploy).
-		Column(cols...).
-		WherePK().
-		Where("status != ?", common.Deleted).
-		Exec(ctx)
+	res, err := q.Column(cols...).Exec(ctx)
 	if err != nil {
 		return false, errorx.HandleDBError(err, nil)
 	}
@@ -323,15 +329,22 @@ func (s *deployTaskStoreImpl) GetLatestDeploysBySpaceIDs(ctx context.Context, sp
 }
 
 func (s *deployTaskStoreImpl) CreateDeployTask(ctx context.Context, deployTask *DeployTask) error {
-	_, err := s.db.Core.NewInsert().Model(deployTask).Exec(ctx, deployTask)
-	err = errorx.HandleDBError(err, nil)
-	return err
+	return s.writeDeployTaskAdmission(ctx, deployTask.DeployID, func(db bun.IDB) error {
+		_, err := db.NewInsert().Model(deployTask).Exec(ctx, deployTask)
+		return errorx.HandleDBError(err, nil)
+	})
 }
 
 func (s *deployTaskStoreImpl) UpdateDeployTask(ctx context.Context, deployTask *DeployTask) error {
-	_, err := s.db.Core.NewUpdate().Model(deployTask).WherePK().Exec(ctx)
-	err = errorx.HandleDBError(err, nil)
-	return err
+	update := func(db bun.IDB) error {
+		_, err := db.NewUpdate().Model(deployTask).WherePK().Exec(ctx)
+		return errorx.HandleDBError(err, nil)
+	}
+	// Adopting a sandbox can requeue an existing task instead of inserting one.
+	if deployTask.Status == common.TaskStatusDeployPending {
+		return s.writeDeployTaskAdmission(ctx, deployTask.DeployID, update)
+	}
+	return update(s.db.Core)
 }
 
 func (s *deployTaskStoreImpl) GetDeployTask(ctx context.Context, id int64) (*DeployTask, error) {
@@ -381,17 +394,13 @@ func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, dep
 		if deploy != nil {
 			deployColumns = append(deployColumns, "updated_at")
 			deploy.UpdatedAt = time.Now()
+			q := tx.NewUpdate().Model(deploy).WherePK().Where("status != ?", common.Deleted)
 			if slices.Contains(deployColumns, "status") {
+				q.Where("status NOT IN (?)", bun.In(finishedDeployStatuses))
 				deployColumns = append(deployColumns, "status_update_at")
 				deploy.StatusUpdateAt = time.Now()
 			}
-			_, err := tx.NewUpdate().Model(deploy).
-				Column(deployColumns...).
-				WherePK().
-				// A Deleted deploy must stay terminal: status writes landing
-				// after a concurrent delete are dropped, not applied.
-				Where("status != ?", common.Deleted).
-				Exec(ctx)
+			_, err := q.Column(deployColumns...).Exec(ctx)
 			err = errorx.HandleDBError(err, nil)
 			if err != nil {
 				return fmt.Errorf("failed to update deploy,%w", err)
@@ -406,6 +415,7 @@ func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, dep
 			_, err := tx.NewUpdate().
 				Model(&deployTasks).
 				Column(deployTaskColumns...).
+				Where("deploy_task.status != ?", common.TaskStatusCancelled).
 				Bulk().
 				Exec(ctx)
 			err = errorx.HandleDBError(err, nil)
@@ -787,10 +797,7 @@ func (s *deployTaskStoreImpl) GetRunningDeployByUserUUID(ctx context.Context, us
 
 func (s *deployTaskStoreImpl) ListAllDeployByUID(ctx context.Context, userID int64) ([]Deploy, error) {
 	var result []Deploy
-	err := s.db.Operator.Core.NewSelect().
-		Model(&result).
-		Where("user_id = ? and status IN (?)", userID, bun.In([]int64{common.Running, common.Deploying, common.Building, common.BuildInQueue})).
-		Scan(ctx)
+	err := s.db.Core.NewSelect().Model((*Deploy)(nil)).Where("user_id = ? AND status IN (?)", userID, bun.In([]int{common.Running, common.Deploying, common.Building, common.BuildInQueue})).Scan(ctx, &result)
 
 	err = errorx.HandleDBError(err, nil)
 	return result, err

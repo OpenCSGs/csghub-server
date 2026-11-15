@@ -1551,3 +1551,153 @@ func TestLLMConfigStore_ListGatewayModels_HasAssociated_InternalBranchOnly(t *te
 	require.Equal(t, 1, total)
 	require.Equal(t, []string{"internal-no-csghub-id"}, modelNames(configs))
 }
+
+func TestLLMConfigStore_Index_SourceFilter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+	store := database.NewLLMConfigStoreWithDB(db, cfg)
+	upstreamStore := database.NewUpstreamStoreWithDB(db, cfg)
+
+	// csghub-sourced upstreams share the (source, source_id) unique index
+	// with real deploys, so every upstream gets its own source id.
+	nextSourceID := int64(0)
+	createConfig := func(t *testing.T, name string, sources ...types.UpstreamSource) {
+		t.Helper()
+		created, err := store.Create(ctx, database.LLMConfig{
+			ModelName: name,
+			Type:      database.LLMTypeAigatewayExternal,
+			Enabled:   true,
+		})
+		require.Nil(t, err)
+		for _, source := range sources {
+			nextSourceID++
+			err := upstreamStore.Create(ctx, &database.Upstream{
+				LLMConfigID: created.ID,
+				URL:         "http://" + name + ":8080/v1",
+				Enabled:     true,
+				Source:      source,
+				SourceID:    nextSourceID,
+			})
+			require.Nil(t, err)
+		}
+	}
+
+	// Mirrors the portal's source column: all-csghub, all-external, blank
+	// source (normalized to external), no upstreams, and mixed upstreams.
+	createConfig(t, "src-csghub", types.UpstreamSourceCSGHubDeploy)
+	createConfig(t, "src-external", types.UpstreamSourceExternal)
+	createConfig(t, "src-blank", "")
+	createConfig(t, "src-none")
+	createConfig(t, "src-mixed", types.UpstreamSourceCSGHubDeploy, types.UpstreamSourceExternal)
+
+	cfgsCsghub, totalCsghub, err := store.Index(ctx, 20, 1, &types.SearchLLMConfig{
+		Source: string(types.UpstreamSourceCSGHubDeploy),
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, totalCsghub)
+	require.Len(t, cfgsCsghub, 1)
+	require.Equal(t, "src-csghub", cfgsCsghub[0].ModelName)
+
+	cfgsExternal, totalExternal, err := store.Index(ctx, 20, 1, &types.SearchLLMConfig{
+		Source: string(types.UpstreamSourceExternal),
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, totalExternal)
+	externalNames := make([]string, 0, len(cfgsExternal))
+	for _, c := range cfgsExternal {
+		externalNames = append(externalNames, c.ModelName)
+	}
+	require.ElementsMatch(t, []string{"src-external", "src-blank", "src-none"}, externalNames)
+
+	_, totalAll, err := store.Index(ctx, 20, 1, &types.SearchLLMConfig{})
+	require.Nil(t, err)
+	require.Equal(t, 5, totalAll)
+}
+
+// TestCredentialExplicitLLMReads covers every public LLM query, including
+// has-many upstreams, the extended catalogue row and legacy plaintext storage.
+func TestCredentialExplicitLLMReads(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewLLMConfigStoreWithDB(db, &config.Config{})
+	repo := &database.Repository{Path: "credential-owner/llm", Name: "llm", RepositoryType: types.ModelRepo, UserID: 1}
+	_, err := db.Core.NewInsert().Model(repo).Exec(ctx)
+	require.NoError(t, err)
+	cfg := &database.LLMConfig{ModelName: "explicit-llm", RepoID: repo.ID, Type: database.LLMTypeOptimization | database.LLMTypeSummaryReadme | database.LLMTypeAigatewayExternal, Enabled: true, AuthHeader: "legacy-config-secret"}
+	_, err = db.Core.NewInsert().Model(cfg).Exec(ctx)
+	require.NoError(t, err)
+	upstreams := database.NewUpstreamStoreWithDB(db, nil)
+	for i := 0; i < 2; i++ {
+		require.NoError(t, upstreams.Create(ctx, &database.Upstream{LLMConfigID: cfg.ID, URL: fmt.Sprintf("https://explicit-%d.example", i), SourceID: int64(i + 1), Enabled: true, AuthHeader: fmt.Sprintf("upstream-secret-%d", i)}))
+	}
+	one := func(read func() (*database.LLMConfig, error)) func() ([]*database.LLMConfig, error) {
+		return func() ([]*database.LLMConfig, error) { row, err := read(); return []*database.LLMConfig{row}, err }
+	}
+	page := func(read func() ([]*database.LLMConfig, int, error)) func() ([]*database.LLMConfig, error) {
+		return func() ([]*database.LLMConfig, error) {
+			rows, total, err := read()
+			if err == nil {
+				require.Equal(t, 1, total)
+			}
+			return rows, err
+		}
+	}
+	queries := []struct {
+		name          string
+		read          func() ([]*database.LLMConfig, error)
+		withUpstreams bool
+	}{
+		{"optimization", one(func() (*database.LLMConfig, error) { return store.GetOptimization(ctx) }), true},
+		{"summary", one(func() (*database.LLMConfig, error) { return store.GetModelForSummaryReadme(ctx) }), true},
+		{"type", one(func() (*database.LLMConfig, error) { return store.GetByType(ctx, database.LLMTypeOptimization) }), true},
+		{"id", one(func() (*database.LLMConfig, error) { return store.GetByID(ctx, cfg.ID) }), true},
+		{"name", one(func() (*database.LLMConfig, error) { return store.GetByModelName(ctx, cfg.ModelName) }), true},
+		{"caller-name", one(func() (*database.LLMConfig, error) { return store.GetByModelNameForCaller(ctx, cfg.ModelName, nil) }), true},
+		{"repo-path", one(func() (*database.LLMConfig, error) { return store.GetByRepoPath(ctx, repo.Path) }), false},
+		{"index", page(func() ([]*database.LLMConfig, int, error) { return store.Index(ctx, 10, 1, nil) }), true},
+		{"repo-index", page(func() ([]*database.LLMConfig, int, error) { return store.IndexWithRepo(ctx, 10, 1, nil) }), true},
+		{"caller-index", page(func() ([]*database.LLMConfig, int, error) { return store.IndexWithRepoForCaller(ctx, 10, 1, nil, nil) }), true},
+		{"catalogue", page(func() ([]*database.LLMConfig, int, error) {
+			return store.ListGatewayModels(ctx, 10, 0, &types.GatewayModelListQuery{})
+		}), true},
+	}
+	for _, phase := range []string{"encrypted", "legacy", "bad-upstream"} {
+		t.Run(phase, func(t *testing.T) {
+			if phase == "legacy" {
+				for i := 0; i < 2; i++ {
+					_, err = db.BunDB.DB.ExecContext(ctx, "UPDATE ai_gateway_upstreams SET auth_header=$1,credential_version=0 WHERE source_id=$2", fmt.Sprintf("upstream-secret-%d", i), i+1)
+					require.NoError(t, err)
+				}
+			}
+			if phase == "bad-upstream" {
+				_, err = db.BunDB.DB.ExecContext(ctx, "UPDATE ai_gateway_upstreams SET auth_header='broken',credential_version=1 WHERE llm_config_id=$1", cfg.ID)
+				require.NoError(t, err)
+			}
+			for _, q := range queries {
+				t.Run(q.name, func(t *testing.T) {
+					rows, err := q.read()
+					if phase == "bad-upstream" && q.withUpstreams {
+						require.Error(t, err)
+						return
+					}
+					require.NoError(t, err)
+					require.Len(t, rows, 1)
+					require.NotNil(t, rows[0])
+					require.Equal(t, cfg.AuthHeader, rows[0].AuthHeader)
+					if q.withUpstreams {
+						require.Len(t, rows[0].Upstreams, 2)
+						for _, up := range rows[0].Upstreams {
+							require.Equal(t, fmt.Sprintf("upstream-secret-%d", up.SourceID-1), up.AuthHeader)
+						}
+					} else {
+						require.Empty(t, rows[0].Upstreams)
+					}
+				})
+			}
+		})
+	}
+}

@@ -81,6 +81,65 @@ func (_c *MockCodeComponent_Create_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// CreateFork provides a mock function with given fields: ctx, req
+func (_m *MockCodeComponent) CreateFork(ctx context.Context, req types.CreateForkReq) (*types.Code, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateFork")
+	}
+
+	var r0 *types.Code
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateForkReq) (*types.Code, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateForkReq) *types.Code); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Code)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.CreateForkReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCodeComponent_CreateFork_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateFork'
+type MockCodeComponent_CreateFork_Call struct {
+	*mock.Call
+}
+
+// CreateFork is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CreateForkReq
+func (_e *MockCodeComponent_Expecter) CreateFork(ctx interface{}, req interface{}) *MockCodeComponent_CreateFork_Call {
+	return &MockCodeComponent_CreateFork_Call{Call: _e.mock.On("CreateFork", ctx, req)}
+}
+
+func (_c *MockCodeComponent_CreateFork_Call) Run(run func(ctx context.Context, req types.CreateForkReq)) *MockCodeComponent_CreateFork_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CreateForkReq))
+	})
+	return _c
+}
+
+func (_c *MockCodeComponent_CreateFork_Call) Return(_a0 *types.Code, _a1 error) *MockCodeComponent_CreateFork_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCodeComponent_CreateFork_Call) RunAndReturn(run func(context.Context, types.CreateForkReq) (*types.Code, error)) *MockCodeComponent_CreateFork_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, namespace, name, currentUser
 func (_m *MockCodeComponent) Delete(ctx context.Context, namespace string, name string, currentUser string) error {
 	ret := _m.Called(ctx, namespace, name, currentUser)
