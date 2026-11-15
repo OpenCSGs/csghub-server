@@ -997,7 +997,7 @@ func chatCompletionChunkModerationText(chunk types.ChatCompletionChunk) string {
 	var b strings.Builder
 	for _, choice := range chunk.Choices {
 		writeTextModerationPart(&b, choice.Delta.Content)
-		writeTextModerationPart(&b, choice.Delta.ReasoningContent)
+		writeTextModerationPart(&b, choice.Delta.ReasoningText())
 		writeTextModerationPart(&b, choice.Delta.Refusal)
 		for _, call := range choice.Delta.ToolCalls {
 			writeTextModerationPart(&b, call.Function.Name)

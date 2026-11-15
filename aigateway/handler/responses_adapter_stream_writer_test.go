@@ -182,6 +182,57 @@ func TestResponsesAdapterStreamWriterModeratesRefusalDelta(t *testing.T) {
 	require.NotContains(t, body, "blocked refusal")
 }
 
+func TestResponsesAdapterStreamWriterModeratesDeltaReasoning(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+
+	moderation := mockcomp.NewMockModeration(t)
+	moderation.EXPECT().CheckText(
+		mock.MatchedBy(func(ctx context.Context) bool {
+			deadline, ok := ctx.Deadline()
+			return ok && time.Until(deadline) <= responsespkg.ModerationTimeout
+		}),
+		types.TextModerationRequest{
+			Content: "secret reasoning",
+			Key:     "session-1",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeStream,
+		},
+	).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, moderation, "session-1")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"reasoning":"secret reasoning"},"finish_reason":"stop"}]}` + "\n\n"))
+	require.NoError(t, err)
+
+	body := rec.Body.String()
+	require.Contains(t, body, responsespkg.BlockedMessage)
+	require.NotContains(t, body, "secret reasoning")
+}
+
+func TestChatChunkModerationTextReasoningPrecedence(t *testing.T) {
+	onlyReasoning := chatChunkModerationText(types.ChatCompletionChunk{
+		Choices: []types.ChatCompletionChunkChoice{{
+			Delta: types.ChatCompletionChunkChoiceDelta{
+				Content:   "answer",
+				Reasoning: "secret reasoning",
+			},
+		}},
+	})
+	require.Equal(t, "answer\nsecret reasoning", onlyReasoning)
+
+	both := chatChunkModerationText(types.ChatCompletionChunk{
+		Choices: []types.ChatCompletionChunkChoice{{
+			Delta: types.ChatCompletionChunkChoiceDelta{
+				ReasoningContent: "preferred",
+				Reasoning:        "fallback",
+			},
+		}},
+	})
+	require.Equal(t, "preferred", both)
+}
+
 func TestResponsesAdapterStreamWriterReportsIncompleteWhenOutputIsCutOff(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()

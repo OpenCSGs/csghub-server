@@ -65,6 +65,17 @@ type ChatCompletionChunkChoiceDelta struct {
 	ToolCalls []openai.ChatCompletionChunkChoiceDeltaToolCall `json:"tool_calls"`
 }
 
+// ReasoningText returns the streamed reasoning the client is shown.
+// reasoning_content wins when it is non-empty; reasoning is the fallback
+// used by OpenRouter and vLLM. When both are set, only reasoning_content
+// is returned so the same text is not applied twice.
+func (d ChatCompletionChunkChoiceDelta) ReasoningText() string {
+	if d.ReasoningContent != "" {
+		return d.ReasoningContent
+	}
+	return d.Reasoning
+}
+
 type ChatCompletion struct {
 	openai.ChatCompletion
 }

@@ -324,6 +324,52 @@ func TestModerationImpl_CheckChatStreamResponse(t *testing.T) {
 	mockChecker.AssertExpectations(t)
 }
 
+func TestModerationImpl_CheckChatStreamResponse_DeltaReasoning(t *testing.T) {
+	ctx := context.Background()
+	mockChecker := new(MockStreamChecker)
+	modImpl := &moderationImpl{streamChecker: mockChecker}
+	uuid := "uuid-reasoning"
+	expectedResult := &rpc.CheckResult{IsSensitive: true, Reason: "toxic"}
+
+	// OpenRouter and vLLM stream reasoning in delta.reasoning, not reasoning_content.
+	mockChecker.On("CheckStreamResponseText", ctx, "secret reasoning", uuid).Return(expectedResult, nil).Once()
+
+	chunk := types.ChatCompletionChunk{
+		ID: "test-id",
+		Choices: []types.ChatCompletionChunkChoice{{
+			Delta: types.ChatCompletionChunkChoiceDelta{Reasoning: "secret reasoning"},
+		}},
+	}
+	res, err := modImpl.CheckChatStreamResponse(ctx, chunk, uuid)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expectedResult, res)
+	mockChecker.AssertExpectations(t)
+}
+
+func TestChatCompletionChunkModerationTextReasoningPrecedence(t *testing.T) {
+	onlyReasoning := chatCompletionChunkModerationText(types.ChatCompletionChunk{
+		Choices: []types.ChatCompletionChunkChoice{{
+			Delta: types.ChatCompletionChunkChoiceDelta{
+				Content:   "answer",
+				Reasoning: "secret reasoning",
+			},
+		}},
+	})
+	assert.Equal(t, "answer\nsecret reasoning", onlyReasoning)
+
+	// Same precedence as chatDeltaReasoning: do not audit both fields when both are set.
+	both := chatCompletionChunkModerationText(types.ChatCompletionChunk{
+		Choices: []types.ChatCompletionChunkChoice{{
+			Delta: types.ChatCompletionChunkChoiceDelta{
+				ReasoningContent: "preferred",
+				Reasoning:        "fallback",
+			},
+		}},
+	})
+	assert.Equal(t, "preferred", both)
+}
+
 func TestModerationImpl_CloseStreamCheck(t *testing.T) {
 	ctx := context.Background()
 	mockChecker := new(MockStreamChecker)
