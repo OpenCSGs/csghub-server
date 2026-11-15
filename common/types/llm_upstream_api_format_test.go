@@ -17,6 +17,7 @@ func TestInferProtocolFromURLPath(t *testing.T) {
 		{"https://api.anthropic.com/v1/messages", ApiFormatMessages, true},
 		{"https://api.deepseek.com/anthropic", ApiFormatMessages, true},
 		{"https://gateway.example.com/v1/systemone", ApiFormatSystemOne, true},
+		{"https://gateway.example.com/v1/decisions", ApiFormatDecisions, true},
 		{"http://model-svc:8080", "", false},
 		{"https://gw.example.com/v1", "", false},
 		{"", "", false},

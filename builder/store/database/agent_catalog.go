@@ -10,12 +10,16 @@ import (
 )
 
 type UpdateLogicalAgentInput struct {
-	LogicalInstanceID int64
-	OwnerUUID         string
-	Name              *string
-	Description       *string
-	Metadata          *map[string]any
-	Public            *bool
+	LogicalInstanceID   int64
+	OwnerUUID           string
+	Name                *string
+	Description         *string
+	Metadata            *map[string]any
+	Public              *bool
+	ResolvedIdleTimeout *int
+	// RelayAgentID persists the CSGRelay agent id reported for this logical
+	// agent. Nil leaves the stored value unchanged.
+	RelayAgentID *string
 }
 
 type AgentCatalogStore interface {
@@ -63,6 +67,9 @@ func (s *agentCatalogStoreImpl) UpdateLogical(ctx context.Context, input UpdateL
 		if err != nil {
 			return err
 		}
+		if err := checkAgentPolicyUpdate(ctx, tx, logical, input.Metadata); err != nil {
+			return err
+		}
 		query := tx.NewUpdate().Model(logical)
 		if input.Name != nil {
 			query = query.Set("name = ?", *input.Name)
@@ -76,9 +83,15 @@ func (s *agentCatalogStoreImpl) UpdateLogical(ctx context.Context, input UpdateL
 		if input.Public != nil {
 			query = query.Set("public = ?", *input.Public)
 		}
-		return query.WherePK().Returning("*").Scan(ctx, result)
+		if input.RelayAgentID != nil {
+			query = query.Set("relay_agent_id = ?", *input.RelayAgentID)
+		}
+		if err := query.WherePK().Returning("*").Scan(ctx, result); err != nil {
+			return err
+		}
+		return updateLogicalAgentDeployTimeouts(ctx, tx, input.LogicalInstanceID, input.ResolvedIdleTimeout)
 	})
-	if err != nil && !errors.Is(err, errorx.ErrForbidden) && !errors.Is(err, errorx.ErrBadRequest) {
+	if err != nil && !errors.Is(err, errorx.ErrForbidden) && !errors.Is(err, errorx.ErrBadRequest) && !errors.Is(err, errorx.ErrAgentAllocationLifecycleConflict) {
 		err = errorx.HandleDBError(err, map[string]any{"operation": "update_logical_instance", "instance_id": input.LogicalInstanceID})
 	}
 	return result, err

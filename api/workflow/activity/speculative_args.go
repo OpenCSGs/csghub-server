@@ -32,6 +32,11 @@ const (
 	ngramPromptLookupMax = 4
 	ngramPromptLookupMin = 2
 
+	// asyncSchedulingFlag is the vLLM boolean flag that plain ngram speculative
+	// decoding cannot be combined with: the engine only whitelists ngram_gpu
+	// and rejects the whole config at startup otherwise (issue #1659).
+	asyncSchedulingFlag = "--async-scheduling"
+
 	// maxSpecNumTokens caps the speculative token count: values above 8
 	// waste draft compute without measurable gain (vLLM and SGLang both
 	// recommend 1-4 in practice).
@@ -135,7 +140,18 @@ func composeSpeculativeArgs(logger log.Logger, in speculativeComposeInput) (stri
 		if config == "" {
 			return skip("cannot select MTP alias for this architecture on this vLLM version")
 		}
-		return in.EngineArgsStr + " " + config, state
+		engineArgs := in.EngineArgsStr
+		if method == specMethodNgram {
+			// Keep the deploy startable: vLLM rejects --async-scheduling together
+			// with plain ngram, so drop the flag instead of failing at startup
+			// (issue #1659).
+			var stripped bool
+			engineArgs, stripped = stripAsyncScheduling(engineArgs)
+			if stripped {
+				logger.Info("removed --async-scheduling because plain ngram does not support it", "method", method)
+			}
+		}
+		return engineArgs + " " + config, state
 	}
 	if method == specMethodEagle3 {
 		// SGLang eagle3 also requires architecture metadata so the draft model
@@ -150,6 +166,40 @@ func composeSpeculativeArgs(logger log.Logger, in speculativeComposeInput) (stri
 		return skip("cannot build SGLang speculative args for this method")
 	}
 	return in.EngineArgsStr + " " + sgArgs, state
+}
+
+// stripAsyncScheduling removes every standalone --async-scheduling flag from
+// the composed ENGINE_ARGS and reports whether any was present. The flag
+// carries no value, so only the token boundaries are matched; every other byte
+// (including whitespace inside user-supplied custom-options) is preserved.
+// Adjacent occurrences share their separator, so removal repeats until the
+// string stops changing.
+func stripAsyncScheduling(engineArgs string) (string, bool) {
+	removed := false
+	for {
+		next, ok := stripOneAsyncScheduling(engineArgs)
+		if !ok {
+			return engineArgs, removed
+		}
+		engineArgs, removed = next, true
+	}
+}
+
+// stripOneAsyncScheduling removes the flags it can match in a single pass.
+// Every branch strictly shortens the input, so the caller can loop safely.
+func stripOneAsyncScheduling(engineArgs string) (string, bool) {
+	switch {
+	case strings.Contains(engineArgs, " "+asyncSchedulingFlag+" "):
+		return strings.ReplaceAll(engineArgs, " "+asyncSchedulingFlag+" ", " "), true
+	case strings.HasSuffix(engineArgs, " "+asyncSchedulingFlag):
+		return strings.TrimSuffix(engineArgs, " "+asyncSchedulingFlag), true
+	case engineArgs == asyncSchedulingFlag:
+		return "", true
+	case strings.HasPrefix(engineArgs, asyncSchedulingFlag+" "):
+		return strings.TrimPrefix(engineArgs, asyncSchedulingFlag+" "), true
+	default:
+		return engineArgs, false
+	}
 }
 
 // speculativeAutoInjectInput groups the inputs of autoInjectMTPSpeculativeArgs.

@@ -42,7 +42,7 @@ type SandboxV2CreateRequest struct {
 	MinCPU          string                 `json:"min_cpu,omitempty"`         // lower bound for auto-allocation, e.g. "500m"
 	MinMemory       string                 `json:"min_memory,omitempty"`      // lower bound for auto-allocation, e.g. "512Mi"
 	ReadinessProbe  *SandboxReadinessProbe `json:"readiness_probe,omitempty"` // app-level readiness (persistent only)
-	Timeout         int                    `json:"timeout,omitempty"`         // idle-reclaim timeout in minutes; 0 = permanent (paid resources only)
+	Timeout         int                    `json:"timeout,omitempty"`         // resolved idle-reclaim timeout in minutes; 0 = permanent
 	VolumeMounts    []VolumeMount          `json:"volume_mounts,omitempty"`
 	MinReplica      int                    `json:"min_replica,omitempty"`
 	MaxReplica      int                    `json:"max_replica,omitempty"`
@@ -89,9 +89,10 @@ type SandboxV2InspectPersistentRequest struct {
 // deletion. RuntimeGeneration and operation identity are deliberately omitted:
 // deletion owns every generation created for the allocation.
 type SandboxV2DeletePersistentRequest struct {
-	ResourceKey  string `json:"resource_key"`
-	AllocationID int64  `json:"allocation_id"`
-	UserUUID     string `json:"user_uuid"`
+	ResourceKey     string `json:"resource_key"`
+	AllocationID    int64  `json:"allocation_id"`
+	UserUUID        string `json:"user_uuid"`
+	PreserveStorage bool   `json:"preserve_storage,omitempty"`
 }
 
 type SandboxV2Type string

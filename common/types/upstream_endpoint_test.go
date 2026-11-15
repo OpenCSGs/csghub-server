@@ -48,6 +48,9 @@ func TestUpstreamConfig_SDKBaseURL(t *testing.T) {
 	// Formats without an SDK convention fall back to the URL as-is.
 	systemOne := UpstreamConfig{URL: "https://openrouter.example.com/api/v1/systemone"}
 	assert.Equal(t, "https://openrouter.example.com/api/v1/systemone", systemOne.SDKBaseURL(ApiFormatSystemOne))
+
+	decisions := UpstreamConfig{URL: "https://api.openai.com/v1/decisions"}
+	assert.Equal(t, "https://api.openai.com/v1", decisions.SDKBaseURL(ApiFormatDecisions))
 }
 
 func TestUpstreamConfig_SDKBaseURLPreservesQuery(t *testing.T) {

@@ -564,7 +564,7 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 				LfsPointerSize:  lfsPointerSize,
 				LfsRelativePath: LfsRelativePath,
 			}
-			if listBlobResp.Oid != "" && fileSize < lfsMaxPointerSize {
+			if listBlobResp.Type == gitalypb.ObjectType_BLOB && listBlobResp.Oid != "" && fileSize < lfsMaxPointerSize {
 				oidFiles[listBlobResp.Oid] = append(oidFiles[listBlobResp.Oid], file)
 			}
 			files = append(files, file)

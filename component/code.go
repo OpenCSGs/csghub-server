@@ -34,6 +34,7 @@ const codeGitattributesContent = modelGitattributesContent
 
 type CodeComponent interface {
 	Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error)
+	CreateFork(ctx context.Context, req types.CreateForkReq) (*types.Code, error)
 	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Code, int, error)
 	Update(ctx context.Context, req *types.UpdateCodeReq) (*types.Code, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
@@ -41,6 +42,22 @@ type CodeComponent interface {
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
 	OrgCodes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error)
 	GetUploadUrl(ctx context.Context) (string, string, map[string]string, error)
+}
+
+func (c *codeComponentImpl) CreateFork(ctx context.Context, req types.CreateForkReq) (*types.Code, error) {
+	req.SourceRepoType = types.CodeRepo
+	repo, err := c.repoComponent.CreateFork(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("fork code repository: %w", err)
+	}
+	repoPath := path.Join(req.TargetNamespace, req.TargetName)
+	code, err := c.codeStore.CreateAndUpdateRepoPath(ctx, database.Code{RepositoryID: repo.ID, Repository: repo}, repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("create forked code record: %w", err)
+	}
+	return &types.Code{ID: code.ID, RepositoryID: repo.ID, Name: repo.Name, Nickname: repo.Nickname,
+		Description: repo.Description, Path: repoPath, Private: repo.Private, DefaultBranch: repo.DefaultBranch,
+		CreatedAt: repo.CreatedAt, UpdatedAt: repo.UpdatedAt}, nil
 }
 
 func NewCodeComponent(config *config.Config) (CodeComponent, error) {
@@ -384,7 +401,7 @@ func (c *codeComponentImpl) syncAgentTemplateVisibility(ctx context.Context, rep
 		return fmt.Errorf("find csgclaw templates by name: %w", err)
 	}
 	for i := range templates {
-		if templates[i].Metadata["repo_path"] != repo.Path || templates[i].Public == public {
+		if templates[i].IsInternal || templates[i].Metadata["repo_path"] != repo.Path || templates[i].Public == public {
 			continue
 		}
 		templates[i].Public = public

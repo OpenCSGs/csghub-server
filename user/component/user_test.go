@@ -2090,7 +2090,7 @@ func TestUserComponent_AdminAuthorizedProfiles(t *testing.T) {
 			require.Equal(t, tt.wantAdmin, result.Admin)
 			require.Equal(t, tt.wantSuperAdmin, result.SuperAdmin)
 
-			req := types.UserListReq{VisitorName: "module-admin", Page: 2, Per: 20, Search: "alice", VerifyStatus: "approved", ExactMatch: true, SortBy: "created_at", SortOrder: "desc"}
+			req := types.UserListReq{VisitorName: "module-admin", Page: 2, Per: 20, Search: "alice", VerifyStatus: "approved", ExactMatch: true, SortBy: "last_login_at", SortOrder: "desc"}
 			us.EXPECT().IndexWithSearch(ctx, req, types.UserWithAdminPermissions).Return([]database.User{target}, 41, nil).Once()
 			list, total, err := uc.Index(ctx, req)
 			require.NoError(t, err)

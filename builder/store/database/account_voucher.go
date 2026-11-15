@@ -30,6 +30,7 @@ type AccountVoucherStore interface {
 	List(ctx context.Context, filter types.VoucherFilter) ([]AccountVoucher, int, error)
 	ListByTargetUUID(ctx context.Context, filter types.VoucherNamespaceFilter) ([]AccountVoucher, int, error)
 	ListActiveByTargetUUID(ctx context.Context, targetUUID string) ([]AccountVoucher, error)
+	ListVoucherCandidates(ctx context.Context, targetUUID string, now time.Time) ([]AccountVoucher, error)
 	UpdateStatus(ctx context.Context, id int64, status types.VoucherStatus) (*AccountVoucher, error)
 	RefreshStatus(ctx context.Context) error
 	GetDashboard(ctx context.Context, req types.VoucherDashboardReq) ([]VoucherDashboardResult, error)
@@ -328,6 +329,21 @@ func (a *accountVoucherStoreImpl) ListActiveByTargetUUID(ctx context.Context, ta
 		Where("target_uuid = ?", targetUUID).
 		Where("status = ?", types.VoucherStatusActive).
 		Order("id DESC").
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("target_uuid", targetUUID))
+	}
+	return vouchers, nil
+}
+
+// ListVoucherCandidates returns unexpired, funded vouchers for eligibility checks.
+func (a *accountVoucherStoreImpl) ListVoucherCandidates(ctx context.Context, targetUUID string, now time.Time) ([]AccountVoucher, error) {
+	var vouchers []AccountVoucher
+	err := a.db.Core.NewSelect().Model(&vouchers).
+		Where("target_uuid = ?", targetUUID).
+		Where("status IN (?)", bun.In([]types.VoucherStatus{types.VoucherStatusActive, types.VoucherStatusPending})).
+		Where("begin_date <= ? AND end_date > ?", now, now).
+		Where("(total - ABS(used)) > 0").
 		Scan(ctx)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("target_uuid", targetUUID))

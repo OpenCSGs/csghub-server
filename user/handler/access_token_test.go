@@ -1,10 +1,15 @@
 package handler
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	mockapicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -477,4 +482,148 @@ func TestAccessTokenHandler_DeleteAPIKey(t *testing.T) {
 
 		tester.ResponseEqCode(t, 400)
 	})
+}
+
+// TestAccessTokenHandlerListNeverDisclosesStoredValues checks the display boundary
+// independently from runtime credential resolution and existing create/refresh tests.
+func TestAccessTokenHandlerListNeverDisclosesStoredValues(t *testing.T) {
+	tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc { return h.GetUserTokensDisplay })
+	tester.mocks.token.EXPECT().GetTokens(tester.Gctx(), &types.GetAccessTokenRequest{Username: "u", Application: types.AccessTokenAppGit}).Return([]types.CheckAccessTokenResp{{Token: "sk-original-secret-yz", TokenName: "sample", Application: types.AccessTokenAppGit}}, nil)
+	tester.WithUser().WithQuery("app", "git").Execute()
+	tester.ResponseEq(t, 200, "OK", []types.CheckAccessTokenResp{{Token: "sk********yz", TokenName: "sample", Application: types.AccessTokenAppGit}})
+	require.NotContains(t, tester.Response().Body.String(), "original-secret")
+}
+
+// TestAccessTokenRuntimeResolverKeepsOriginalBearer verifies that actual business
+// execution retains the existing response independently of display-only reads.
+func TestAccessTokenRuntimeResolverKeepsOriginalBearer(t *testing.T) {
+	tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc { return h.GetOrCreateFirstAvaiTokens })
+	tester.mocks.token.EXPECT().GetOrCreateFirstAvaiToken(tester.Gctx(), "u", "git", "runtime").Return("original-secret-value", nil)
+	tester.WithUser().WithQuery("app", "git").WithQuery("token_name", "runtime").Execute()
+	tester.ResponseEq(t, 200, "OK", "original-secret-value")
+}
+
+// TestAccessTokenListCompatibility checks that display projection does not change
+// legacy plaintext reads, application filtering, or missing-token behavior.
+func TestAccessTokenListCompatibility(t *testing.T) {
+	for _, app := range []types.AccessTokenApp{types.AccessTokenAppGit, types.AccessTokenAppStarship, types.AccessTokenAppMirror} {
+		for _, masked := range []bool{false, true} {
+			t.Run(string(app)+"/masked="+fmt.Sprint(masked), func(t *testing.T) {
+				tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+					if masked {
+						return h.GetUserTokensDisplay
+					}
+					return h.GetUserTokens
+				})
+				tester.mocks.token.EXPECT().GetTokens(tester.Gctx(), &types.GetAccessTokenRequest{Username: "u", Application: app}).Return([]types.CheckAccessTokenResp{{Token: "original-secret-value", Application: app}}, nil)
+				tester.WithUser().WithQuery("app", string(app)).Execute()
+				value := "original-secret-value"
+				if masked {
+					value = "or********ue"
+				}
+				tester.ResponseEq(t, 200, "OK", []types.CheckAccessTokenResp{{Token: value, Application: app}})
+			})
+		}
+	}
+	t.Run("display requires authentication", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc { return h.GetUserTokensDisplay })
+		tester.Execute()
+		tester.ResponseEqCode(t, 401)
+	})
+	t.Run("missing credentials remain absent", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc { return h.GetUserTokensDisplay })
+		tester.mocks.token.EXPECT().GetTokens(tester.Gctx(), &types.GetAccessTokenRequest{Username: "u", Application: types.AccessTokenAppGit}).Return([]types.CheckAccessTokenResp{}, nil)
+		tester.WithUser().WithQuery("app", "git").Execute()
+		tester.ResponseEq(t, 200, "OK", []types.CheckAccessTokenResp{})
+	})
+}
+
+// TestAccessTokenBuiltinRuntimeDisplay verifies separate JSON responses for raw
+// resolution and masked display, with no custom display response header.
+func TestAccessTokenBuiltinRuntimeDisplay(t *testing.T) {
+	for _, masked := range []bool{false, true} {
+		for _, present := range []bool{false, true} {
+			t.Run(fmt.Sprintf("masked=%t/present=%t", masked, present), func(t *testing.T) {
+				tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+					if masked {
+						return h.GetBuiltinKeysDisplay
+					}
+					return h.GetBuiltinKeys
+				})
+				req := &types.GetAccessTokenRequest{Username: "u", OpUUID: "user-uuid", NSUUID: "namespace-uuid", Application: types.AccessTokenAppAIGateway}
+				var key *types.CheckAccessTokenResp
+				if present {
+					value := "original-gateway-key"
+					if masked {
+						value = "or********ey"
+					}
+					key = &types.CheckAccessTokenResp{ID: 1, Token: value, NSUUID: req.NSUUID}
+				}
+				if masked {
+					tester.mocks.token.EXPECT().GetBuiltinAPIKeyDisplay(context.Background(), req).Return(key, nil).Once()
+				} else {
+					tester.mocks.token.EXPECT().GetOrCreateBuiltinAPIKey(context.Background(), req).Return(key, nil).Once()
+				}
+				tester.WithUserAndUUID().WithParam("uuid", req.NSUUID).Execute()
+				tester.ResponseEq(t, 200, "OK", key)
+				require.Empty(t, tester.Response().Header().Get("X-Credential-Display"))
+			})
+		}
+	}
+}
+
+// TestAccessTokenBuiltinDisplayErrors preserves namespace validation and propagates
+// authorization or storage errors without disclosing a credential.
+func TestAccessTokenBuiltinDisplayErrors(t *testing.T) {
+	t.Run("missing namespace", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc { return h.GetBuiltinKeysDisplay })
+		tester.WithUserAndUUID().Execute()
+		tester.ResponseEqCode(t, 400)
+	})
+	t.Run("component error", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc { return h.GetBuiltinKeysDisplay })
+		tester.mocks.token.EXPECT().GetBuiltinAPIKeyDisplay(context.Background(), &types.GetAccessTokenRequest{Username: "u", OpUUID: "user-uuid", NSUUID: "namespace-uuid", Application: types.AccessTokenAppAIGateway}).Return(nil, fmt.Errorf("lookup unavailable")).Once()
+		tester.WithUserAndUUID().WithParam("uuid", "namespace-uuid").Execute()
+		tester.ResponseEqCode(t, 500)
+	})
+}
+
+// TestCreateAPIKeyLimitReached verifies that a wrapped quota error returns a stable client error code.
+func TestCreateAPIKeyLimitReached(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc { return h.CreateAPIKey })
+	tester.mocks.token.EXPECT().Create(mock.Anything, mock.Anything).
+		Return(nil, fmt.Errorf("create token: %w", errorx.ErrAPIKeyLimitReached)).Once()
+	tester.WithUserAndUUID().WithParam("uuid", "namespace-uuid").WithBody(t, types.CreateAPIKeyRequest{
+		KeyName: "new-key",
+		Quotas:  []types.UpdateAPIKeyQuotaItem{{QuotaType: types.AccountingQuotaTypeUnlimited, ValueType: types.AccountingQuotaValueTypeFee}},
+	}).Execute()
+	tester.ResponseEqCode(t, 400)
+	require.Contains(t, tester.Response().Body.String(), `"code":"USER-ERR-31"`)
+}
+
+// TestCreateLegacyAPIKeyLimitReached verifies the same client error on both legacy creation routes.
+func TestCreateLegacyAPIKeyLimitReached(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name    string
+		handler func(*AccessTokenHandler) gin.HandlerFunc
+	}{
+		{"app token", func(h *AccessTokenHandler) gin.HandlerFunc { return h.CreateAppToken }},
+		{"deprecated user token", func(h *AccessTokenHandler) gin.HandlerFunc { return h.Create }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tester := NewAccessTokenTester(t).WithHandleFunc(tc.handler)
+			sensitive := mockapicomp.NewMockSensitiveComponent(t)
+			sensitive.EXPECT().CheckRequestV2(mock.Anything, mock.Anything).Return(true, nil).Once()
+			tester.handler.sc = sensitive
+			tester.mocks.token.EXPECT().Create(mock.Anything, mock.MatchedBy(func(req *types.CreateUserTokenRequest) bool {
+				return req.Username == "u" && req.Application == types.AccessTokenAppAIGateway && req.NSUUID == ""
+			})).Return(nil, fmt.Errorf("create token: %w", errorx.ErrAPIKeyLimitReached)).Once()
+			tester.WithUser().WithParam("app", "aigateway").WithParam("token_name", "legacy-key").WithParam("username", "u").
+				WithBody(t, types.CreateUserTokenRequest{TokenName: "legacy-key", Application: types.AccessTokenAppAIGateway}).Execute()
+			tester.ResponseEqCode(t, 400)
+			require.Contains(t, tester.Response().Body.String(), `"code":"USER-ERR-31"`)
+		})
+	}
 }

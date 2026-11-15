@@ -161,7 +161,7 @@ func (h *embeddingPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 		slog.Any("user", meta.UserID), slog.Any("model_id", meta.Model))
 
 	proxyToAPI := resolveProxyPathFromModelEndpoint(mt.Model.Endpoint, mt.ModelName)
-	rp, err := proxy.NewReverseProxy(mt.Target, proxy.WithoutAcceptEncoding())
+	rp, err := newArchiveProxy(mt.Target, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		finishEmbeddingTraceWithError(embeddingRecorder, err, types.TraceErrUpstreamUnavailable)
 		httpbase.ServerError(c, err)

@@ -792,12 +792,14 @@ type RechargesIndexReq struct {
 }
 
 type PresentsIndexReq struct {
-	UserUUID  string `json:"user_uuid"`
-	UserName  string `json:"user_name"`
-	StartDate string `json:"start_date"`
-	EndDate   string `json:"end_date"`
-	Per       int    `json:"per"`
-	Page      int    `json:"page"`
+	UserUUID        string `json:"user_uuid"`
+	UserName        string `json:"user_name"`
+	StartDate       string `json:"start_date"`
+	EndDate         string `json:"end_date"`
+	ActivityID      int64  `json:"activity_id"`
+	ParticipantUUID string `json:"participant_uuid"`
+	Per             int    `json:"per"`
+	Page            int    `json:"page"`
 }
 
 type RechargeIndexResp struct {

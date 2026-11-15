@@ -56,6 +56,18 @@ type ModelTreeReq struct {
 	Relation     ModelRelation `json:"relation"`
 }
 
+// ScanModels is the public request body for the model tree scan API. It only
+// carries the models to scan: the scan always follows the repository's stored
+// default branch, so API callers cannot choose a branch.
 type ScanModels struct {
 	Models []string `json:"models"`
+}
+
+// ScanModelTreeParams is the internal scan request used by the component and
+// the workflow. DefaultBranch pins a callback-triggered scan to the branch that
+// produced the push, because mirror syncs persist the repository default branch
+// only after the callback starts. Empty means use the stored value.
+type ScanModelTreeParams struct {
+	Models        []string `json:"models"`
+	DefaultBranch string   `json:"default_branch,omitempty"`
 }

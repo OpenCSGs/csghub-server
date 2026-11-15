@@ -770,6 +770,11 @@ func (h *OpenAIHandlerImpl) applyChatAlternateModel(
 	if err := chatAlternateSatisfiesPlanGates(resolved, modelTarget, p); err != nil {
 		return err
 	}
+	if !resolved.Model.SkipBalance() {
+		if err := h.openaiComponent.CheckBalance(c.Request.Context(), httpbase.GetCurrentNamespaceUUID(c), resolved.Model); err != nil {
+			return fmt.Errorf("check balance for alternate model %q: %w", resolved.Model.ID, err)
+		}
+	}
 	if h.tokenPlanQuotaChecker != nil {
 		if nsUUID := httpbase.GetCurrentNamespaceUUID(c); nsUUID != "" {
 			if err := h.tokenPlanQuotaChecker.CheckTokenPlanQuota(c.Request.Context(), commonType.TokenPlanQuotaReq{
@@ -813,9 +818,8 @@ func recordAutoRouteFallback(ctx context.Context, alternate *types.AutoRouteCand
 // chatAlternateSatisfiesPlanGates refuses an alternate whose use would rest
 // on a plan-phase decision this request never made for it.
 //
-//   - Balance is checked per tenant, so a decision already taken covers any
-//     model; but a primary that skips the check leaves the request with no
-//     decision at all, which cannot be extended to a model that needs one.
+//   - A primary that skips the balance check leaves no decision that can be
+//     extended to an alternate. Eligible alternates are checked again above.
 //   - Content safety is decided twice for a request, and both decisions are
 //     made before the first attempt: the plan phase checks the prompt, and
 //     the handler enables stream-time output moderation. Both were made for
@@ -981,7 +985,7 @@ func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResp
 	if observation.Enabled() {
 		options = append(options, proxy.WithoutAcceptEncoding())
 	}
-	rp, err := proxy.NewReverseProxy(modelTarget.Target, options...)
+	rp, err := newArchiveProxy(modelTarget.Target, options...)
 	if err != nil {
 		observation.Finish(err)
 		return nil, err

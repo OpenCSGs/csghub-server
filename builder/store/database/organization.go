@@ -251,31 +251,33 @@ func (s *orgStoreImpl) GetUserOwnOrgs(ctx context.Context, username string) (org
 }
 
 // IsLastOrganizationAdmin reports whether the user is the only active administrator of any organization.
-// Organizations are evaluated independently, and only the admin role grants administrator status.
+// Both administrator and legacy owner memberships count.
 func (s *orgStoreImpl) IsLastOrganizationAdmin(ctx context.Context, username string) (bool, error) {
 	if username == "" {
 		return false, nil
 	}
-	exists, err := s.db.Operator.Core.NewSelect().
+	exists, err := soleAdminOrganizations(s.db.Core).Where("target_user.username = ?", username).Exists(ctx)
+	return exists, errorx.HandleDBError(err, nil)
+}
+
+func soleAdminOrganizations(db bun.IDB) *bun.SelectQuery {
+	return db.NewSelect().
 		Model((*Member)(nil)).
-		Join("JOIN users AS target_user ON target_user.id = member.user_id AND target_user.deleted_at IS NULL").
+		Join("JOIN users AS target_user ON target_user.id = member.user_id AND target_user.deleted_at IS NULL AND NOT target_user.login_frozen").
 		Join("JOIN organizations AS organization ON organization.id = member.organization_id AND organization.deleted_at IS NULL").
-		Where("target_user.username = ?", username).
 		Where("member.deleted_at IS NULL").
-		Where("member.role = ?", types.UserAdmin).
+		Where("member.role IN (?, ?)", types.UserAdmin, "owner").
 		Where(`NOT EXISTS (
 			SELECT 1
 			FROM members AS other_member
 			JOIN users AS other_user
 				ON other_user.id = other_member.user_id
-				AND other_user.deleted_at IS NULL
+				AND other_user.deleted_at IS NULL AND NOT other_user.login_frozen
 			WHERE other_member.organization_id = member.organization_id
 				AND other_member.user_id <> member.user_id
 				AND other_member.deleted_at IS NULL
-				AND other_member.role = ?
-		)`, types.UserAdmin).
-		Exists(ctx)
-	return exists, errorx.HandleDBError(err, nil)
+				AND other_member.role IN (?, ?)
+		)`, types.UserAdmin, "owner")
 }
 
 func (s *orgStoreImpl) Update(ctx context.Context, org *Organization) (err error) {

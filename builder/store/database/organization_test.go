@@ -146,10 +146,10 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	isLastAdmin, err = store.IsLastOrganizationAdmin(ctx, "u1")
 	require.NoError(t, err)
 	require.True(t, isLastAdmin)
-	require.NoError(t, database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db)).Delete(ctx, org.ID, owner.ID))
+	require.ErrorIs(t, database.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db)).Delete(ctx, org.ID, owner.ID), errorx.ErrLastOrgAdmin)
 	isLastAdmin, err = store.IsLastOrganizationAdmin(ctx, "u1")
 	require.NoError(t, err)
-	require.False(t, isLastAdmin)
+	require.True(t, isLastAdmin)
 
 	orgs, err = store.GetUserBelongOrgs(ctx, 321)
 	require.Nil(t, err)

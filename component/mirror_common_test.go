@@ -28,7 +28,7 @@ import (
 
 func TestMirrorComponentDeleteClearsRepoSyncCache(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	jobClient := useFakeMirrorJobClient(mc)
 	syncCache := mockcache.NewMockCache(t)
 	mc.syncCache = syncCache
@@ -44,7 +44,7 @@ func TestMirrorComponentDeleteClearsRepoSyncCache(t *testing.T) {
 
 func TestMirrorComponent_Repos(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: ""}, true).Return([]database.Mirror{{
 		CurrentTask: &database.MirrorTask{ID: 123, Progress: 100, Status: types.MirrorLfsSyncFinished},
 		Progress:    100, Repository: &database.Repository{Path: "foo", SyncStatus: types.SyncStatusCompleted, RepositoryType: types.ModelRepo},
@@ -58,7 +58,7 @@ func TestMirrorComponent_Repos(t *testing.T) {
 
 func TestMirrorComponent_Index(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: "foo"}, false).Return(
 		[]database.Mirror{{CurrentTask: &database.MirrorTask{Status: types.MirrorLfsSyncFinished}, Username: "user", LastMessage: "msg", Repository: &database.Repository{}}}, 100, nil,
 	)
@@ -71,7 +71,7 @@ func TestMirrorComponent_Index(t *testing.T) {
 
 func TestMirrorComponent_Statistic(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestMirrorComponent(ctx, t)
+	mc := newPublicMirrorTestComponent(ctx, t)
 	mc.mocks.stores.MirrorMock().EXPECT().StatusCount(ctx).Return([]database.MirrorStatusCount{{Status: types.MirrorRepoSyncFinished, Count: 100}}, nil)
 
 	status, err := mc.Statistics(ctx)

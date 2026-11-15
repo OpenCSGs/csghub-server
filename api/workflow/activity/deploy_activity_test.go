@@ -47,6 +47,13 @@ type testEnv struct {
 	mockClusterStore      *mockdb.MockClusterInfoStore
 }
 
+func (env *testEnv) expectDispatch() {
+	env.mockDeployTaskStore.EXPECT().DispatchPendingTask(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ *database.DeployTask, submit func(database.DeployTaskStore) error) error {
+			return submit(env.mockDeployTaskStore)
+		}).Once()
+}
+
 func setupTest(t *testing.T) *testEnv {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, "test", "test")
@@ -481,6 +488,7 @@ func TestBuildFailed(t *testing.T) {
 		Sdk:          "gradio",
 		RepositoryID: deploy.Repository.ID,
 	}, nil)
+	tester.expectDispatch()
 	tester.mockImageBuilder.EXPECT().Build(mock.Anything, mock.Anything).Return(errors.New("build failed"))
 	tester.mockLogReporter.EXPECT().Report(mock.Anything).Return().Maybe()
 	err := tester.activities.Build(tester.ctx, buildTask.ID)
@@ -561,6 +569,7 @@ func TestDeploy(t *testing.T) {
 		Sdk:          "gradio",
 		RepositoryID: deploy.Repository.ID,
 	}, nil)
+	tester.expectDispatch()
 	tester.mockImageRunner.EXPECT().Run(mock.Anything, mock.MatchedBy(func(req *types.RunRequest) bool {
 		if req.DeployExtend.NodeAffinity == nil || len(req.DeployExtend.Tolerations) == 0 {
 			return false
@@ -1364,4 +1373,11 @@ func TestSetEngineArgs_MultiNodeParallelism(t *testing.T) {
 			require.Equal(t, tt.want, envMap["ENGINE_ARGS"])
 		})
 	}
+}
+
+func TestCancelledDeployWorkflowDoesNotStartWork(t *testing.T) {
+	env := setupTest(t)
+	env.mockDeployTaskStore.EXPECT().GetDeployTask(env.ctx, int64(1)).Return(&database.DeployTask{Status: common.TaskStatusCancelled}, nil)
+	require.NoError(t, env.activities.Build(env.ctx, 1))
+	require.NoError(t, env.activities.Deploy(env.ctx, 1))
 }

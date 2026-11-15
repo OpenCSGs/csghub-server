@@ -313,6 +313,119 @@ func TestComposeSpeculativeArgs_NoMethodKeepsArgsUntouched(t *testing.T) {
 	}
 }
 
+// TestComposeSpeculativeArgs_NgramStripsAsyncScheduling covers issue #1659:
+// vLLM only whitelists ngram_gpu for --async-scheduling, so the flag must not
+// reach the engine together with plain ngram.
+func TestComposeSpeculativeArgs_NgramStripsAsyncScheduling(t *testing.T) {
+	compose := func(method, engineArgs string) (string, specDecodeState) {
+		return composeSpeculativeArgs(nopLogger(), speculativeComposeInput{
+			EngineArgsStr: engineArgs,
+			ArgValues:     map[string]string{specArgMethod: method},
+			Runtime:       runtimeConfig{EngineName: "nvidia-vllm", EngineVersion: "25.11-py3"},
+			ArchLookup:    func() string { return "" },
+		})
+	}
+
+	t.Run("ngram drops the flag", func(t *testing.T) {
+		args, state := compose("ngram", "--max-model-len 8192 --async-scheduling")
+		require.True(t, state.Active)
+		require.NotContains(t, args, asyncSchedulingFlag)
+		require.NotContains(t, args, "  ")
+		require.Contains(t, args, "--max-model-len 8192")
+		require.Contains(t, args, `"method":"ngram"`)
+	})
+
+	t.Run("ngram keeps args untouched when the flag is absent", func(t *testing.T) {
+		args, state := compose("ngram", "--max-model-len 8192")
+		require.True(t, state.Active)
+		require.Equal(t, "--max-model-len 8192 --speculative-config {\"method\":\"ngram\",\"num_speculative_tokens\":2,\"prompt_lookup_max\":4,\"prompt_lookup_min\":2}", args)
+	})
+
+	t.Run("mtp keeps the flag", func(t *testing.T) {
+		args, state := compose("mtp", "--max-model-len 8192 --async-scheduling")
+		require.True(t, state.Active)
+		require.Contains(t, args, asyncSchedulingFlag)
+	})
+
+	t.Run("eagle3 keeps the flag", func(t *testing.T) {
+		args, state := composeSpeculativeArgs(nopLogger(), speculativeComposeInput{
+			EngineArgsStr: "--max-model-len 8192 --async-scheduling",
+			ArgValues: map[string]string{
+				specArgMethod:     "eagle3",
+				specArgDraftModel: "opencsg/eagle3-llama",
+			},
+			Runtime:    runtimeConfig{EngineName: "nvidia-vllm", EngineVersion: "25.11-py3"},
+			ArchLookup: func() string { return "LlamaForCausalLM" },
+		})
+		require.True(t, state.Active)
+		require.Contains(t, args, asyncSchedulingFlag)
+	})
+
+	t.Run("sglang ngram is unaffected", func(t *testing.T) {
+		args, state := composeSpeculativeArgs(nopLogger(), speculativeComposeInput{
+			EngineArgsStr: "--max-model-len 8192",
+			ArgValues:     map[string]string{specArgMethod: "ngram"},
+			Runtime:       runtimeConfig{EngineName: "nvidia-sglang", EngineVersion: "25.11-py3"},
+			ArchLookup:    func() string { return "" },
+		})
+		require.True(t, state.Active)
+		require.Contains(t, args, "--speculative-algorithm NGRAM")
+	})
+}
+
+func TestStripAsyncScheduling(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		removed bool
+	}{
+		{name: "trailing flag", input: "--a 1 --async-scheduling", want: "--a 1", removed: true},
+		{name: "leading flag", input: "--async-scheduling --a 1", want: "--a 1", removed: true},
+		{name: "middle flag", input: "--a 1 --async-scheduling --b 2", want: "--a 1 --b 2", removed: true},
+		{name: "only flag", input: "--async-scheduling", want: "", removed: true},
+		{name: "no flag", input: "--a 1 --b 2", want: "--a 1 --b 2", removed: false},
+		{name: "lookalike token is kept", input: "--a --async-scheduling-extra", want: "--a --async-scheduling-extra", removed: false},
+		{
+			// User-supplied custom-options may contain runs of whitespace; only
+			// the flag token is removed, nothing is re-normalized.
+			name:    "inner whitespace is preserved",
+			input:   `--custom-options --served-model-name "a  b" --async-scheduling`,
+			want:    `--custom-options --served-model-name "a  b"`,
+			removed: true,
+		},
+		{name: "empty input", input: "", want: "", removed: false},
+		{
+			// Adjacent duplicates share their separator, so a single pass would
+			// leave one behind; the loop must remove every occurrence.
+			name:    "adjacent duplicates",
+			input:   "--a 1 --async-scheduling --async-scheduling --b 2",
+			want:    "--a 1 --b 2",
+			removed: true,
+		},
+		{
+			name:    "adjacent duplicates at start",
+			input:   "--async-scheduling --async-scheduling --b 2",
+			want:    "--b 2",
+			removed: true,
+		},
+		{
+			name:    "separated duplicates",
+			input:   "--async-scheduling --a 1 --async-scheduling",
+			want:    "--a 1",
+			removed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, removed := stripAsyncScheduling(tt.input)
+			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.removed, removed)
+		})
+	}
+}
+
 func TestParseEngineVersion(t *testing.T) {
 	tests := []struct {
 		version string
@@ -760,6 +873,31 @@ func TestSetEngineArgsDraftRepoEnv(t *testing.T) {
 	state = a.setEngineArgs(ctx, nopLogger(), envMap, deployInfo, rc, "opencsg/test-model")
 	require.NotContains(t, envMap, "SPEC_DRAFT_REPO_ID")
 	require.True(t, state.Active)
+}
+
+// Issue #1659: the template ships --async-scheduling enabled, so selecting
+// ngram must still produce a startable ENGINE_ARGS.
+func TestSetEngineArgsNgramDropsAsyncScheduling(t *testing.T) {
+	rc := runtimeConfig{
+		EngineName:    "nvidia-vllm",
+		EngineVersion: "25.11-py3",
+		EngineArgsTemplates: []types.EngineArg{
+			{Name: "max-model-len", Format: "--max-model-len %s"},
+			{Name: "async-scheduling", Value: "enable", Format: "--async-scheduling"},
+			{Name: "spec-decode-method", Value: "", Format: "%s", Virtual: true},
+		},
+	}
+	a := &DeployActivity{}
+	envMap := map[string]string{}
+	deployInfo := &database.Deploy{
+		EngineArgs: `{"spec-decode-method":"ngram","max-model-len":"8192"}`,
+	}
+	state := a.setEngineArgs(context.Background(), nopLogger(), envMap, deployInfo, rc, "opencsg/test-model")
+
+	require.True(t, state.Active)
+	require.Contains(t, envMap["ENGINE_ARGS"], `"method":"ngram"`)
+	require.Contains(t, envMap["ENGINE_ARGS"], "--max-model-len 8192")
+	require.NotContains(t, envMap["ENGINE_ARGS"], asyncSchedulingFlag)
 }
 
 func TestJsonSafeValue(t *testing.T) {

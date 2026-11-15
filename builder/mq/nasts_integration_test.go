@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+// TestDeleteXnetMessagesByFilterWithWorkQueueConsumer verifies selective deletion preserves the durable consumer.
 func TestDeleteXnetMessagesByFilterWithWorkQueueConsumer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -37,7 +37,7 @@ func TestDeleteXnetMessagesByFilterWithWorkQueueConsumer(t *testing.T) {
 
 	host, err := container.Host(ctx)
 	require.NoError(t, err)
-	port, err := container.MappedPort(ctx, nat.Port("4222/tcp"))
+	port, err := container.MappedPort(ctx, "4222/tcp")
 	require.NoError(t, err)
 	serverURL := fmt.Sprintf("nats://%s:%s", host, port.Port())
 	var connection *nats.Conn

@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.20.0-gpu-jupyter
+FROM tensorflow/tensorflow:2.21.0-gpu-jupyter
 LABEL maintainer="xzgan@opencsg.com"
 
 RUN apt-get update && apt-get -y install vim dumb-init \

@@ -121,7 +121,15 @@ func TestImageFileChecker_Run(t *testing.T) {
 	t.Run("empty image url with reader falls back to stream check", func(t *testing.T) {
 		mockChecker := mocksens.NewMockSensitiveChecker(t)
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			Return(&ss_type.CheckResult{IsSensitive: false}, nil)
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
+				// The empty-content probe must rewind the stream, so the full
+				// image content is uploaded.
+				readContent, _ := io.ReadAll(r)
+				if string(readContent) != "image-bytes" {
+					t.Errorf("Expected full image content, got '%s'", readContent)
+				}
+				return &ss_type.CheckResult{IsSensitive: false}, nil
+			})
 
 		c := newEnabledChecker(true, mockChecker)
 		status, message := c.Run(context.Background(), FileCheckContext{Reader: strings.NewReader("image-bytes")})
@@ -131,6 +139,21 @@ func TestImageFileChecker_Run(t *testing.T) {
 		if message != "" {
 			t.Errorf("Expected empty message, got '%s'", message)
 		}
+	})
+
+	t.Run("empty image stream passes without remote check", func(t *testing.T) {
+		mockChecker := mocksens.NewMockSensitiveChecker(t)
+
+		c := newEnabledChecker(true, mockChecker)
+		status, message := c.Run(context.Background(), FileCheckContext{Reader: strings.NewReader("")})
+		if status != types.SensitiveCheckPass {
+			t.Errorf("Expected status %v, got %v", types.SensitiveCheckPass, status)
+		}
+		if message != "empty file" {
+			t.Errorf("Expected message '%s', got '%s'", "empty file", message)
+		}
+		// A zero-byte image must never be uploaded to the remote service.
+		mockChecker.AssertNotCalled(t, "PassImageStreamCheck")
 	})
 
 	t.Run("empty image url without reader returns exception", func(t *testing.T) {

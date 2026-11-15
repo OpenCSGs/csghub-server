@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"opencsg.com/csghub-server/aigateway/types"
+	"opencsg.com/csghub-server/common/errorx"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -29,8 +30,7 @@ func (c *recordingTokenPlanQuotaChecker) CheckTokenPlanQuota(_ context.Context, 
 
 // autoRoutePlan is the plan a request that asked for the virtual model
 // carries once the plan phase has run: the balance check was made and
-// passed, which is what lets an alternate model be used without making it
-// again.
+// passed for the primary model.
 func autoRoutePlan(alternates ...types.AutoRouteCandidate) *types.RequestPlan {
 	return &types.RequestPlan{
 		BalanceOK: true,
@@ -136,6 +136,7 @@ func TestFinishOrTryAnotherModel_ServesTheNextRankedModelAfterA400(t *testing.T)
 	tester.mocks.openAIComp.EXPECT().
 		GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{NsUUID: "testuuid"}, ModelID: "second-model"}).
 		Return(chatModelFallbackTarget("second-model", secondURL).Model, nil)
+	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid", mock.MatchedBy(func(m *types.Model) bool { return m.ID == "second-model" })).Return(nil)
 	// The alternate model brings its own upstream, so the attempt acquires a
 	// lease for it; nil means the upstream has no capacity policy.
 	tester.mocks.openAIComp.EXPECT().
@@ -182,6 +183,7 @@ func TestFinishOrTryAnotherModel_SkipsAnAlternateWithExhaustedTokenPlanQuota(t *
 	tester.mocks.openAIComp.EXPECT().
 		GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{NsUUID: "testuuid"}, ModelID: "second-model"}).
 		Return(chatModelFallbackTarget("second-model", "https://second.example.com/v1/chat/completions").Model, nil)
+	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid", mock.Anything).Return(nil)
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions",
 		bytes.NewReader([]byte(`{"model":"auto","messages":[]}`)))
@@ -203,6 +205,17 @@ func TestFinishOrTryAnotherModel_SkipsAnAlternateWithExhaustedTokenPlanQuota(t *
 	assert.Equal(t, "first-model", modelTarget.Model.ID)
 	assert.Equal(t, "first-model", chatReq.Model)
 	assert.Equal(t, []commontypes.TokenPlanQuotaReq{{NsUUID: "testuuid", ModelID: "second-model"}}, quotaChecker.requests)
+}
+
+func TestApplyChatAlternateModelRejectsInsufficientBalance(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, mock.Anything).
+		Return(chatModelFallbackTarget("second-model", "https://second.example.com/v1/chat/completions").Model, nil)
+	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid", mock.MatchedBy(func(m *types.Model) bool { return m.ID == "second-model" })).Return(errorx.ErrInsufficientBalance)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	err := tester.handler.applyChatAlternateModel(c, &chatContext{}, chatModelFallbackTarget("first-model", "https://first.example.com/v1/chat/completions"), &types.ChatCompletionRequest{}, "second-model", autoRoutePlan(), types.ProtocolChat)
+	assert.ErrorIs(t, err, errorx.ErrInsufficientBalance)
 }
 
 func TestFinishOrTryAnotherModel_ReplaysTheFailureWhenNoModelRemains(t *testing.T) {

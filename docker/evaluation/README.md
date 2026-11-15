@@ -38,6 +38,7 @@ docker buildx build --platform linux/amd64 \
 export IMAGE_TAG=1.11.1-rocm7.2.2
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/evalscope-amd:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/evalscope-amd:latest \
   -f Dockerfile.evalscope-amd \
   --push .
 

@@ -10,5 +10,5 @@ import (
 type ModelTreeComponent interface {
 	GetModelTree(ctx context.Context, currentUser, namespace, name string) (*types.ModelTree, error)
 	ProcessModelTree(ctx context.Context, relations []*types.ModelNode, currentRepo database.Repository)
-	ScanModelTree(ctx context.Context, req types.ScanModels) error
+	ScanModelTree(ctx context.Context, req types.ScanModelTreeParams) error
 }

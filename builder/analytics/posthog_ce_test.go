@@ -16,6 +16,7 @@ func TestNewReturnsNoOpInCE(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+	require.False(t, Available(publisher))
 	require.NoError(t, publisher.Capture(Event{Name: "ignored"}))
 	require.NoError(t, publisher.Close())
 }

@@ -3,9 +3,12 @@ package router
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"path/filepath"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"opencsg.com/csghub-server/aigateway/httparchive"
 	bldprometheus "opencsg.com/csghub-server/builder/prometheus"
 
 	"opencsg.com/csghub-server/builder/instrumentation"
@@ -22,6 +25,23 @@ import (
 
 // NewRouter initializes handlers and registers authenticated service routes.
 func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
+	archiveConfig := *config
+	if archiveConfig.HTTPArchive.Directory != "" {
+		archiveConfig.HTTPArchive.Directory = filepath.Join(config.HTTPArchive.Directory, "gateway")
+	}
+	archiveCleanup, err := httparchive.Init(&archiveConfig)
+	if err != nil {
+		// Archive availability must not prevent model serving. The initialization
+		// error metric remains visible even when no recorder could start.
+		slog.Error("HTTP archive unavailable; serving continues without capture until restart", "error", err)
+		archiveCleanup = func() {}
+	}
+	routerInitialized := false
+	defer func() {
+		if !routerInitialized && archiveCleanup != nil {
+			archiveCleanup()
+		}
+	}()
 	r := gin.New()
 	middleware.SetInfraMiddleware(r, config, instrumentation.Aigateway)
 	r.Use(middleware.BuildCORS(config))
@@ -55,7 +75,6 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
-	routerInitialized := false
 	defer func() {
 		if !routerInitialized {
 			_ = openAIhandler.Shutdown(context.Background())
@@ -75,6 +94,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	responsesHandler := handler.NewResponsesHandler(openAIhandler)
 	chatHandler := handler.NewChatHandler(openAIhandler)
 	jevHandler := handler.NewJevHandler(openAIhandler)
+	decisionsHandler := handler.NewDecisionsHandler(openAIhandler)
 	// Metrics middleware: manages request lifecycle metrics for inference
 	// routes.  Each route opts in by including metricsMw in its handler chain.
 	// Returns a no-op handler + cleanup when the metrics feature is not
@@ -112,6 +132,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	v1Group.POST("/responses", APIKeyMW, quotaMW, userTagsMW, metricsMW, responsesHandler.Responses)
 	v1Group.POST("/chat/completions", APIKeyMW, quotaMW, userTagsMW, metricsMW, chatHandler.Chat)
 	v1Group.POST("/systemone", APIKeyMW, quotaMW, userTagsMW, metricsMW, jevHandler.SystemOne)
+	v1Group.POST("/decisions", APIKeyMW, quotaMW, userTagsMW, metricsMW, decisionsHandler.Decisions)
 	v1Group.POST("/messages", APIKeyMW, quotaMW, userTagsMW, metricsMW, anthropicHandler.Messages)
 	v1Group.POST("/embeddings", APIKeyMW, quotaMW, userTagsMW, metricsMW, embeddingHandler.Embedding)
 	v1Group.POST("/rerank", APIKeyMW, quotaMW, userTagsMW, metricsMW, rerankHandler.Rerank)
@@ -161,6 +182,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 		_ = openAIhandler.Shutdown(context.Background())
 	})
 
+	cleanup = combineCleanup(cleanup, archiveCleanup)
 	routerInitialized = true
 	return r, cleanup, nil
 }

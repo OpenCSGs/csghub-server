@@ -24,10 +24,10 @@ import (
 var enableSwagger bool
 
 const (
-	// historicalMigrationTimeout limits the migration context during server startup.
-	historicalMigrationTimeout = 60 * time.Second
+	// Allow concurrent index builds on large tables during startup migrations.
+	historicalMigrationTimeout = 10 * time.Minute
 	// historicalMigrationLockExpiration keeps the startup migration lock slightly longer than its context.
-	historicalMigrationLockExpiration = 80 * time.Second
+	historicalMigrationLockExpiration = historicalMigrationTimeout + 20*time.Second
 )
 
 func init() {

@@ -1238,7 +1238,7 @@ func TestUserHandler_UpdateVerifyValidation(t *testing.T) {
 			t.Cleanup(func() { service.AssertExpectations(t) })
 			if tc.valid {
 				service.On("Update", mock.Anything, int64(42), tc.status, tc.reason).
-					Return(&database.UserVerify{ID: 42, RealName: "Test Owner", Status: tc.status, Reason: tc.reason}, nil).Once()
+					Return(&database.UserVerify{ID: 42, Status: tc.status, Reason: tc.reason}, nil).Once()
 			}
 			h := &UserHandler{uv: service}
 			r := gin.New()
@@ -1384,7 +1384,7 @@ func TestUserHandler_UserChoicesResponse(t *testing.T) {
 			h := &UserHandler{c: userComponent}
 			userComponent.EXPECT().UserChoices(mock.MatchedBy(func(ctx context.Context) bool {
 				return types.IsAdminAuthorized(ctx)
-			}), types.UserListReq{VisitorName: "module-admin", Search: "alice", Page: 2, Per: 10, ExactMatch: true}).
+			}), types.UserListReq{VisitorName: "module-admin", Search: "alice", Page: 2, Per: 10, ExactMatch: true, SortBy: "id", SortOrder: "asc"}).
 				Return([]types.UserChoice{{ID: 42, UUID: "alice-uuid", Username: "alice", Nickname: "Alice", Avatar: "avatar.png"}}, 11, nil).Once()
 			engine := gin.New()
 			engine.GET("/users", func(ctx *gin.Context) {
@@ -1410,6 +1410,11 @@ func TestUserHandler_UserChoicesResponse(t *testing.T) {
 func TestUserHandler_UserListValidation(t *testing.T) {
 	for _, query := range []struct{ key, value string }{
 		{"exact_match", "invalid"}, {"page", "invalid"}, {"per", "invalid"},
+		{"sort_by", "created_at"}, {"sort_by", "username"}, {"sort_by", "ID"},
+		{"sort_by", "id; SELECT 1"}, {"sort_by", "(SELECT 1)"},
+		{"sort_order", "invalid"}, {"sort_order", "asc nulls first"},
+		{"sort_order", "desc nulls last"}, {"sort_order", "asc; SELECT 1"},
+		{"sort_order", "desc--"}, {"sort_order", " asc"},
 	} {
 		for _, choices := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/choices=%t", query.key, choices), func(t *testing.T) {
@@ -1423,6 +1428,8 @@ func TestUserHandler_UserListValidation(t *testing.T) {
 				}
 				tester.WithQuery(query.key, query.value).Execute()
 				tester.ResponseEqCode(t, http.StatusBadRequest)
+				userComponent.AssertNotCalled(t, "Index", mock.Anything, mock.Anything)
+				userComponent.AssertNotCalled(t, "UserChoices", mock.Anything, mock.Anything)
 			})
 		}
 	}
@@ -1435,7 +1442,7 @@ func TestUserHandler_AccountUserListResponse(t *testing.T) {
 	ctx := types.WithAdminAuthorization(tester.Ctx())
 	tester.Gctx().Request = tester.Gctx().Request.WithContext(ctx)
 	users := []*types.User{{ID: 42, Username: "alice", Email: "private@example.com", Phone: "123456", Roles: []string{"personal_user"}}}
-	userComponent.EXPECT().Index(ctx, types.UserListReq{VisitorName: "u", Per: 10, Page: 1}).Return(users, 1, nil).Once()
+	userComponent.EXPECT().Index(ctx, types.UserListReq{VisitorName: "u", Per: 10, Page: 1, SortBy: "id", SortOrder: "asc"}).Return(users, 1, nil).Once()
 	tester.Handler((&UserHandler{c: userComponent}).Index)
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEq(t, http.StatusOK, "OK", gin.H{"data": users, "total": 1})
@@ -1469,6 +1476,124 @@ func TestUserHandler_UserChoiceResponse(t *testing.T) {
 			if tc.status == http.StatusOK {
 				require.JSONEq(t, `{"msg":"OK","data":{"id":42,"uuid":"user-uuid","username":"alice","nickname":"Alice","avatar":"avatar.png","namespaces":[{"Path":"alice","Type":"user","UUID":"personal-ns"}]}}`, response.Body.String())
 			}
+		})
+	}
+}
+
+// TestAccountStatusSignin redirects denied browser callbacks without exposing OAuth credentials or issuing a JWT.
+func TestAccountStatusSignin(t *testing.T) {
+	for _, accountErr := range []errorx.CustomError{errorx.ErrAccountBanned, errorx.ErrAccountClosed} {
+		for _, failureURL := range []string{
+			"https://portal.example/errors/server-error",
+			"https://portal.example/custom/failure?locale=zh&tag=a&tag=b&empty=&error_code=500&error_code=409&error_message=old#fragment",
+			"https://portal.example/errors/login-failed?source=login",
+		} {
+			for _, routingState := range []string{CASDOOR, VSCODE, "https://untrusted.example/callback"} {
+				t.Run(accountErr.Code()+"/"+failureURL+"/"+routingState, func(t *testing.T) {
+					comp := component.NewMockUserComponent(t)
+					comp.EXPECT().Signin(mock.Anything, "secret-code", "secret-state").Return(nil, "", fmt.Errorf("signin: %w", accountErr)).Once()
+					handler := &UserHandler{c: comp, signinFailureRedirectURL: failureURL}
+					res := httptest.NewRecorder()
+					ctx, _ := gin.CreateTestContext(res)
+					ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/callback/casdoor", nil)
+					handler.handleSigninCallback(ctx, "secret-code", "secret-state", routingState)
+					require.Equal(t, http.StatusFound, res.Code)
+					configured, err := url.Parse(failureURL)
+					require.NoError(t, err)
+					actual, err := url.Parse(res.Header().Get("Location"))
+					require.NoError(t, err)
+					require.Equal(t, configured.Scheme, actual.Scheme)
+					require.Equal(t, configured.Host, actual.Host)
+					require.Equal(t, configured.Path, actual.Path)
+					require.Equal(t, configured.Fragment, actual.Fragment)
+					query := actual.Query()
+					require.Equal(t, []string{accountErr.Code()}, query["error_code"])
+					query.Del("error_code")
+					originalQuery := configured.Query()
+					originalQuery.Del("error_code")
+					require.Equal(t, originalQuery, query)
+					require.NotContains(t, actual.String(), "secret-code")
+					require.NotContains(t, actual.String(), "secret-state")
+					require.Empty(t, res.Body.String())
+					require.Empty(t, res.Header().Values("Set-Cookie"))
+				})
+			}
+		}
+	}
+}
+
+// TestUserHandler_UserListSorting verifies both projections forward only normalized sorting options.
+func TestUserHandler_UserListSorting(t *testing.T) {
+	for _, tc := range []struct {
+		name, by, order, wantBy, wantOrder string
+	}{
+		{"defaults", "", "", "id", "asc"},
+		{"id descending", "id", "DESC", "id", "desc"},
+		{"login ascending", "last_login_at", "ASC", "last_login_at", "asc"},
+		{"login descending", "last_login_at", "dEsC", "last_login_at", "desc"},
+		{"default column", "", "desc", "id", "desc"},
+		{"default direction", "last_login_at", "", "last_login_at", "asc"},
+	} {
+		for _, projection := range []string{"Index", "UserChoices"} {
+			t.Run(tc.name+"/"+projection, func(t *testing.T) {
+				tester := testutil.NewGinTester()
+				component := component.NewMockUserComponent(t)
+				h := &UserHandler{c: component}
+				req := types.UserListReq{
+					VisitorName: "u", Per: 10, Page: 2,
+					SortBy: tc.wantBy, SortOrder: tc.wantOrder,
+				}
+				if projection == "Index" {
+					component.EXPECT().Index(tester.Ctx(), req).Return(nil, 0, nil).Once()
+					tester.Handler(h.Index)
+				} else {
+					component.EXPECT().UserChoices(tester.Ctx(), req).Return(nil, 0, nil).Once()
+					tester.Handler(h.UserChoices)
+				}
+				tester.WithUser().AddPagination(2, 10).
+					WithQuery("sort_by", tc.by).WithQuery("sort_order", tc.order).Execute()
+				tester.ResponseEqCode(t, http.StatusOK)
+			})
+		}
+	}
+}
+
+// TestUserListReqNormalizeSort covers defaults, case normalization, and the complete sorting allowlist.
+func TestUserListReqNormalizeSort(t *testing.T) {
+	for _, tc := range []struct {
+		name, by, order, wantBy, wantOrder string
+	}{
+		{"defaults", "", "", "id", "asc"},
+		{"id ascending", "id", "asc", "id", "asc"},
+		{"id descending", "id", "desc", "id", "desc"},
+		{"login ascending", "last_login_at", "ASC", "last_login_at", "asc"},
+		{"login descending", "last_login_at", "DeSc", "last_login_at", "desc"},
+		{"default field", "", "DESC", "id", "desc"},
+		{"default direction", "last_login_at", "", "last_login_at", "asc"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := types.UserListReq{SortBy: tc.by, SortOrder: tc.order, Search: "alice", Page: 2, Per: 10}
+			want := req
+			want.SortBy, want.SortOrder = tc.wantBy, tc.wantOrder
+			require.NoError(t, req.NormalizeSort())
+			require.Equal(t, want, req)
+			require.NoError(t, req.NormalizeSort())
+			require.Equal(t, want, req)
+		})
+	}
+	for _, tc := range []struct{ by, order string }{
+		{"created_at", "asc"}, {"username", "asc"}, {"ID", "asc"},
+		{" id", "asc"}, {"user.id", "asc"}, {"id,last_login_at", "asc"},
+		{"id; SELECT 1", "asc"}, {"(SELECT 1)", "asc"},
+		{"id", "invalid"}, {"id", " asc"}, {"id", "desc "},
+		{"id", "asc nulls first"}, {"id", "desc nulls last"},
+		{"id", "asc; SELECT 1"}, {"id", "desc--"},
+	} {
+		t.Run(tc.by+"/"+tc.order, func(t *testing.T) {
+			req := types.UserListReq{SortBy: tc.by, SortOrder: tc.order}
+			original := req
+			require.Error(t, req.NormalizeSort())
+			require.Equal(t, original, req)
 		})
 	}
 }

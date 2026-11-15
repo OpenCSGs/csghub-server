@@ -16,8 +16,9 @@ type GiteaCallbackPushReq_Commit struct {
 }
 
 type GiteaCallbackPushReq_Repository struct {
-	FullName string `json:"full_name"`
-	Private  bool   `json:"private"`
+	FullName      string `json:"full_name"`
+	Private       bool   `json:"private"`
+	DefaultBranch string `json:"default_branch"`
 }
 
 type GiteaCallbackPushReq_HeadCommit struct {

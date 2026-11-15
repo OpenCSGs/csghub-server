@@ -14,6 +14,7 @@ import (
 
 	aigatewaycomp "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
+	"opencsg.com/csghub-server/aigateway/httparchive"
 	taskprocessor "opencsg.com/csghub-server/aigateway/task/processor"
 	types "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -34,7 +35,7 @@ func NewProcessor(openaiComponent aigatewaycomp.OpenAIComponent, t2vRegistry *te
 		t2vRegistry = text2video.NewRegistry()
 	}
 	if httpClient == nil {
-		client := rpc.NewHttpClient("")
+		client := rpc.NewHttpClient("").WrapTransport(httparchive.WrapTransport)
 		client.SetTimeout(30 * time.Second)
 		httpClient = client
 	}

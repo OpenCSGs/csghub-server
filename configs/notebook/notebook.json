@@ -18,15 +18,33 @@
     },
     {
       "compute_type": "gpu",
+      "image": "opencsghq/notebook:ubuntu-26.04-cuda12.8-py313-torch2.11.0",
+      "driver_version": "12.8",
+      "engine_version": "4.6.4"
+    },
+    {
+      "compute_type": "gpu",
       "image": "opencsghq/notebook:ubuntu-22.04-cuda12.3-py311-tensorflow2.20.0",
       "driver_version": "12.3",
       "engine_version": "4.2.5"
     },
     {
       "compute_type": "gpu",
+      "image": "opencsghq/notebook:ubuntu-22.04-cuda12.3-py311-tensorflow2.21.0",
+      "driver_version": "12.3",
+      "engine_version": "4.5.5"
+    },
+    {
+      "compute_type": "gpu",
       "image": "opencsghq/notebook:ubuntu-22.04-cuda12.6-py311-unsloth2025.8.10",
       "driver_version": "12.6",
       "engine_version": "2025.8.10"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/notebook:ubuntu-24.04-cuda12.8-py312-unsloth2026.10.28",
+      "driver_version": "12.8",
+      "engine_version": "2026.10.28"
     },
     {
       "compute_type": "gpu",
@@ -37,6 +55,11 @@
     {
       "compute_type": "cpu",
       "image": "opencsghq/notebook:ubuntu-22.04-py311-torch2.3.1",
+      "engine_version": "4.2.4"
+    },
+    {
+      "compute_type": "cpu",
+      "image": "opencsghq/notebook:ubuntu-22.04-py311-torch2.15.0",
       "engine_version": "4.2.4"
     }
   ]

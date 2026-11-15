@@ -92,6 +92,7 @@ var adapterMatrix = map[types.Protocol]map[types.Protocol]AdapterKind{
 	// either direction: a systemone request is only served by a systemone
 	// upstream (native passthrough), and vice versa.
 	types.ProtocolSystemOne: {},
+	types.ProtocolDecisions: {},
 }
 
 // ResolveRouting determines how a client request should be routed to the
@@ -194,7 +195,7 @@ func DetectUpstreamProtocol(target RoutingTarget) types.Protocol {
 	if target.ProtocolOverride != "" {
 		p := strings.TrimSpace(strings.ToLower(target.ProtocolOverride))
 		switch types.Protocol(p) {
-		case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages, types.ProtocolSystemOne:
+		case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages, types.ProtocolSystemOne, types.ProtocolDecisions:
 			return types.Protocol(p)
 		}
 	}
@@ -329,8 +330,9 @@ func nativeBackendURL(clientProtocol types.Protocol, target RoutingTarget) strin
 
 // StripProtocolTail removes the recognized protocol terminal path from a URL
 // so it can be used as a base URL: .../chat/completions, .../responses,
-// .../messages and .../anthropic are all protocol namespaces rather than
-// resource prefixes. URLs without a recognizable tail are returned unchanged.
+// .../messages, .../decisions and .../anthropic are all protocol namespaces
+// rather than resource prefixes. URLs without a recognizable tail are
+// returned unchanged.
 //
 // Note for providers that namespace their Anthropic API (e.g.
 // https://api.deepseek.com/anthropic/messages): stripping the /messages tail
@@ -358,7 +360,8 @@ func StripProtocolTail(rawURL string) string {
 	case n >= 2 && strings.EqualFold(parts[n-2], commontypes.PathSegChat) && strings.EqualFold(parts[n-1], commontypes.PathSegCompletions):
 		kept = parts[:n-2]
 	case strings.EqualFold(parts[n-1], commontypes.PathSegResponses),
-		strings.EqualFold(parts[n-1], commontypes.PathSegMessages):
+		strings.EqualFold(parts[n-1], commontypes.PathSegMessages),
+		strings.EqualFold(parts[n-1], commontypes.PathSegDecisions):
 		kept = parts[:n-1]
 	default:
 		return rawURL
@@ -378,7 +381,7 @@ func hasExplicitProtocolMetadata(target RoutingTarget) bool {
 	}
 	p := strings.TrimSpace(strings.ToLower(target.ProtocolOverride))
 	switch types.Protocol(p) {
-	case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages, types.ProtocolSystemOne:
+	case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages, types.ProtocolSystemOne, types.ProtocolDecisions:
 		return true
 	}
 	return false

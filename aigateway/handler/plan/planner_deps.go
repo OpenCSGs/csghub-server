@@ -49,7 +49,7 @@ type AutoModelSelector interface {
 
 // BalanceChecker verifies that the tenant has sufficient balance.
 type BalanceChecker interface {
-	CheckBalance(ctx context.Context, nsUUID string) error
+	CheckBalance(ctx context.Context, nsUUID string, model *types.Model) error
 }
 
 // TokenPlanQuotaChecker verifies that the tenant's active token plan
@@ -67,6 +67,28 @@ type BalanceChecker interface {
 // subscription must be allowed through.
 type TokenPlanQuotaChecker interface {
 	CheckTokenPlanQuota(ctx context.Context, req commontypes.TokenPlanQuotaReq) error
+}
+
+// UserRateLimitChecker enforces the per-user rate limit (RPM/TPM) configured
+// at the model or gateway-global level, for the resolved model target.
+//
+// CheckUserRateLimit runs once per request on the first plan round, after
+// the balance check and before capacity admission. It ATOMICALLY checks the
+// policy and consumes one unit of the user's RPM budget when allowed (a
+// hard limit: concurrent bursts cannot overshoot). The consumption is final
+// regardless of the later admission outcome — a deliberate product
+// trade-off: when the user's RPM passes but the upstream capacity rejects,
+// the upstream is saturated, and charging every attempt against the user's
+// budget damps the retry storm against the already-pressured upstream
+// instead of letting it amplify. Rejections BY the check itself reserve
+// nothing.
+//
+// An implementation must return *types.UserRateLimitExceededError when the
+// user is over the limit, and fail open (return nil) on infrastructure
+// failures: a rate limiter outage must never take the gateway down. A nil
+// checker skips the check entirely.
+type UserRateLimitChecker interface {
+	CheckUserRateLimit(ctx context.Context, meta *types.RequestMetadata, mt *types.ModelTarget) error
 }
 
 // AdmissionChecker enforces capacity admission (CapacityPolicy) for the

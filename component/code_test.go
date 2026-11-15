@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -15,6 +16,31 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+func TestCodeComponentCreateFork(t *testing.T) {
+	ctx := context.Background()
+	cc := initializeTestCodeComponent(ctx, t)
+	req := types.CreateForkReq{SourceNamespace: "source", SourceName: "template", TargetNamespace: "alice", TargetName: "fork"}
+	wantReq := req
+	wantReq.SourceRepoType = types.CodeRepo
+	repo := &database.Repository{ID: 12, Name: "fork", Private: true, DefaultBranch: "main"}
+	cc.mocks.components.repo.EXPECT().CreateFork(ctx, wantReq).Return(repo, nil).Once()
+	cc.mocks.stores.CodeMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Code{RepositoryID: 12, Repository: repo}, "alice/fork").Return(&database.Code{ID: 13}, nil).Once()
+	got, err := cc.CreateFork(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, int64(13), got.ID)
+	require.Equal(t, "alice/fork", got.Path)
+	require.True(t, got.Private)
+}
+
+func TestCodeComponentCreateForkPropagatesFailure(t *testing.T) {
+	ctx := context.Background()
+	cc := initializeTestCodeComponent(ctx, t)
+	want := errors.New("fork failed")
+	cc.mocks.components.repo.EXPECT().CreateFork(ctx, mock.Anything).Return(nil, want).Once()
+	_, err := cc.CreateFork(ctx, types.CreateForkReq{})
+	require.ErrorIs(t, err, want)
+}
 
 func TestCodeComponent_Create(t *testing.T) {
 	ctx := context.TODO()
@@ -190,6 +216,7 @@ func TestCodeComponent_Update_SyncsRepositoryManagedTemplateVisibility(t *testin
 	cc.mocks.stores.AgentTemplateMock().EXPECT().FindByTypeAndName(ctx, "csgclaw", "owner/agent").Return([]database.AgentTemplate{
 		{ID: 10, UserUUID: "owner-uuid", Public: false, Metadata: map[string]any{"repo_path": "owner/agent"}},
 		{ID: 11, UserUUID: "owner-uuid", Public: false, Metadata: map[string]any{"repo_path": "owner/other"}},
+		{ID: 12, UserUUID: "owner-uuid", IsInternal: true, Public: false, Metadata: map[string]any{"repo_path": "owner/agent"}},
 	}, nil)
 	cc.mocks.stores.AgentTemplateMock().EXPECT().Update(ctx, mock.MatchedBy(func(template *database.AgentTemplate) bool {
 		return template.ID == 10 && template.Public

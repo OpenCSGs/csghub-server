@@ -15,6 +15,7 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -417,6 +418,19 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 			return
 		case types.PlanErrQuotaExceeded:
 			// The tenant's token plan allowance for this model is spent.
+			writeError(c, http.StatusTooManyRequests, ErrTypeRateLimit, err.Error())
+			return
+		case types.PlanErrUserRateLimitExceeded:
+			// The USER's own per-user RPM/TPM limit (model-level or
+			// gateway-global) is spent for the current window.
+			retryAfter := int64(1)
+			var rateLimitErr *types.UserRateLimitExceededError
+			if errors.As(err, &rateLimitErr) {
+				if rateLimitErr.RetryAfterSeconds > 0 {
+					retryAfter = rateLimitErr.RetryAfterSeconds
+				}
+			}
+			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
 			writeError(c, http.StatusTooManyRequests, ErrTypeRateLimit, err.Error())
 			return
 		case types.PlanErrQueueTimeout:

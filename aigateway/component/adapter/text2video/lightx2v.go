@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"opencsg.com/csghub-server/aigateway/httparchive"
 	"opencsg.com/csghub-server/aigateway/types"
 	commonTypes "opencsg.com/csghub-server/common/types"
 )
@@ -249,7 +250,10 @@ func fetchRemoteImage(ctx context.Context, imageURL string) ([]byte, string, err
 	if err != nil {
 		return nil, "", &RequestValidationError{Message: "invalid input_reference.image_url: " + err.Error()}
 	}
-	resp, err := http.DefaultClient.Do(req)
+	// Copy client policy while retaining the underlying connection pool.
+	client := *http.DefaultClient
+	client.Transport = httparchive.WrapTransport(client.Transport)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", &RequestValidationError{Message: "failed to fetch input_reference.image_url: " + err.Error()}
 	}

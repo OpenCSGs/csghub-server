@@ -129,9 +129,11 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 }
 
 func stripAgentProxyContextHeaders(header http.Header) {
+	header.Del(types.CSGHubBaseURLHeader)
 	header.Del(types.CSGHubAgentBaseURLHeader)
 	header.Del(types.CSGHubAgentAuthModeHeader)
 	header.Del(types.CSGHubAgentKindHeader)
+	header.Del(types.CSGHubAgentGuestMaxCountHeader)
 	header.Del(types.CSGBotHeaderAgentName)
 }
 

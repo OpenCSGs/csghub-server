@@ -21,6 +21,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/cryptox"
 )
 
 var ErrUserNotFound = errors.New("user not found, please login first")
@@ -36,6 +37,8 @@ type AccessTokenComponent interface {
 	SetActive(ctx context.Context, req *types.UpdateAPIKeyStatusRequest) (*types.CheckAccessTokenResp, error)
 	GetAPIKeyQuotas(ctx context.Context, apiKey string) ([]database.AccountAccessTokenQuota, error)
 	GetOrCreateBuiltinAPIKey(ctx context.Context, req *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error)
+	// GetBuiltinAPIKeyDisplay reads an existing builtin key as a masked projection.
+	GetBuiltinAPIKeyDisplay(ctx context.Context, req *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error)
 }
 
 func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error) {
@@ -265,7 +268,9 @@ func (c *accessTokenComponentImpl) Check(ctx context.Context, req *types.CheckAc
 	resp.TokenName = t.Name
 	resp.Application = t.Application
 	resp.Permission = t.Permission
-	if t.User != nil {
+	// An organization key keeps its namespace after its creator closes their account.
+	// It must no longer authenticate requests as that user.
+	if t.User != nil && !t.User.LoginFrozen {
 		resp.Username = t.User.Username
 		resp.UserUUID = t.User.UUID
 	}
@@ -483,7 +488,11 @@ func (c *accessTokenComponentImpl) GetOrCreateFirstAvaiToken(ctx context.Context
 	return token.Token, nil
 }
 
+// createUserToken applies the edition's creation policy and persists the token with its quotas.
 func (c *accessTokenComponentImpl) createUserToken(ctx context.Context, newToken *database.AccessToken, user database.User, quotas []*database.AccountAccessTokenQuota) error {
+	if err := c.setAccessTokenCreationLimit(ctx, newToken, user); err != nil {
+		return err
+	}
 	// Convert slice of pointers to slice of values for the store.
 	var quotaValues []database.AccountAccessTokenQuota
 	if len(quotas) > 0 {
@@ -682,10 +691,7 @@ func (c *accessTokenComponentImpl) SetActive(ctx context.Context, req *types.Upd
 }
 
 func maskToken(token string) string {
-	if len(token) <= 4 {
-		return "*****"
-	}
-	return token[:2] + "***" + token[len(token)-2:]
+	return cryptox.MaskCredential(token)
 }
 
 func (c *accessTokenComponentImpl) GetOrCreateBuiltinAPIKey(ctx context.Context, req *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error) {
@@ -706,18 +712,44 @@ func (c *accessTokenComponentImpl) GetOrCreateBuiltinAPIKey(ctx context.Context,
 		return nil, err
 	}
 
-	resp := &types.CheckAccessTokenResp{
-		ID:          defaultToken.ID,
-		Token:       defaultToken.Token,
-		TokenName:   defaultToken.Name,
-		Application: defaultToken.Application,
-		NSUUID:      defaultToken.NsUUID,
-		CreatedAt:   defaultToken.CreatedAt,
-		UpdatedAt:   defaultToken.UpdatedAt,
-		TokenType:   string(defaultToken.TokenType),
-		IsActive:    defaultToken.IsActive,
+	return builtinAPIKeyResponse(defaultToken), nil
+}
+
+// GetBuiltinAPIKeyDisplay applies the existing namespace authorization and never
+// creates a credential. Missing keys return an empty display response.
+func (c *accessTokenComponentImpl) GetBuiltinAPIKeyDisplay(ctx context.Context, req *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error) {
+	checkReq := &types.CreateUserTokenRequest{Username: req.Username, OpUUID: req.OpUUID, NSUUID: req.NSUUID}
+	if _, err := c.validateNamespacePermission(ctx, checkReq); err != nil {
+		return nil, err
 	}
+	token, err := c.ts.FindBuiltinByNsUUID(ctx, req.NSUUID, string(types.AccessTokenAppAIGateway))
+	if errors.Is(err, errorx.ErrDatabaseNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if token == nil {
+		return nil, nil
+	}
+	resp := builtinAPIKeyResponse(token)
+	resp.Token = maskToken(token.Token)
 	return resp, nil
+}
+
+// builtinAPIKeyResponse preserves the builtin response fields for both read paths.
+func builtinAPIKeyResponse(token *database.AccessToken) *types.CheckAccessTokenResp {
+	return &types.CheckAccessTokenResp{
+		ID:          token.ID,
+		Token:       token.Token,
+		TokenName:   token.Name,
+		Application: token.Application,
+		NSUUID:      token.NsUUID,
+		CreatedAt:   token.CreatedAt,
+		UpdatedAt:   token.UpdatedAt,
+		TokenType:   string(token.TokenType),
+		IsActive:    token.IsActive,
+	}
 }
 
 func (c *accessTokenComponentImpl) checkOrCreateBuiltinAPIKey(ctx context.Context, req *types.GetAccessTokenRequest, user database.User) (*database.AccessToken, error) {

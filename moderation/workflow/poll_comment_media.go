@@ -213,8 +213,8 @@ func (w *pollCommentMediaWorkflow) finalize(ctx workflow.Context, req common.Pol
 }
 
 // StartCommentMediaModerationWorkflow starts a poll workflow for one comment.
-// The workflow ID is derived from the comment id so a duplicate create retry
-// reuses the existing run instead of starting a second one.
+// The comment-derived workflow ID allows a new run after completion and replaces
+// an active run on a duplicate start. This requires Temporal Server v1.24 or later.
 func StartCommentMediaModerationWorkflow(ctx context.Context, temporalClient csghubTemporal.Client, req common.PollCommentMediaReq, timing common.PollCommentMediaOptions) error {
 	if temporalClient == nil {
 		return fmt.Errorf("temporal client is not configured")
@@ -227,9 +227,10 @@ func StartCommentMediaModerationWorkflow(ctx context.Context, temporalClient csg
 		timeout = timing.WorkflowTimeout
 	}
 	opts := client.StartWorkflowOptions{
-		ID:                    fmt.Sprintf("comment-media-moderation-%d", req.CommentID),
-		TaskQueue:             common.PollCommentMediaQueue,
-		WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING,
+		ID:                       fmt.Sprintf("comment-media-moderation-%d", req.CommentID),
+		TaskQueue:                common.PollCommentMediaQueue,
+		WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+		WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING,
 		// The workflow owns the business deadline and must remain alive long
 		// enough to run its disconnected finalize activity afterwards.
 		WorkflowExecutionTimeout: timeout + workflowCleanupGrace,

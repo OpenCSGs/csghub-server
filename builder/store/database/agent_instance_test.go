@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
@@ -1464,4 +1465,103 @@ func TestAgentInstanceStore_ListByUserUUID_WithBuiltInFilter(t *testing.T) {
 		require.True(t, inst.BuiltIn, "All instances should be built-in")
 		require.Equal(t, "code", inst.Type, "All instances should be of type code")
 	}
+}
+
+func TestAgentInstanceStore_Curation(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+	curationStore := database.NewAgentResourceCurationStoreWithDB(db)
+
+	ownerUUID := uuid.New().String()
+	otherUUID := uuid.New().String()
+
+	mkPublic := func(contentID string) *database.AgentInstance {
+		inst := &database.AgentInstance{
+			TemplateID: 1,
+			UserUUID:   ownerUUID,
+			Type:       "langflow",
+			ContentID:  contentID,
+			Public:     true,
+		}
+		_, err := store.Create(ctx, inst)
+		require.NoError(t, err)
+		return inst
+	}
+	instA := mkPublic("curation-a")
+	instB := mkPublic("curation-b")
+	idA := strconv.FormatInt(instA.ID, 10)
+	idB := strconv.FormatInt(instB.ID, 10)
+
+	listedByID := func(userUUID string) map[int64]database.AgentInstance {
+		instances, _, err := store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 100, 1)
+		require.NoError(t, err)
+		byID := make(map[int64]database.AgentInstance, len(instances))
+		for _, inst := range instances {
+			byID[inst.ID] = inst
+		}
+		return byID
+	}
+
+	// Unlisted hides the instance from non-owners but not from the owner
+	unlisted := true
+	require.NoError(t, curationStore.UpsertFields(ctx, "agent_instance", idA, database.AgentResourceCurationFields{Unlisted: &unlisted}))
+	require.NotContains(t, listedByID(otherUUID), instA.ID, "unlisted instance must be hidden from non-owners")
+	require.Contains(t, listedByID(otherUUID), instB.ID)
+	require.Contains(t, listedByID(ownerUUID), instA.ID, "owner still sees own unlisted instance")
+
+	// Admin list includes unlisted instances with curation state
+	adminItems, adminTotal, err := store.ListPublicWithCuration(ctx, "", 100, 1)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, adminTotal, 2)
+	adminByID := make(map[int64]database.AgentInstance, len(adminItems))
+	for _, inst := range adminItems {
+		adminByID[inst.ID] = inst
+	}
+	require.True(t, adminByID[instA.ID].Unlisted)
+	require.False(t, adminByID[instB.ID].Unlisted)
+
+	// Visible order excludes unlisted instances
+	visible, err := store.ListVisiblePublicOrder(ctx)
+	require.NoError(t, err)
+	visibleIDs := make(map[int64]bool, len(visible))
+	for _, inst := range visible {
+		visibleIDs[inst.ID] = true
+	}
+	require.False(t, visibleIDs[instA.ID])
+	require.True(t, visibleIDs[instB.ID])
+
+	// Recommended badge shows on the user list
+	recommended := true
+	require.NoError(t, curationStore.UpsertFields(ctx, "agent_instance", idB, database.AgentResourceCurationFields{Recommended: &recommended}))
+	require.True(t, listedByID(otherUUID)[instB.ID].Recommended)
+
+	// Weight drives ordering: recommended A with a lower weight sorts after
+	// recommended B with a higher weight. Relist A and recommend it first.
+	listed := false
+	require.NoError(t, curationStore.UpsertFields(ctx, "agent_instance", idA, database.AgentResourceCurationFields{Unlisted: &listed, Recommended: &recommended}))
+	require.NoError(t, curationStore.BatchUpsertWeights(ctx, "agent_instance", map[string]int64{idA: 1, idB: 2}))
+
+	instances, _, err := store.ListByUserUUID(ctx, otherUUID, types.AgentInstanceFilter{}, 100, 1)
+	require.NoError(t, err)
+	idxA, idxB := -1, -1
+	for i, inst := range instances {
+		if inst.ID == instA.ID {
+			idxA = i
+		}
+		if inst.ID == instB.ID {
+			idxB = i
+		}
+	}
+	require.NotEqual(t, -1, idxA)
+	require.NotEqual(t, -1, idxB)
+	require.Less(t, idxB, idxA, "higher weight must sort first within the recommended group")
+
+	// Deleting an instance removes its curation row
+	require.NoError(t, store.Delete(ctx, instA.ID))
+	curation, err := curationStore.GetByEntity(ctx, "agent_instance", idA)
+	require.NoError(t, err)
+	require.Nil(t, curation)
 }

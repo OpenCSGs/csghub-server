@@ -89,6 +89,14 @@ func ModelIDFromResourceID(resourceID string, includeInference bool) string {
 	}
 }
 
+// VoucherModelID resolves the model identity used for token voucher matching.
+func VoucherModelID(resourceID, customerID string) string {
+	if modelID := ModelIDFromResourceID(resourceID, false); modelID != "" {
+		return modelID
+	}
+	return customerID
+}
+
 // Provider type values for Metadata[MetaKeyLLMType].
 const (
 	ProviderTypeServerless  = "serverless"
@@ -239,6 +247,24 @@ func (m UpstreamMetadata) MarshalJSON() ([]byte, error) {
 		out.Responses = &nestedResponses{ChatAdapter: m.ResponsesChatAdapter}
 	}
 	return json.Marshal(out)
+}
+
+// UserRateLimitPolicy caps what ONE user may consume — requests (RPM) and
+// tokens (TPM) — over a fixed 60-second window. It is configured at the LLM
+// config level: a model-level policy overrides the gateway-global one; a
+// model without its own policy falls back to the global policy. Both
+// dimensions differ in strictness: RPM is a hard limit (atomically checked
+// and consumed in one script at plan time, so concurrent bursts cannot
+// overshoot), while TPM is a soft limit committed with the actual usage
+// after the response — in-flight requests may briefly overshoot the token
+// cap. Both windows are fixed 60-second buckets (the same semantics as the
+// upstream CapacityPolicy).
+type UserRateLimitPolicy struct {
+	Enabled bool `json:"enabled"`
+	// MaxRPM is the maximum number of requests per user per window. 0 = unlimited.
+	MaxRPM int64 `json:"max_rpm,omitempty"`
+	// MaxTPM is the maximum number of tokens per user per window. 0 = unlimited.
+	MaxTPM int64 `json:"max_tpm,omitempty"`
 }
 
 type RepositoryLite struct {
@@ -616,6 +642,8 @@ func InferProtocolFromURLPath(rawURL string) (ApiFormat, bool) {
 		return ApiFormatMessages, true
 	case PathSegSystemOne:
 		return ApiFormatSystemOne, true
+	case PathSegDecisions:
+		return ApiFormatDecisions, true
 	}
 	return "", false
 }
@@ -648,6 +676,8 @@ func InferResourcePathFromURL(rawURL string) (ApiFormat, bool) {
 		return ApiFormatResponses, true
 	case last == PathSegMessages:
 		return ApiFormatMessages, true
+	case last == PathSegDecisions:
+		return ApiFormatDecisions, true
 	case last == PathSegCompletions && len(parts) >= 2 && strings.EqualFold(parts[len(parts)-2], PathSegChat):
 		return ApiFormatChat, true
 	}
@@ -719,13 +749,15 @@ func (p *CapacityPolicy) QueueEnabled() bool {
 type UpstreamQueueStatus struct {
 	UpstreamID int64 `json:"upstream_id"`
 	// QueueDepth is the total number of tickets waiting in the upstream's
-	// admission reservation queue (high + low priority).
+	// admission reservation queue (the high + low buckets below).
 	QueueDepth int64 `json:"queue_depth"`
-	// HighPriorityWaiting is the number of waiting tickets whose queue
-	// priority is high (promoted first).
+	// HighPriorityWaiting is the number of waiting tickets whose score is
+	// below the high-class boundary: the scope-high class PLUS every caller
+	// promotion band (user-tag tiers, negative classes) — all of them are
+	// served before any low-priority ticket.
 	HighPriorityWaiting int64 `json:"high_priority_waiting"`
-	// LowPriorityWaiting is the number of waiting tickets whose queue
-	// priority is low.
+	// LowPriorityWaiting is the number of waiting tickets in the low
+	// bucket: the scope-low class and the low_priority-tag bottom band.
 	LowPriorityWaiting int64 `json:"low_priority_waiting"`
 	// CurrentConcurrency is the number of in-flight leases (executing
 	// requests) on the upstream at read time.
@@ -775,11 +807,14 @@ type LLMConfig struct {
 	ModelSizeB         float64          `json:"model_size_b,omitempty"`
 	// AccessPolicy controls who can view and call the model:
 	// LLMAccessPolicyPublic (default) or LLMAccessPolicyWhitelist.
-	AccessPolicy       string    `json:"access_policy"`
-	IsAvailable        bool      `json:"is_available"`
-	AvailabilityReason string    `json:"availability_reason,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	AccessPolicy string `json:"access_policy"`
+	// RateLimit caps per-user RPM/TPM for this model; nil or disabled means
+	// the gateway-global policy applies.
+	RateLimit          *UserRateLimitPolicy `json:"rate_limit,omitempty"`
+	IsAvailable        bool                 `json:"is_available"`
+	AvailabilityReason string               `json:"availability_reason,omitempty"`
+	CreatedAt          time.Time            `json:"created_at"`
+	UpdatedAt          time.Time            `json:"updated_at"`
 }
 
 type PromptPrefix struct {
@@ -790,9 +825,16 @@ type PromptPrefix struct {
 }
 
 type SearchLLMConfig struct {
-	Keyword   string `json:"keyword"`    // Search keyword
-	Types     []int  `json:"types"`      // Type flags to match (configs that include any of these flags are returned)
-	Enabled   *bool  `json:"enabled"`    // Enabled filter
+	Keyword string `json:"keyword"` // Search keyword
+	Types   []int  `json:"types"`   // Type flags to match (configs that include any of these flags are returned)
+	Enabled *bool  `json:"enabled"` // Enabled filter
+	// Source filters by the origin of the config's upstreams: "csghub" keeps
+	// configs whose upstreams are all CSGHub deploys, "external" keeps
+	// configs with no csghub-sourced upstream (including configs without
+	// upstreams). Mirrors the portal's source column, so what the list
+	// displays is what the filter matches; mixed-source configs match
+	// neither value.
+	Source    string `json:"source"`     // Optional source filter: csghub | external
 	SortBy    string `json:"sort_by"`    // Sortable field: model_size_b | updated_at
 	SortOrder string `json:"sort_order"` // ASC | DESC
 	// AvailableFirst prepends an availability-first ordering before the
@@ -940,6 +982,11 @@ type UpdateLLMConfigReq struct {
 	RepoID             *int64            `json:"repo_id"`
 	ModelSizeB         *float64          `json:"model_size_b"`
 	AccessPolicy       *string           `json:"access_policy"`
+	// RateLimit replaces the model-level per-user rate limit policy when
+	// present; omit the field to keep the stored value. Disabling the policy
+	// (enabled=false) is equivalent to no model-level policy: the
+	// gateway-global one applies.
+	RateLimit *UserRateLimitPolicy `json:"rate_limit,omitempty"`
 }
 
 type UpdatePromptPrefixReq struct {
@@ -950,16 +997,17 @@ type UpdatePromptPrefixReq struct {
 }
 
 type CreateLLMConfigReq struct {
-	ModelName          string           `json:"model_name" binding:"required"`
-	Upstreams          []UpstreamConfig `json:"upstreams,omitempty"`
-	Types              []int            `json:"types" binding:"required,min=1,dive,oneof=1 2 4 8 16"` // individual type flags, combined into a bitmask on create
-	Enabled            bool             `json:"enabled"`
-	RoutingPolicy      RoutingPolicy    `json:"routing_policy"`
-	Metadata           map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
-	RepoID             *int64           `json:"repo_id"`
-	NeedSensitiveCheck bool             `json:"need_sensitive_check"`
-	ModelSizeB         float64          `json:"model_size_b,omitempty"`
-	AccessPolicy       string           `json:"access_policy,omitempty"` // defaults to LLMAccessPolicyPublic when empty
+	ModelName          string               `json:"model_name" binding:"required"`
+	Upstreams          []UpstreamConfig     `json:"upstreams,omitempty"`
+	Types              []int                `json:"types" binding:"required,min=1,dive,oneof=1 2 4 8 16"` // individual type flags, combined into a bitmask on create
+	Enabled            bool                 `json:"enabled"`
+	RoutingPolicy      RoutingPolicy        `json:"routing_policy"`
+	Metadata           map[string]any       `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
+	RepoID             *int64               `json:"repo_id"`
+	NeedSensitiveCheck bool                 `json:"need_sensitive_check"`
+	ModelSizeB         float64              `json:"model_size_b,omitempty"`
+	AccessPolicy       string               `json:"access_policy,omitempty"` // defaults to LLMAccessPolicyPublic when empty
+	RateLimit          *UserRateLimitPolicy `json:"rate_limit,omitempty"`
 }
 
 // Access policy modes for LLM configs (AI Gateway model access whitelist).

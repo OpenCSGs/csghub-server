@@ -117,13 +117,13 @@ func TestDatasetCompnent_Index(t *testing.T) {
 	dc.mocks.stores.DatasetMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return([]database.Dataset{
 		{
 			ID: 11, RepositoryID: 2, Repository: &database.Repository{
-				User: database.User{Username: "user2"},
+				User: database.User{Username: "user2", Email: "owner2@lgdg.cc"},
 				Path: "user2/dataset2",
 			},
 		},
 		{
 			ID: 12, RepositoryID: 1, Repository: &database.Repository{
-				User: database.User{Username: "user1"},
+				User: database.User{Username: "user1", Email: "owner1@lgdg.cc"},
 				Path: "user1/dataset1",
 			},
 		},
@@ -282,6 +282,7 @@ func TestDatasetCompnent_Show(t *testing.T) {
 			Tags: []database.Tag{{Name: "t1"}},
 			User: database.User{
 				Username: "user",
+				Email:    "owner@lgdg.cc",
 			},
 			SyncStatus: types.SyncStatusInProgress,
 		},

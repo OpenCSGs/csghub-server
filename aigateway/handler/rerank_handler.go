@@ -159,7 +159,7 @@ func (h *rerankPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetad
 		proxyToAPI = "/rerank"
 	}
 
-	rp, err := proxy.NewReverseProxy(mt.Target, proxy.WithoutAcceptEncoding())
+	rp, err := newArchiveProxy(mt.Target, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		httpbase.ServerError(c, err)
 		return nil

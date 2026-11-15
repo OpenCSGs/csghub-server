@@ -79,7 +79,7 @@
     },
     {
       "name": "enable-prompt-tokens-details",
-      "value": "disable",
+      "value": "enable",
       "format": "--enable-prompt-tokens-details"
     },
     {
@@ -98,7 +98,10 @@
     {
       "name": "async-scheduling",
       "value": "enable",
-      "format": "--async-scheduling"
+      "format": "--async-scheduling",
+      "conflicts_with": [
+        "spec-decode-method"
+      ]
     },
     {
       "name": "disable-custom-all-reduce",

@@ -67,6 +67,8 @@ var (
 
 // LfsSyncWorker synchronizes Git LFS objects for mirror tasks.
 type LfsSyncWorker struct {
+	recordLatestLFS func(context.Context, int64, int64, string, []string) error
+
 	mirrorTaskStore    database.MirrorTaskStore
 	lfsMetaObjectStore database.LfsMetaObjectStore
 	ossClient          s3.Client
@@ -201,8 +203,12 @@ func NewLfsSyncWorker(config *config.Config) (*LfsSyncWorker, error) {
 	if config.Mirror.PartSize <= 0 {
 		return nil, fmt.Errorf("LFS multipart part size must be positive: %d", config.Mirror.PartSize)
 	}
+	if config.Proxy.Enable && config.Proxy.URL != "" {
+		return nil, fmt.Errorf("LFS source proxy is not supported: direct connections are required for destination IP validation")
+	}
 	var err error
 	w := &LfsSyncWorker{}
+	w.initLatestLFS()
 	w.config = config
 	w.mirrorTaskStore = database.NewMirrorTaskStore()
 	w.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
@@ -231,19 +237,7 @@ func NewLfsSyncWorker(config *config.Config) (*LfsSyncWorker, error) {
 	}
 	w.syncCache = cache
 
-	if !config.Proxy.Enable || config.Proxy.URL == "" {
-		w.httpClient = &http.Client{}
-	} else {
-		proxyURL, err := url.Parse(config.Proxy.URL)
-		if err != nil {
-			return nil, fmt.Errorf("fail to parse proxy url: %w", err)
-		}
-		w.httpClient = &http.Client{
-			Transport: &http.Transport{
-				Proxy: http.ProxyURL(proxyURL),
-			},
-		}
-	}
+	w.httpClient = newLFSSourceHTTPClient(common.PublicHTTPPolicy{TrustedDomains: config.Mirror.TrustedDomains})
 
 	msgSender := hook.NewMessageSender(
 		fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
@@ -301,11 +295,17 @@ func (w *LfsSyncWorker) refreshLfsMetaObjects(ctx context.Context, mt *database.
 	}
 
 	lfsMetaObjects, totalSize := lfsPointersToMetaObjects(repo.ID, lfsPointers)
+	if err := w.markLatestLFS(ctx, mt, lfsMetaObjects); err != nil {
+		return err
+	}
 	repo.LFSObjectsSize = totalSize
 	if err := w.lfsMetaObjectStore.BulkUpdateOrCreate(ctx, repo.ID, lfsMetaObjects); err != nil {
 		return fmt.Errorf("failed to bulk update or create lfs meta objects: %w", err)
 	}
 
+	if err := w.persistLatestLFS(ctx, mt, lfsMetaObjects); err != nil {
+		return err
+	}
 	loggerFromLFSContext(ctx).InfoContext(ctx, "refreshed lfs meta objects",
 		slog.String("afterCommitID", mt.AfterLastCommitID),
 		slog.Int("lfsCount", len(lfsMetaObjects)),
@@ -454,6 +454,7 @@ func (w *LfsSyncWorker) getSyncPointers(
 		return pointers, fmt.Errorf("fail to get lfs meta objects: %w", err)
 	}
 	repo := mt.Mirror.Repository
+	prioritizeLatestLFS(lfsMetaObjects, mt.AfterLastCommitID)
 
 	loggerFromLFSContext(ctx).InfoContext(ctx,
 		"fetched lfs meta objects",
@@ -590,7 +591,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 		}
 
 		sharedcomponent.MirrorMetricsOperation(ctx, "resolve_urls")
-		pointers, err := w.GetLFSDownloadURLs(
+		resolvedPointers, err := w.GetLFSDownloadURLs(
 			ctx, mirror.SourceUrl, repo.DefaultBranch, mirror.Username, mirror.AccessToken, pointers,
 		)
 		if err != nil {
@@ -602,6 +603,8 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 			)
 			return fmt.Errorf("failed to get lfs download urls: %w", err)
 		}
+
+		pointers = preservePointerOrder(pointers, resolvedPointers)
 
 		for _, pointer := range pointers {
 			select {

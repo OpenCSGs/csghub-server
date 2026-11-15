@@ -54,7 +54,7 @@ func (b *jevHandlerBridge) toJevDeps() jev.Deps {
 // backend URL so the client's request path (/v1/systemone) is overridden
 // with the correct upstream path.
 func (b *jevHandlerBridge) ServeProxy(c *gin.Context, backendURL, host string, responseWriter types.HTTPResponseWriter) {
-	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding())
+	rp, err := newArchiveProxy(backendURL, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		responseWriter.WriteHeader(http.StatusBadGateway)
 		return

@@ -2,6 +2,7 @@ package checker
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"path"
@@ -143,19 +144,49 @@ func (c *ImageFileChecker) checkByURL(ctx context.Context, imageURL string) (typ
 // checkByStream checks an image by uploading its stream to S3 and generating
 // a presigned URL. Used for private repos where no public URL is available.
 //
-// Retries are only enabled when the reader is seekable (io.ReadSeeker), because
-// the first attempt consumes the stream and retries need a rewind to upload the
-// full content again. The actual rewind before each attempt is handled by
-// chainImpl.PassImageStreamCheck, which seeks the reader to the start before
-// every checker call.
+// Each attempt rewinds the reader, probes one byte to reject empty images
+// without a remote call, rewinds again, and then uploads the full stream. The
+// probe lives inside the retry loop so a transient Git read failure is retried
+// instead of being recorded as a permanent exception. Retries are only enabled
+// when the reader is seekable (io.ReadSeeker), because a failed attempt
+// consumes the stream and retries need a rewind to upload the full content.
 func (c *ImageFileChecker) checkByStream(ctx context.Context, reader io.Reader) (types.SensitiveCheckStatus, string) {
-	_, seekable := reader.(io.ReadSeeker)
+	seeker, seekable := reader.(io.ReadSeeker)
+
+	type attemptResult struct {
+		check *ss_type.CheckResult
+		empty bool
+	}
 
 	res, err := retry.DoWithData(
-		func() (*ss_type.CheckResult, error) {
+		func() (attemptResult, error) {
+			if seekable {
+				if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+					return attemptResult{}, err
+				}
+			}
+			// Decide emptiness from the content that will actually be checked.
+			// The persisted file size comes from an earlier tree snapshot and
+			// may not match the current default branch, so it must not be used
+			// to skip the check. A zero-byte image would otherwise be uploaded
+			// as an empty object and rejected by the remote service.
+			var probe [1]byte
+			n, err := reader.Read(probe[:])
+			if err != nil && !errors.Is(err, io.EOF) {
+				return attemptResult{}, err
+			}
+			if n == 0 && errors.Is(err, io.EOF) {
+				return attemptResult{empty: true}, nil
+			}
+			if seekable {
+				if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+					return attemptResult{}, err
+				}
+			}
 			reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
-			return c.checker.PassImageStreamCheck(reqCtx, c.scenario, reader)
+			check, err := c.checker.PassImageStreamCheck(reqCtx, c.scenario, reader)
+			return attemptResult{check: check}, err
 		}, retry.Attempts(3), retry.DelayType(retry.BackOffDelay), retry.LastErrorOnly(true),
 		retry.RetryIf(func(error) bool {
 			// Only retry when the reader is seekable; otherwise the stream
@@ -168,9 +199,13 @@ func (c *ImageFileChecker) checkByStream(ctx context.Context, reader io.Reader) 
 		return types.SensitiveCheckException, "call sensitive image stream checker api failed"
 	}
 
-	if res.IsSensitive {
-		slog.InfoContext(ctx, "stream image content is sensitive", slog.String("reason", res.Reason))
-		return types.SensitiveCheckFail, res.Reason
+	if res.empty {
+		return types.SensitiveCheckPass, "empty file"
+	}
+
+	if res.check != nil && res.check.IsSensitive {
+		slog.InfoContext(ctx, "stream image content is sensitive", slog.String("reason", res.check.Reason))
+		return types.SensitiveCheckFail, res.check.Reason
 	}
 
 	return types.SensitiveCheckPass, ""

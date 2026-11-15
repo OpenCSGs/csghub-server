@@ -2,10 +2,13 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/payment/consts"
 )
@@ -53,8 +56,31 @@ type AccountRecharge struct {
 	Description   string                `json:"description"`
 }
 
+// Lock the same user row as account closure before accepting a personal recharge.
+// Organization wallets have their own lifecycle.
+func lockPersonalRechargeOwner(ctx context.Context, tx bun.Tx, walletUUID string) error {
+	var frozen bool
+	err := tx.NewSelect().Model((*User)(nil)).Column("login_frozen").
+		Where(`("user".id IN (SELECT user_id FROM namespaces WHERE uuid = ? AND namespace_type = ? AND deleted_at IS NULL)
+			OR ("user".uuid = ? AND NOT EXISTS (SELECT 1 FROM namespaces WHERE uuid = ?)))`, walletUUID, UserNamespace, walletUUID, walletUUID).
+		For("UPDATE").Scan(ctx, &frozen)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err == nil && frozen {
+		return errorx.ErrForbidden
+	}
+	return err
+}
+
 func (rs *accountRechargeStoreImpl) CreateRecharge(ctx context.Context, recharge *AccountRecharge) error {
-	_, err := rs.db.Operator.Core.NewInsert().Model(recharge).Exec(ctx)
+	err := rs.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := lockPersonalRechargeOwner(ctx, tx, recharge.UserUUID); err != nil {
+			return err
+		}
+		_, err := tx.NewInsert().Model(recharge).Exec(ctx)
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("create recharge record, error: %w", err)
 	}

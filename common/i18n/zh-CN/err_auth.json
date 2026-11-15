@@ -49,5 +49,9 @@
     },
     "error.AUTH-ERR-16": {
         "other": "邮箱地址未设置"
+    },
+    "error.AUTH-ERR-17": {"other": "账户已被封禁"},
+    "error.AUTH-ERR-18": {
+        "other": "账号已注销"
     }
 }

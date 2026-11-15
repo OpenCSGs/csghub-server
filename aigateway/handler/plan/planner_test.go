@@ -37,7 +37,7 @@ type mockBalanceChecker struct {
 	err error
 }
 
-func (m *mockBalanceChecker) CheckBalance(ctx context.Context, nsUUID string) error {
+func (m *mockBalanceChecker) CheckBalance(ctx context.Context, nsUUID string, model *types.Model) error {
 	return m.err
 }
 

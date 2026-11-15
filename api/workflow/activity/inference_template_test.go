@@ -16,15 +16,23 @@ import (
 // so guard the shape here (issue #1489).
 func TestInferenceTemplatesSpecDecodeContract(t *testing.T) {
 	// ascend-vllm lives under configs/inference/ee and is covered by the EE/SaaS test.
-	for _, engine := range []string{"nvidia-vllm", "nvidia-sglang"} {
-		t.Run(engine, func(t *testing.T) {
-			path := filepath.Join("..", "..", "..", "configs", "inference", engine+".json")
-			assertInferenceTemplateSpecDecodeContract(t, engine, path)
+	for _, tc := range []struct {
+		engine string
+		// conflictArgs are the flags that must declare the spec-decode-method
+		// mutual-exclusion hint in this template.
+		conflictArgs []string
+	}{
+		{engine: "nvidia-vllm", conflictArgs: []string{"enforce-eager", "async-scheduling"}},
+		{engine: "nvidia-sglang"},
+	} {
+		t.Run(tc.engine, func(t *testing.T) {
+			path := filepath.Join("..", "..", "..", "configs", "inference", tc.engine+".json")
+			assertInferenceTemplateSpecDecodeContract(t, tc.engine, path, tc.conflictArgs)
 		})
 	}
 }
 
-func assertInferenceTemplateSpecDecodeContract(t *testing.T, engine, path string) {
+func assertInferenceTemplateSpecDecodeContract(t *testing.T, engine, path string, conflictArgs []string) {
 	t.Helper()
 	sceneOptions := []string{"rag", "code-completion", "rewrite", "summarization", "other"}
 
@@ -59,20 +67,24 @@ func assertInferenceTemplateSpecDecodeContract(t *testing.T, engine, path string
 		[]string{"rag", "code-completion", "rewrite", "summarization"},
 		scene.RecommendNgram)
 
-	// The enforce-eager x spec-decode mutual-exclusion hint (issue
-	// #1489) exists in both vllm templates and points at a parameter
-	// that really exists in the same template; sglang has no
-	// enforce-eager at all.
-	if engine == "nvidia-sglang" {
-		_, ok := byName["enforce-eager"]
-		require.False(t, ok, "sglang template must not carry enforce-eager")
-		return
+	// The mutual-exclusion hints (issues #1489, #1659) must only appear on
+	// flags that really exist in the template and must point at a parameter
+	// that also exists there.
+	wantConflict := make(map[string]bool, len(conflictArgs))
+	for _, name := range conflictArgs {
+		wantConflict[name] = true
 	}
-	eager, ok := byName["enforce-eager"]
-	require.True(t, ok, "missing enforce-eager in %s", engine)
-	require.Equal(t, []string{"spec-decode-method"}, eager.ConflictsWith)
-	for _, conflict := range eager.ConflictsWith {
-		_, ok := byName[conflict]
-		require.True(t, ok, "conflicts_with target %q missing in %s", conflict, engine)
+	for _, name := range []string{"enforce-eager", "async-scheduling"} {
+		arg, ok := byName[name]
+		if !wantConflict[name] {
+			require.False(t, ok, "%s template must not carry %s", engine, name)
+			continue
+		}
+		require.True(t, ok, "missing %s in %s", name, engine)
+		require.Equal(t, []string{"spec-decode-method"}, arg.ConflictsWith, "%s conflicts_with", name)
+		for _, conflict := range arg.ConflictsWith {
+			_, ok := byName[conflict]
+			require.True(t, ok, "conflicts_with target %q missing in %s", conflict, engine)
+		}
 	}
 }

@@ -175,6 +175,7 @@ type GetDiffBetweenTwoCommitsReq struct {
 	LeftCommitId  string               `json:"left_commit_id"`
 	RightCommitId string               `json:"right_commit_id"`
 	Private       bool                 `json:"private"`
+	DefaultBranch string               `json:"default_branch"`
 	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
 	RelativePath string `json:"-"`
 }

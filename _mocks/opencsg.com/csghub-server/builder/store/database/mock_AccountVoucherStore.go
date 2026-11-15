@@ -8,6 +8,8 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
 
+	time "time"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -552,6 +554,66 @@ func (_c *MockAccountVoucherStore_ListByTargetUUID_Call) Return(_a0 []database.A
 }
 
 func (_c *MockAccountVoucherStore_ListByTargetUUID_Call) RunAndReturn(run func(context.Context, types.VoucherNamespaceFilter) ([]database.AccountVoucher, int, error)) *MockAccountVoucherStore_ListByTargetUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListVoucherCandidates provides a mock function with given fields: ctx, targetUUID, now
+func (_m *MockAccountVoucherStore) ListVoucherCandidates(ctx context.Context, targetUUID string, now time.Time) ([]database.AccountVoucher, error) {
+	ret := _m.Called(ctx, targetUUID, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListVoucherCandidates")
+	}
+
+	var r0 []database.AccountVoucher
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, time.Time) ([]database.AccountVoucher, error)); ok {
+		return rf(ctx, targetUUID, now)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, time.Time) []database.AccountVoucher); ok {
+		r0 = rf(ctx, targetUUID, now)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountVoucher)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, time.Time) error); ok {
+		r1 = rf(ctx, targetUUID, now)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountVoucherStore_ListVoucherCandidates_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListVoucherCandidates'
+type MockAccountVoucherStore_ListVoucherCandidates_Call struct {
+	*mock.Call
+}
+
+// ListVoucherCandidates is a helper method to define mock.On call
+//   - ctx context.Context
+//   - targetUUID string
+//   - now time.Time
+func (_e *MockAccountVoucherStore_Expecter) ListVoucherCandidates(ctx interface{}, targetUUID interface{}, now interface{}) *MockAccountVoucherStore_ListVoucherCandidates_Call {
+	return &MockAccountVoucherStore_ListVoucherCandidates_Call{Call: _e.mock.On("ListVoucherCandidates", ctx, targetUUID, now)}
+}
+
+func (_c *MockAccountVoucherStore_ListVoucherCandidates_Call) Run(run func(ctx context.Context, targetUUID string, now time.Time)) *MockAccountVoucherStore_ListVoucherCandidates_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(time.Time))
+	})
+	return _c
+}
+
+func (_c *MockAccountVoucherStore_ListVoucherCandidates_Call) Return(_a0 []database.AccountVoucher, _a1 error) *MockAccountVoucherStore_ListVoucherCandidates_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountVoucherStore_ListVoucherCandidates_Call) RunAndReturn(run func(context.Context, string, time.Time) ([]database.AccountVoucher, error)) *MockAccountVoucherStore_ListVoucherCandidates_Call {
 	_c.Call.Return(run)
 	return _c
 }

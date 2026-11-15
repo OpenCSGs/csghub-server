@@ -59,7 +59,7 @@ func (e *extendOpenai) priceConfiguredFilterEnabled() bool {
 	return false
 }
 
-func (e *extendOpenai) CheckBalance(ctx context.Context, userUUID string) error {
+func (e *extendOpenai) CheckBalance(ctx context.Context, userUUID string, model *types.Model) error {
 	return nil
 }
 

@@ -76,6 +76,9 @@ func (s *paymentStripeStoreImpl) Get(ctx context.Context, id int64) (*PaymentStr
 
 func (s *paymentStripeStoreImpl) Create(ctx context.Context, input PaymentStripe) (*PaymentStripe, error) {
 	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := lockPersonalRechargeOwner(ctx, tx, input.UserUUID); err != nil {
+			return err
+		}
 		var err error
 		var acctStatement AccountStatement
 
@@ -89,7 +92,7 @@ func (s *paymentStripeStoreImpl) Create(ctx context.Context, input PaymentStripe
 			return fmt.Errorf("check account statement by event uuid %s in create stripe session, error: %w", input.ClientReferenceID, err)
 		}
 
-		res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
+		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
 		if err := assertAffectedOneRow(res, err); err != nil {
 			return err
 		}
@@ -112,7 +115,7 @@ func (s *paymentStripeStoreImpl) Update(ctx context.Context, input PaymentStripe
 			}
 		}
 
-		res, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+		res, err := tx.NewUpdate().Model(&input).WherePK().Exec(ctx)
 		if err := assertAffectedOneRow(res, err); err != nil {
 			return err
 		}

@@ -50,6 +50,9 @@ type RepoSyncResult struct {
 }
 
 type RepoSyncWorker struct {
+	sourcePolicy    common.PublicHTTPPolicy
+	recordLatestLFS func(context.Context, int64, int64, string, []string) error
+
 	mirrorTaskStore        database.MirrorTaskStore
 	repoStore              database.RepoStore
 	promptPrefixStore      database.PromptPrefixStore
@@ -67,6 +70,7 @@ type RepoSyncWorker struct {
 func NewRepoSyncWorker(config *config.Config) (*RepoSyncWorker, error) {
 	var err error
 	w := &RepoSyncWorker{}
+	w.initLatestLFS()
 	w.git, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
@@ -79,6 +83,7 @@ func NewRepoSyncWorker(config *config.Config) (*RepoSyncWorker, error) {
 	w.syncClientSettingStore = database.NewSyncClientSettingStore()
 	w.mirrorTaskStore = database.NewMirrorTaskStore()
 	w.config = config
+	w.sourcePolicy.TrustedDomains = config.Mirror.TrustedDomains
 	w.workflowClient = temporal.GetClient()
 	msgSender := hook.NewMessageSender(
 		fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
@@ -86,12 +91,12 @@ func NewRepoSyncWorker(config *config.Config) (*RepoSyncWorker, error) {
 		rpc.WithJSONHeader(),
 	)
 	w.msgSender = msgSender
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.MultiSync.HTTPInsecureSkipVerify},
-	}
+	tr := w.sourcePolicy.Transport()
+	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: config.MultiSync.HTTPInsecureSkipVerify}
 	w.httpClient = &http.Client{
-		Timeout:   5 * time.Second,
-		Transport: tr,
+		Timeout:       5 * time.Second,
+		Transport:     tr,
+		CheckRedirect: common.RejectHTTPRedirect,
 	}
 	return w, nil
 }
@@ -108,6 +113,10 @@ func (w *RepoSyncWorker) SyncRepo(
 	// Check if repository is not present
 	if mirror.Repository == nil {
 		return RepoSyncResult{}, fmt.Errorf("mirror repository is nil")
+	}
+	// Revalidate persisted sources before any work, including resumed tasks.
+	if _, err := w.sourcePolicy.ResolveURL(ctx, mirror.SourceUrl); err != nil {
+		return RepoSyncResult{Task: mt}, fmt.Errorf("invalid mirror source: %w", err)
 	}
 	mt.Mirror = mirror
 
@@ -292,6 +301,11 @@ func (w *RepoSyncWorker) SyncRepo(
 		return RepoSyncResult{Task: mt}, fmt.Errorf("failed to check lfs pointers: %w", err)
 	}
 	if len(lfsPointers) == 0 {
+		if w.recordLatestLFS != nil {
+			if err := w.recordLatestLFS(ctx, mirror.Repository.ID, mt.ID, commit.ID, nil); err != nil {
+				return RepoSyncResult{Task: mt}, err
+			}
+		}
 		if err := PublishCommitAndTriggerCallback(
 			ctx, w.git, w.workflowClient,
 			mirror.Repository, namespace, name, relativePath, commit.ID,

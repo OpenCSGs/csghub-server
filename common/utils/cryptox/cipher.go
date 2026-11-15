@@ -263,6 +263,19 @@ func zeroBytes(value []byte) {
 	}
 }
 
+// MaskCredential returns a display-only value. Short credentials are fully hidden;
+// longer values retain only their first and last two Unicode characters.
+func MaskCredential(value string) string {
+	if value == "" {
+		return ""
+	}
+	chars := []rune(value)
+	if len(chars) <= 4 {
+		return "********"
+	}
+	return string(chars[:2]) + "********" + string(chars[len(chars)-2:])
+}
+
 // LookupHash computes a stable HMAC-SHA256 index using a purpose-separated key.
 // RFC 5869 HKDF derivation separates it from encryption, including for equal scopes.
 // Do not include user identifiers in scope when cross-user equality is required.

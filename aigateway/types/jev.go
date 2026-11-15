@@ -120,11 +120,11 @@ func jevStatePresent(raw json.RawMessage) bool {
 	return true
 }
 
-// JevJSONToText renders a raw JSON value as plain text for prompt checks,
+// JSONToText renders a raw JSON value as plain text for prompt checks,
 // token estimation, and log capture: JSON strings are used verbatim, JSON
 // null renders as empty, and every other JSON value (object, array, number)
 // is kept as compact JSON.
-func JevJSONToText(raw json.RawMessage) string {
+func JSONToText(raw json.RawMessage) string {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
 		return ""
@@ -151,7 +151,7 @@ func JevJSONToText(raw json.RawMessage) string {
 func (r *JevRequest) PromptText() string {
 	var b strings.Builder
 	appendText := func(raw json.RawMessage) {
-		text := JevJSONToText(raw)
+		text := JSONToText(raw)
 		// Empty containers carry no checkable content.
 		if text == "" || text == "{}" || text == "[]" {
 			return

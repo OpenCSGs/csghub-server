@@ -501,6 +501,23 @@ func newTestCipher(t *testing.T, infoPrefix string) *Cipher {
 	return cipher
 }
 
+// TestMaskCredential covers opaque prefixes, short secrets, and Unicode boundaries.
+func TestMaskCredential(t *testing.T) {
+	cases := map[string]string{
+		"": "", "abcd": "********", "abc": "********",
+		"gf-abcdefghxyz": "gf********yz", "sk-abcdefghxyz": "sk********yz",
+		"gm_abcdefghxyz": "gm********yz", "abcdefghijklmn": "ab********mn",
+		"密钥内容测试结束": "密钥********结束",
+	}
+	for value, want := range cases {
+		t.Run(value, func(t *testing.T) {
+			if got := MaskCredential(value); got != want {
+				t.Fatalf("mask: got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 // TestIdentityLookupHash verifies domain separation and stable keyed indexes.
 func TestIdentityLookupHash(t *testing.T) {
 	c, err := NewCipher(Config{MasterKey: testMasterKey, Salt: testSalt, InfoPrefix: "identity/"})

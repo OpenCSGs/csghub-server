@@ -312,10 +312,10 @@ func (c *repoComponentImpl) AllowAccessEndpoint(ctx context.Context, currentUser
 		return false, fmt.Errorf("deploy %d has no owner", deploy.ID)
 	}
 	owner, err := c.userStore.FindByID(ctx, deploy.UserID)
-	if err != nil {
+	if err != nil && !(deploy.OwnerNamespace != "" && errors.Is(err, sql.ErrNoRows)) {
 		return false, fmt.Errorf("failed to find deploy owner %d, %w", deploy.UserID, err)
 	}
-	if owner.Username == currentUser {
+	if err == nil && owner.Username == currentUser {
 		return true, nil
 	}
 	if deploy.OwnerNamespace == "" {

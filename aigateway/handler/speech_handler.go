@@ -295,7 +295,7 @@ func (h *speechPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetad
 		slog.WarnContext(ctx, "invalid auth head", slog.String("model", mt.ModelName), slog.Any("error", err))
 	}
 
-	rp, err := proxy.NewReverseProxy(mt.Target, proxy.WithoutAcceptEncoding())
+	rp, err := newArchiveProxy(mt.Target, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))

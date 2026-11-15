@@ -19,8 +19,6 @@ import (
 func TestUserVerifyComponent_Create(t *testing.T) {
 	req := &types.UserVerifyReq{
 		UUID:        "uuid_1",
-		RealName:    "John Doe",
-		Username:    "johndoe",
 		IDCardFront: "idcard-front.png",
 		IDCardBack:  "idcard-back.png",
 	}
@@ -30,12 +28,10 @@ func TestUserVerifyComponent_Create(t *testing.T) {
 
 	// SaaS resolves the authenticated owner; the other editions retain their existing behavior.
 	mockUserStore.EXPECT().FindByUUID(mock.Anything, req.UUID).
-		Return(&database.User{UUID: req.UUID, Username: req.Username}, nil).Maybe()
+		Return(&database.User{UUID: req.UUID}, nil).Maybe()
 
 	expected := &database.UserVerify{
 		UUID:        req.UUID,
-		RealName:    req.RealName,
-		Username:    req.Username,
 		IDCardFront: req.IDCardFront,
 		IDCardBack:  req.IDCardBack,
 		Status:      "pending",
@@ -123,11 +119,9 @@ func TestUserVerifyComponent_Get(t *testing.T) {
 	mockUserStore := mockdb.NewMockUserStore(t)
 
 	expected := &database.UserVerify{
-		ID:       1,
-		UUID:     "uuid_1",
-		RealName: "John Doe",
-		Username: "johndoe",
-		Status:   "pending",
+		ID:     1,
+		UUID:   "uuid_1",
+		Status: "pending",
 	}
 
 	mockUserVerifyStore.EXPECT().
@@ -135,7 +129,7 @@ func TestUserVerifyComponent_Get(t *testing.T) {
 		Return(expected, nil).Once()
 	// Only SaaS resolves the owner before reading verification data.
 	mockUserStore.EXPECT().FindByUUID(mock.Anything, expected.UUID).
-		Return(&database.User{UUID: expected.UUID, Username: expected.Username}, nil).Maybe()
+		Return(&database.User{UUID: expected.UUID}, nil).Maybe()
 
 	c := &UserVerifyComponentImpl{
 		userVerifyStore: mockUserVerifyStore,

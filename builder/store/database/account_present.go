@@ -21,6 +21,7 @@ type accountPresentStoreImpl struct {
 type AccountPresentStore interface {
 	AddPresent(ctx context.Context, input AccountPresent, statement AccountStatement) error
 	SendNewUserPresent(ctx context.Context, gift NewUserPresentGift) (bool, error)
+	SendInviterPresent(ctx context.Context, gift NewUserPresentGift) (bool, error)
 	FindPresentByUserAndActivity(ctx context.Context, userID string, activityID int64, participantUUID string) (*AccountPresent, error)
 	ListExpiredPresentsByActivityID(ctx context.Context, activityID int64) ([]AccountPresent, error)
 	ListAutoExpirePresents(ctx context.Context, activityID int64, grantedStart, grantedEnd time.Time, validDays int, afterID int64, limit int) ([]AutoExpirePresent, error)
@@ -33,11 +34,13 @@ type AccountPresentStore interface {
 }
 
 type PresentFilter struct {
-	UserUUID  string
-	StartDate string
-	EndDate   string
-	Limit     int
-	Offset    int
+	UserUUID        string
+	StartDate       string
+	EndDate         string
+	ActivityID      int64
+	ParticipantUUID string
+	Limit           int
+	Offset          int
 }
 
 // AutoExpirePresent is one activity present selected for auto expiry: it was
@@ -199,20 +202,50 @@ func (ap *accountPresentStoreImpl) SendNewUserPresent(ctx context.Context, gift 
 		if err != nil {
 			return err
 		}
-		if act.VoucherValue <= 0 {
+		// A negative per-type value is a misconfiguration, not a zero: the
+		// issued vouchers would not add up to the recorded gift total, so
+		// refuse the grant instead of silently issuing a subset.
+		if act.VoucherTokenValue < 0 || act.VoucherComputeValue < 0 {
+			return fmt.Errorf("%w: activity %d has a negative voucher value (token:%d compute:%d)",
+				ErrActivityNotGrantable, gift.Present.ActivityID, act.VoucherTokenValue, act.VoucherComputeValue)
+		}
+		if act.VoucherTokenValue == 0 && act.VoucherComputeValue == 0 {
 			return fmt.Errorf("%w: activity %d has no positive voucher value",
 				ErrActivityNotGrantable, gift.Present.ActivityID)
 		}
 
-		voucherValue := float64(act.VoucherValue)
+		if act.ValidDurationMonth <= 0 {
+			return fmt.Errorf("%w: activity %d has no positive valid duration",
+				ErrActivityNotGrantable, gift.Present.ActivityID)
+		}
+
+		now := time.Now()
+
+		// The gift total must equal the face value actually handed out, so the
+		// aggregation counts the same vouchers the insertion loop below issues:
+		// a zero-valued type is skipped by both. A negative value is rejected
+		// above, so it can never make the two loops disagree.
 		gift.Present.Value = 0
 		for i := range gift.Vouchers {
-			gift.Vouchers[i].Total = voucherValue
-			gift.Present.Value += gift.Vouchers[i].Total
+			if gift.Vouchers[i].VoucherType == types.VoucherTypeToken {
+				gift.Vouchers[i].Total = float64(act.VoucherTokenValue)
+			}
+			if gift.Vouchers[i].VoucherType == types.VoucherTypeCompute {
+				gift.Vouchers[i].Total = float64(act.VoucherComputeValue)
+			}
+			gift.Vouchers[i].BeginDate = NormalizeBeginDate(now)
+			gift.Vouchers[i].EndDate = NormalizeEndDate(now.AddDate(0, int(act.ValidDurationMonth), 0))
+			if gift.Vouchers[i].Total > 0 {
+				gift.Present.Value += gift.Vouchers[i].Total
+			}
 		}
 
 		if err := assertAffectedOneRow(tx.NewInsert().Model(&gift.Present).Exec(ctx)); err != nil {
 			return fmt.Errorf("insert new user present, user_uuid:%s, error:%w", gift.Present.UserUUID, err)
+		}
+
+		if err := insertGiftAuditStatement(ctx, tx, gift.Present); err != nil {
+			return err
 		}
 
 		if err := insertNewUserPresentSubscription(ctx, tx, gift); err != nil {
@@ -220,6 +253,9 @@ func (ap *accountPresentStoreImpl) SendNewUserPresent(ctx context.Context, gift 
 		}
 
 		for i := range gift.Vouchers {
+			if gift.Vouchers[i].Total <= 0 {
+				continue
+			}
 			voucherNo, err := genVoucherNo(ctx, tx)
 			if err != nil {
 				return fmt.Errorf("generate new user present voucher number, user_uuid:%s, error:%w", gift.Present.UserUUID, err)
@@ -238,6 +274,27 @@ func (ap *accountPresentStoreImpl) SendNewUserPresent(ctx context.Context, gift 
 		return false, err
 	}
 	return awarded, nil
+}
+
+// insertGiftAuditStatement writes the zero-amount ledger row recording a gift
+// grant: Value stays zero because no balance moves, while EventValue carries
+// the voucher face value for audit. It keeps the gift visible in the
+// user-facing statement list the same way the legacy credit present was.
+func insertGiftAuditStatement(ctx context.Context, tx bun.Tx, present AccountPresent) error {
+	statement := AccountStatement{
+		EventUUID:  present.EventUUID,
+		UserUUID:   present.UserUUID,
+		Value:      0,
+		EventValue: present.Value,
+		Scene:      types.ScenePortalCharge,
+		OpUID:      present.OpUID,
+		EventDate:  time.Now().In(config.GetGlobalTimeZone()),
+		RecordedAt: time.Now().UTC(),
+	}
+	if err := assertAffectedOneRow(tx.NewInsert().Model(&statement).Exec(ctx)); err != nil {
+		return fmt.Errorf("insert gift audit statement, user_uuid:%s, error:%w", present.UserUUID, err)
+	}
+	return nil
 }
 
 // insertNewUserPresentSubscription creates the gifted one-month CSGLite
@@ -556,6 +613,14 @@ func (ap *accountPresentStoreImpl) ListPresents(ctx context.Context, filter Pres
 		tx = tx.Where("user_uuid = ?", filter.UserUUID)
 	}
 
+	if filter.ActivityID > 0 {
+		tx = tx.Where("activity_id = ?", filter.ActivityID)
+	}
+
+	if filter.ParticipantUUID != "" {
+		tx = tx.Where("participant_uuid = ?", filter.ParticipantUUID)
+	}
+
 	if filter.StartDate != "" {
 		tx = tx.Where("created_at >= ?", filter.StartDate)
 	}
@@ -596,4 +661,14 @@ func (ap *accountPresentStoreImpl) FindPresentByEventUUID(ctx context.Context, e
 		return nil, fmt.Errorf("get account present, event_uuid:%s, error:%w", eventUUID.String(), err)
 	}
 	return &present, nil
+}
+
+func NormalizeBeginDate(t time.Time) time.Time {
+	t = t.In(config.GetGlobalTimeZone())
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+func NormalizeEndDate(t time.Time) time.Time {
+	t = t.In(config.GetGlobalTimeZone())
+	return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, t.Location())
 }

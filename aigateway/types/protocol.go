@@ -13,6 +13,8 @@ const (
 	// ProtocolSystemOne is the Jev (System One) state-and-questions API
 	// (/v1/systemone), following the TypeSafe SDK guide.
 	ProtocolSystemOne Protocol = "systemone"
+	// ProtocolDecisions is the OpenAI typed decision API (/v1/decisions).
+	ProtocolDecisions Protocol = "decisions"
 )
 
 // ProtocolCapability describes the feature set of a protocol implementation.
@@ -76,6 +78,15 @@ var DefaultProtocolCapabilities = map[Protocol]ProtocolCapability{
 		Streaming:        false,
 		Tools:            false,
 		Vision:           false,
+		Thinking:         false,
+		PromptCaching:    false,
+		StructuredOutput: false,
+	},
+	ProtocolDecisions: {
+		Protocol:         ProtocolDecisions,
+		Streaming:        false,
+		Tools:            false,
+		Vision:           true,
 		Thinking:         false,
 		PromptCaching:    false,
 		StructuredOutput: false,

@@ -41,7 +41,7 @@ type OpenAIComponent interface {
 	ResolveAutoModel(c context.Context, req types.AutoRouteRequest) (*types.AutoRouteDecision, error)
 	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error
 	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) (*commontypes.MeteringEvent, error)
-	CheckBalance(ctx context.Context, nsUUID string) error
+	CheckBalance(ctx context.Context, nsUUID string, model *types.Model) error
 	// CheckCapacityAdmission evaluates per-upstream CapacityPolicy admission
 	// for the router-owned candidate set carried in the request (initial
 	// admission: selection + occupation, or waiting in the upstream's
@@ -654,6 +654,7 @@ func (m *openaiComponentImpl) buildInternalModel(cfg *database.LLMConfig, info *
 		Endpoint:      router.FirstEnabledUpstream(upstreams),
 		Upstreams:     upstreams,
 		RoutingPolicy: cfg.RoutingPolicy,
+		RateLimit:     cfg.RateLimit,
 	}
 	model.OwnedBy = m.getModelIDBuilder().GetModelOwner(info.SvcType, info.OwnerUsername)
 	return model
@@ -698,6 +699,7 @@ func (m *openaiComponentImpl) buildExternalModel(ctx context.Context, cfg *datab
 		Endpoint:      router.FirstEnabledUpstream(upstreams),
 		Upstreams:     upstreams,
 		RoutingPolicy: cfg.RoutingPolicy,
+		RateLimit:     cfg.RateLimit,
 		ExternalModelInfo: types.ExternalModelInfo{
 			Provider:           provider,
 			AuthHead:           cfg.PrimaryAuthHeader(),
@@ -849,6 +851,25 @@ type usageMeteringInfo struct {
 	OwnerType commontypes.TokenUsageType
 }
 
+// resourceIDForMeteringModel constructs the resource identity shared by pricing and metering.
+func resourceIDForMeteringModel(m *types.Model) (string, error) {
+	llmType, err := llmTypeFromModel(m)
+	if err != nil {
+		return "", err
+	}
+	switch llmType {
+	case commontypes.ProviderTypeExternalLLM:
+		return fmt.Sprintf(commontypes.ExternalLLMResourceFmt, m.ID), nil
+	case commontypes.ProviderTypeServerless, commontypes.ProviderTypeInference:
+		if m.CSGHubModelID == "" {
+			return "", fmt.Errorf("model metadata %s=%s requires csghub model id", types.MetaKeyLLMType, llmType)
+		}
+		return fmt.Sprintf(commontypes.CSGHubResourceFmt, llmType, m.CSGHubModelID), nil
+	default:
+		return "", fmt.Errorf("model metadata %s has unsupported value %s", types.MetaKeyLLMType, llmType)
+	}
+}
+
 func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID string, model *types.Model) (usageMeteringInfo, error) {
 	if model == nil {
 		return usageMeteringInfo{}, fmt.Errorf("model is nil")
@@ -857,12 +878,12 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 	if err != nil {
 		return usageMeteringInfo{}, err
 	}
+	id, err := resourceIDForMeteringModel(model)
+	if err != nil {
+		return usageMeteringInfo{}, err
+	}
 	switch llmType {
 	case commontypes.ProviderTypeServerless, commontypes.ProviderTypeInference:
-		if model.CSGHubModelID == "" {
-			return usageMeteringInfo{}, fmt.Errorf("model metadata %s=%s requires csghub model id", types.MetaKeyLLMType, llmType)
-		}
-		id := fmt.Sprintf(commontypes.CSGHubResourceFmt, llmType, model.CSGHubModelID)
 		meteringInfo := usageMeteringInfo{
 			Resource: types.MeteringResource{
 				ResourceID:   id,
@@ -886,7 +907,6 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 		if model.ID == "" {
 			return usageMeteringInfo{}, fmt.Errorf("model metadata %s=%s requires model id", types.MetaKeyLLMType, llmType)
 		}
-		id := fmt.Sprintf(commontypes.ExternalLLMResourceFmt, model.ID)
 		return usageMeteringInfo{
 			Resource: types.MeteringResource{
 				ResourceID:   id,
@@ -1040,6 +1060,12 @@ func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID 
 }
 
 func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
+	// Per-user rate limit TPM commit: the shared post-Execute usage path of
+	// every protocol lands here, so the TPM window is fed from one place.
+	// Fail-soft and independent of the metering outcome below — the tokens
+	// were consumed whether or not the metering event publishes.
+	m.CommitUserRateLimitUsage(c, nsUUID, model, usage)
+
 	event, err := m.BuildUsageMeteringEvent(c, nsUUID, model, targetModelName, usage, tokenID)
 	if err != nil {
 		return err

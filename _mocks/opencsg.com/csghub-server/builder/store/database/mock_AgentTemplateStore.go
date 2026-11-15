@@ -318,6 +318,132 @@ func (_c *MockAgentTemplateStore_ListByUserUUID_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// ListPublicWithCuration provides a mock function with given fields: ctx, search, per, page
+func (_m *MockAgentTemplateStore) ListPublicWithCuration(ctx context.Context, search string, per int, page int) ([]database.AgentTemplate, int, error) {
+	ret := _m.Called(ctx, search, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPublicWithCuration")
+	}
+
+	var r0 []database.AgentTemplate
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]database.AgentTemplate, int, error)); ok {
+		return rf(ctx, search, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []database.AgentTemplate); ok {
+		r0 = rf(ctx, search, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AgentTemplate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
+		r1 = rf(ctx, search, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
+		r2 = rf(ctx, search, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockAgentTemplateStore_ListPublicWithCuration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPublicWithCuration'
+type MockAgentTemplateStore_ListPublicWithCuration_Call struct {
+	*mock.Call
+}
+
+// ListPublicWithCuration is a helper method to define mock.On call
+//   - ctx context.Context
+//   - search string
+//   - per int
+//   - page int
+func (_e *MockAgentTemplateStore_Expecter) ListPublicWithCuration(ctx interface{}, search interface{}, per interface{}, page interface{}) *MockAgentTemplateStore_ListPublicWithCuration_Call {
+	return &MockAgentTemplateStore_ListPublicWithCuration_Call{Call: _e.mock.On("ListPublicWithCuration", ctx, search, per, page)}
+}
+
+func (_c *MockAgentTemplateStore_ListPublicWithCuration_Call) Run(run func(ctx context.Context, search string, per int, page int)) *MockAgentTemplateStore_ListPublicWithCuration_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockAgentTemplateStore_ListPublicWithCuration_Call) Return(_a0 []database.AgentTemplate, _a1 int, _a2 error) *MockAgentTemplateStore_ListPublicWithCuration_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockAgentTemplateStore_ListPublicWithCuration_Call) RunAndReturn(run func(context.Context, string, int, int) ([]database.AgentTemplate, int, error)) *MockAgentTemplateStore_ListPublicWithCuration_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListVisiblePublicOrder provides a mock function with given fields: ctx
+func (_m *MockAgentTemplateStore) ListVisiblePublicOrder(ctx context.Context) ([]types.AgentCurationOrderItem, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListVisiblePublicOrder")
+	}
+
+	var r0 []types.AgentCurationOrderItem
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]types.AgentCurationOrderItem, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []types.AgentCurationOrderItem); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.AgentCurationOrderItem)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentTemplateStore_ListVisiblePublicOrder_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListVisiblePublicOrder'
+type MockAgentTemplateStore_ListVisiblePublicOrder_Call struct {
+	*mock.Call
+}
+
+// ListVisiblePublicOrder is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockAgentTemplateStore_Expecter) ListVisiblePublicOrder(ctx interface{}) *MockAgentTemplateStore_ListVisiblePublicOrder_Call {
+	return &MockAgentTemplateStore_ListVisiblePublicOrder_Call{Call: _e.mock.On("ListVisiblePublicOrder", ctx)}
+}
+
+func (_c *MockAgentTemplateStore_ListVisiblePublicOrder_Call) Run(run func(ctx context.Context)) *MockAgentTemplateStore_ListVisiblePublicOrder_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockAgentTemplateStore_ListVisiblePublicOrder_Call) Return(_a0 []types.AgentCurationOrderItem, _a1 error) *MockAgentTemplateStore_ListVisiblePublicOrder_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentTemplateStore_ListVisiblePublicOrder_Call) RunAndReturn(run func(context.Context) ([]types.AgentCurationOrderItem, error)) *MockAgentTemplateStore_ListVisiblePublicOrder_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, template
 func (_m *MockAgentTemplateStore) Update(ctx context.Context, template *database.AgentTemplate) error {
 	ret := _m.Called(ctx, template)

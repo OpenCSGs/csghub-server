@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -409,4 +410,20 @@ func TestIsValidAccessToken_CSGHubNamespaceUUID(t *testing.T) {
 			assert.Equal(t, httpbase.AuthTypeAccessToken, httpbase.GetAuthType(ctx))
 		})
 	}
+}
+
+func TestFrozenCreatorOrgKeyCannotAuthenticatePersonalRequests(t *testing.T) {
+	client := mock_rpc.NewMockUserSvcClient(t)
+	client.EXPECT().VerifyByAccessToken(mock.Anything, "shared").Return(&types.CheckAccessTokenResp{
+		Application: types.AccessTokenAppAIGateway, NSUUID: "organization", TokenName: "team",
+	}, nil)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	assert.True(t, isValidAccessToken(ctx, client, "shared"))
+	MustUserOrgApiKey(&config.Config{})(ctx)
+	assert.False(t, ctx.IsAborted())
+	MustLogin()(ctx)
+	assert.True(t, ctx.IsAborted())
+	assert.False(t, isValidBasicToken(ctx, client, base64.StdEncoding.EncodeToString([]byte("alice:shared"))))
+	assert.False(t, isValidBasicToken(ctx, client, base64.StdEncoding.EncodeToString([]byte(":shared"))))
 }

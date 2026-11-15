@@ -49,14 +49,15 @@ func TestMirrorSyncAuthorization(t *testing.T) {
 			tt.request.Namespace = "ns"
 			tt.request.Name = "repo"
 			tt.request.RepoType = types.ModelRepo
-			tt.request.CloneUrl = "https://example.com/ns/repo.git"
+			tt.request.CloneUrl = "https://8.8.8.8/ns/repo.git"
 			tt.request.RelativePath = "models_ns/repo.git"
 
 			tester.mocks.repoClient.EXPECT().FetchRemote(
 				mock.Anything,
 				mock.MatchedBy(func(req *gitalypb.FetchRemoteRequest) bool {
 					return req.Repository.RelativePath == tt.request.RelativePath &&
-						req.RemoteParams.HttpAuthorizationHeader == tt.wantHeader
+						req.RemoteParams.HttpAuthorizationHeader == tt.wantHeader &&
+						req.RemoteParams.ResolvedAddress == "8.8.8.8"
 				}),
 			).Return(&gitalypb.FetchRemoteResponse{}, nil)
 			tester.mocks.refClient.EXPECT().ListRefs(mock.Anything, mock.Anything).

@@ -59,7 +59,7 @@ func (c *fakeOpenAIComponent) BuildUsageMeteringEvent(ctx context.Context, nsUUI
 	return nil, nil
 }
 
-func (c *fakeOpenAIComponent) CheckBalance(ctx context.Context, nsUUID string) error {
+func (c *fakeOpenAIComponent) CheckBalance(ctx context.Context, nsUUID string, model *aigwtypes.Model) error {
 	return nil
 }
 

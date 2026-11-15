@@ -13,6 +13,7 @@ import (
 
 // AgentPrompt represents a prompt with pin information for agent context
 type AgentPrompt struct {
+	Recommended  bool       `bun:",scanonly" json:"recommended"`
 	ID           int64      `bun:",pk,autoincrement" json:"id"`
 	RepositoryID int64      `bun:",notnull" json:"repository_id"`
 	IsPinned     bool       `bun:",scanonly" json:"is_pinned"`   // Whether the prompt is pinned (from LEFT JOIN)
@@ -77,6 +78,8 @@ func (s *agentPromptStoreImpl) ListByUsername(ctx context.Context, username stri
 		Where("u.username = ?", username).
 		Where("r.repository_type = ?", types.PromptRepo)
 
+	query = applyAgentPromptCuration(query)
+
 	// Apply search filter on path if provided
 	search = strings.TrimSpace(search)
 	if search != "" {
@@ -94,7 +97,7 @@ func (s *agentPromptStoreImpl) ListByUsername(ctx context.Context, username stri
 	}
 
 	err = query.
-		OrderExpr("pin_pref.created_at DESC NULLS LAST, p.updated_at DESC").
+		Apply(orderAgentPromptCuration).
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &prompts)

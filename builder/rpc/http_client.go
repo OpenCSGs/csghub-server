@@ -95,6 +95,15 @@ func NewHttpClient(endpoint string, opts ...RequestOption) *HttpClient {
 	return defaultClient
 }
 
+// WrapTransport adds an observer without replacing proxy, tracing, timeout or retry settings.
+// Configure clients before sharing them between goroutines.
+func (c *HttpClient) WrapTransport(wrap func(http.RoundTripper) http.RoundTripper) *HttpClient {
+	if wrap != nil {
+		c.hc.Transport = wrap(c.hc.Transport)
+	}
+	return c
+}
+
 // WithRetry sets the total number of attempts for the requests. retry number is n-1
 // 0 - means forever retry req | 1 - means no retry, n - means retry n-1 times
 func (c *HttpClient) WithRetry(attempts uint) *HttpClient {

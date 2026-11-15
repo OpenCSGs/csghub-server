@@ -237,6 +237,8 @@ func TestUpstreamStore_UpsertInternalDeployTarget_UpdatePreservesAuthHeader(t *t
 	err := store.UpsertInternalDeployTarget(ctx, original)
 	require.NoError(t, err)
 	require.NotZero(t, original.ID)
+	assertStoredUpstreamCredential(t, ctx, db, original)
+	originalCiphertext := original.EncryptedAuthHeader
 
 	// Verify auth_header was persisted.
 	found, err := store.GetBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, 9001)
@@ -272,6 +274,19 @@ func TestUpstreamStore_UpsertInternalDeployTarget_UpdatePreservesAuthHeader(t *t
 	require.Equal(t, "http://updated:9090/v1", found.URL, "URL should be updated")
 	require.Equal(t, "model-auth-updated", found.ModelName, "ModelName should be updated")
 	require.Equal(t, "Bearer admin-secret-token", found.AuthHeader, "auth_header should be preserved across re-sync")
+	require.Equal(t, originalCiphertext, found.EncryptedAuthHeader, "source-only updates must not rewrite credentials")
+
+	// Rebinding a source to another model must re-encrypt under the new stable
+	// owner scope while preserving the admin-configured bearer value.
+	other := createTestLLMConfigForUpstream(ctx, t, db, "test-upsert-auth-rebind")
+	updated.LLMConfigID = other.ID
+	require.NoError(t, store.UpsertInternalDeployTarget(ctx, updated))
+	found, err = store.GetBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, 9001)
+	require.NoError(t, err)
+	require.Equal(t, other.ID, found.LLMConfigID)
+	require.NotEqual(t, originalCiphertext, found.EncryptedAuthHeader)
+	assertStoredUpstreamCredential(t, ctx, db, found)
+	require.Equal(t, "Bearer admin-secret-token", found.AuthHeader)
 }
 
 func TestUpstreamStore_ListEnabledBySource(t *testing.T) {
@@ -531,4 +546,102 @@ func TestUpstreamStore_ListHealthCheckEnabled(t *testing.T) {
 		require.False(t, listedURLs[excluded],
 			"upstream %s must not be listed (probe disabled, upstream disabled, config disabled, or config missing)", excluded)
 	}
+}
+
+// TestCredentialExplicitUpstreamReads verifies direct reads still decrypt after
+// removing automatic model read hooks, and corrupt ciphertext fails closed.
+func TestCredentialExplicitUpstreamReads(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	cfg := createTestLLMConfigForUpstream(ctx, t, db, "explicit-upstream")
+	store := database.NewUpstreamStoreWithDB(db, nil)
+	up := &database.Upstream{LLMConfigID: cfg.ID, URL: "https://explicit.example", Enabled: true, HealthCheckEnabled: true, Source: types.UpstreamSourceExternal, SourceID: 99, AuthHeader: "direct-upstream-secret"}
+	require.NoError(t, store.Create(ctx, up))
+	one := func(read func() (*database.Upstream, error)) func() ([]*database.Upstream, error) {
+		return func() ([]*database.Upstream, error) { row, err := read(); return []*database.Upstream{row}, err }
+	}
+	queries := []struct {
+		name string
+		read func() ([]*database.Upstream, error)
+	}{
+		{"id", one(func() (*database.Upstream, error) { return store.GetByID(ctx, up.ID) })},
+		{"source", one(func() (*database.Upstream, error) { return store.GetBySourceID(ctx, up.Source, up.SourceID) })},
+		{"config", func() ([]*database.Upstream, error) { return store.ListByLLMConfigID(ctx, cfg.ID) }},
+		{"enabled", func() ([]*database.Upstream, error) { return store.ListAllEnabled(ctx) }},
+		{"health", func() ([]*database.Upstream, error) { return store.ListHealthCheckEnabled(ctx) }},
+		{"enabled-source", func() ([]*database.Upstream, error) { return store.ListEnabledBySource(ctx, up.Source) }},
+		{"logical-models", func() ([]*database.Upstream, error) { return store.ListEnabledByLogicalModelIDs(ctx, []int64{cfg.ID}) }},
+	}
+	var raw database.Upstream
+	require.NoError(t, db.Core.NewSelect().Model(&raw).Where("id=?", up.ID).Scan(ctx))
+	require.Empty(t, raw.AuthHeader, "a raw Bun query must no longer decrypt implicitly")
+	require.NotEqual(t, up.AuthHeader, raw.EncryptedAuthHeader)
+	for _, phase := range []string{"encrypted", "legacy", "corrupt"} {
+		t.Run(phase, func(t *testing.T) {
+			if phase != "encrypted" {
+				value, version := up.AuthHeader, 0
+				if phase == "corrupt" {
+					value, version = "broken", 1
+				}
+				_, err := db.BunDB.DB.ExecContext(ctx, "UPDATE ai_gateway_upstreams SET auth_header=$1,credential_version=$2 WHERE id=$3", value, version, up.ID)
+				require.NoError(t, err)
+			}
+			for _, q := range queries {
+				t.Run(q.name, func(t *testing.T) {
+					rows, err := q.read()
+					if phase == "corrupt" {
+						require.Error(t, err)
+						return
+					}
+					require.NoError(t, err)
+					require.Len(t, rows, 1)
+					require.Equal(t, up.AuthHeader, rows[0].AuthHeader)
+				})
+			}
+		})
+	}
+	// A projection that does not read the credential must remain usable.
+	ids, err := store.MapUpstreamIDsToLLMConfigIDs(ctx, []int64{up.ID})
+	require.NoError(t, err)
+	require.Equal(t, cfg.ID, ids[up.ID])
+}
+
+// assertStoredUpstreamCredential checks ciphertext and explicit store decryption.
+func assertStoredUpstreamCredential(t *testing.T, ctx context.Context, db *database.DB, up *database.Upstream) {
+	t.Helper()
+	var raw database.Upstream
+	require.NoError(t, db.Core.NewSelect().Model(&raw).Where("id=?", up.ID).Scan(ctx))
+	require.Empty(t, raw.AuthHeader)
+	require.Equal(t, 1, raw.CredentialVersion)
+	if up.AuthHeader == "" {
+		require.Empty(t, raw.EncryptedAuthHeader)
+	} else {
+		require.Contains(t, raw.EncryptedAuthHeader, "v1:")
+		require.NotEqual(t, up.AuthHeader, raw.EncryptedAuthHeader)
+	}
+	read, err := database.NewUpstreamStoreWithDB(db, nil).GetByID(ctx, up.ID)
+	require.NoError(t, err)
+	require.Equal(t, up.AuthHeader, read.AuthHeader)
+}
+
+// TestCredentialExplicitUpstreamWrites verifies create, key replacement and
+// explicit clearing preserve the existing in-memory and read contracts.
+func TestCredentialExplicitUpstreamWrites(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	cfg := createTestLLMConfigForUpstream(ctx, t, db, "explicit-upstream-write")
+	store := database.NewUpstreamStoreWithDB(db, nil)
+	up := &database.Upstream{LLMConfigID: cfg.ID, URL: "https://upstream.example", AuthHeader: "first-external-key"}
+	require.NoError(t, store.Create(ctx, up))
+	require.Equal(t, "first-external-key", up.AuthHeader)
+	assertStoredUpstreamCredential(t, ctx, db, up)
+	up.AuthHeader = "replacement-external-key"
+	require.NoError(t, store.Update(ctx, up))
+	require.Equal(t, "replacement-external-key", up.AuthHeader)
+	assertStoredUpstreamCredential(t, ctx, db, up)
+	up.AuthHeader = ""
+	require.NoError(t, store.Update(ctx, up))
+	assertStoredUpstreamCredential(t, ctx, db, up)
 }

@@ -158,16 +158,17 @@ func NewMirrorTaskJobStoreWithDB(db *DB) MirrorTaskJobStore {
 }
 
 type MirrorTask struct {
-	ID                 int64                  `bun:",pk,autoincrement" json:"id"`
-	MirrorID           int64                  `bun:",notnull" json:"mirror_id"`
-	Mirror             *Mirror                `bun:"rel:belongs-to,join:mirror_id=id" json:"mirror"`
-	ErrorMessage       string                 `bun:",nullzero" json:"error_message"`
-	Status             types.MirrorTaskStatus `bun:",notnull" json:"status"`
-	RetryCount         int                    `bun:",notnull,default:0" json:"retry_count"`
-	Payload            string                 `bun:"," json:"payload"`
-	Priority           types.MirrorPriority   `bun:",notnull" json:"priority"`
-	BeforeLastCommitID string                 `bun:"" json:"before_last_commit_id"`
-	AfterLastCommitID  string                 `bun:"" json:"after_last_commit_id"`
+	LatestLFSScanCommitID string                 `bun:",notnull,default:''" json:"-"`
+	ID                    int64                  `bun:",pk,autoincrement" json:"id"`
+	MirrorID              int64                  `bun:",notnull" json:"mirror_id"`
+	Mirror                *Mirror                `bun:"rel:belongs-to,join:mirror_id=id" json:"mirror"`
+	ErrorMessage          string                 `bun:",nullzero" json:"error_message"`
+	Status                types.MirrorTaskStatus `bun:",notnull" json:"status"`
+	RetryCount            int                    `bun:",notnull,default:0" json:"retry_count"`
+	Payload               string                 `bun:"," json:"payload"`
+	Priority              types.MirrorPriority   `bun:",notnull" json:"priority"`
+	BeforeLastCommitID    string                 `bun:"" json:"before_last_commit_id"`
+	AfterLastCommitID     string                 `bun:"" json:"after_last_commit_id"`
 	// RepoJobID stores the River job ID for the repository sync phase.
 	RepoJobID int64 `bun:",nullzero" json:"repo_job_id"`
 	// LFSJobID stores the River job ID for the Git LFS sync phase.

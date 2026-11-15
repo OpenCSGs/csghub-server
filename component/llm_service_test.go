@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"math"
 	"testing"
@@ -1372,6 +1373,7 @@ func TestLLMServiceComponent_UpdateUpstream_CSGHubAllowsEnabledToggle(t *testing
 	require.Equal(t, "http://original-csghub-url", res.URL)
 	require.Equal(t, "original-model", res.ModelName)
 	require.Equal(t, "original-auth", res.AuthHeader)
+	require.Equal(t, "original-auth", dbUp.AuthHeader)
 	require.Equal(t, "inference", res.Provider)
 }
 
@@ -1423,6 +1425,7 @@ func TestLLMServiceComponent_UpdateUpstream_CSGHubProtectsSourceOwnedFields(t *t
 	require.Equal(t, "http://original-csghub-url", res.URL)
 	require.Equal(t, "original-model", res.ModelName)
 	require.Equal(t, "original-auth", res.AuthHeader)
+	require.Equal(t, "original-auth", dbUp.AuthHeader)
 	require.Equal(t, "inference", res.Provider)
 	// Enabled is NOT source-owned from the admin perspective — it should be updated
 	require.True(t, res.Enabled)
@@ -2730,4 +2733,137 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		require.Equal(t, string(aigatewaytypes.UpstreamStatusDisabled), res.AvailabilityStatus)
 		require.False(t, res.IsAvailable)
 	})
+}
+
+// A negative per-user rate limit cap would silently mean "unlimited" in the
+// limiter while still overriding the gateway-global policy — reject it.
+func TestValidateUserRateLimitPolicy(t *testing.T) {
+	cases := []struct {
+		name    string
+		policy  *types.UserRateLimitPolicy
+		wantErr bool
+	}{
+		{name: "nil policy is allowed", policy: nil},
+		{name: "disabled policy is stored as-is", policy: &types.UserRateLimitPolicy{Enabled: false, MaxRPM: -1}},
+		{name: "zero means unlimited", policy: &types.UserRateLimitPolicy{Enabled: true, MaxRPM: 0, MaxTPM: 0}},
+		{name: "positive caps are valid", policy: &types.UserRateLimitPolicy{Enabled: true, MaxRPM: 5, MaxTPM: 1200000}},
+		{name: "negative max_rpm is invalid", policy: &types.UserRateLimitPolicy{Enabled: true, MaxRPM: -1}, wantErr: true},
+		{name: "negative max_tpm is invalid", policy: &types.UserRateLimitPolicy{Enabled: true, MaxTPM: -1}, wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateUserRateLimitPolicy(tc.policy)
+			if tc.wantErr {
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInvalidLLMConfig)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestMaskUpstreamAuthHeaderKeepsOnlyDisplayFragments covers JSON and legacy header formats.
+func TestMaskUpstreamAuthHeaderKeepsOnlyDisplayFragments(t *testing.T) {
+	require.Equal(t, `{"Authorization":"Bearer sk********yz","X-Api-Key":"gm********yz"}`, maskUpstreamAuthHeader(`{"Authorization":"Bearer sk-abcdefghxyz","X-Api-Key":"gm_abcdefghxyz"}`))
+	require.Equal(t, "Bearer gf********yz", maskUpstreamAuthHeader("Bearer gf-abcdefghxyz"))
+	require.Equal(t, "", maskUpstreamAuthHeader(""))
+}
+
+// TestUpdateUpstreamExplicitCredentialReplacement verifies that omitted credentials
+// preserve the latest stored value and supplied strings are never interpreted as masks.
+func TestUpdateUpstreamExplicitCredentialReplacement(t *testing.T) {
+	current := `{"Authorization":"Bearer latest-key-after-another-admin-update"}`
+	replacement := `{"Authorization":"Bearer explicitly-entered-new-key"}`
+	maskLikeKey := maskUpstreamAuthHeader(current)
+	empty := ""
+	for _, tc := range []struct {
+		name  string
+		input *string
+		want  string
+	}{
+		{name: "omitted keeps the current key", want: current},
+		{name: "explicit replacement", input: &replacement, want: replacement},
+		{name: "mask-like input is a literal replacement", input: &maskLikeKey, want: maskLikeKey},
+		{name: "explicit empty string retains the API clear behavior", input: &empty, want: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			existing := &database.Upstream{
+				ID: 10, LLMConfigID: 100, URL: "https://example.com/v1",
+				AuthHeader: current, Weight: 1, Enabled: true,
+			}
+			store := mockdatabase.NewMockUpstreamStore(t)
+			store.EXPECT().GetByID(ctx, int64(10)).Return(existing, nil).Twice()
+			store.EXPECT().Update(ctx, mock.Anything).Run(func(_ context.Context, updated *database.Upstream) {
+				require.Equal(t, tc.want, updated.AuthHeader)
+				require.Equal(t, 9, updated.Weight)
+			}).Return(nil).Once()
+			component := &llmServiceComponentImpl{upstreamStore: store}
+			weight := 9
+			_, err := component.UpdateUpstream(ctx, &types.UpdateUpstreamReq{
+				ID: 10, Weight: &weight, AuthHeader: tc.input,
+			})
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestLLMConfigForDisplay keeps masking confined to copied display responses.
+func TestLLMConfigForDisplay(t *testing.T) {
+	for _, tc := range []struct{ raw, masked string }{
+		{"sk-abcdefghxyz", "sk********yz"},
+		{"Bearer gf-abcdefghxyz", "Bearer gf********yz"},
+		{`{"Authorization":"Bearer sk-abcdefghxyz","X-Api-Key":"gm_abcdefghxyz"}`, `{"Authorization":"Bearer sk********yz","X-Api-Key":"gm********yz"}`},
+		{"", ""},
+	} {
+		t.Run(tc.raw, func(t *testing.T) {
+			original := &types.LLMConfig{ID: 100, ModelName: "model", Upstreams: []types.UpstreamConfig{{ID: 10, URL: "https://example.com", Weight: 9, AuthHeader: tc.raw}}}
+			display := LLMConfigForDisplay(original)
+			require.Equal(t, tc.masked, display.Upstreams[0].AuthHeader)
+			require.Equal(t, tc.raw, original.Upstreams[0].AuthHeader)
+			display.Upstreams[0].AuthHeader = tc.raw
+			require.Equal(t, original, display)
+		})
+	}
+	require.Nil(t, LLMConfigForDisplay(nil))
+	for _, upstreams := range [][]types.UpstreamConfig{nil, {}} {
+		original := &types.LLMConfig{Upstreams: upstreams}
+		require.Equal(t, original, LLMConfigForDisplay(original))
+	}
+}
+
+// TestLegacyLLMConfigReadUpdatePreservesCredential exercises a full upstream object
+// round trip: query the legacy configuration, edit weight, and submit every field.
+func TestLegacyLLMConfigReadUpdatePreservesCredential(t *testing.T) {
+	for _, auth := range []string{"sk-abcdefghxyz", "Bearer sk-abcdefghxyz", `{"Authorization":"Bearer sk-abcdefghxyz","X-Api-Key":"gm_abcdefghxyz"}`} {
+		t.Run(auth, func(t *testing.T) {
+			ctx := context.Background()
+			upstream := &database.Upstream{
+				ID: 10, LLMConfigID: 100, URL: "https://example.com/v1", Weight: 1,
+				Enabled: true, AuthHeader: auth, Source: types.UpstreamSourceExternal,
+			}
+			configs := mockdatabase.NewMockLLMConfigStore(t)
+			configs.EXPECT().GetByID(ctx, int64(100)).Return(&database.LLMConfig{
+				ID: 100, ModelName: "model", Upstreams: []database.Upstream{*upstream},
+			}, nil).Once()
+			upstreams := mockdatabase.NewMockUpstreamStore(t)
+			upstreams.EXPECT().GetByID(ctx, int64(10)).Return(upstream, nil).Twice()
+			upstreams.EXPECT().Update(ctx, mock.Anything).Run(func(_ context.Context, saved *database.Upstream) {
+				require.Equal(t, auth, saved.AuthHeader)
+				require.Equal(t, 9, saved.Weight)
+			}).Return(nil).Once()
+			service := &llmServiceComponentImpl{llmConfigStore: configs, upstreamStore: upstreams}
+			config, err := service.ShowLLMConfig(ctx, 100)
+			require.NoError(t, err)
+			config.Upstreams[0].Weight = 9
+			body, err := json.Marshal(config.Upstreams[0])
+			require.NoError(t, err)
+			var req types.UpdateUpstreamReq
+			require.NoError(t, json.Unmarshal(body, &req))
+			saved, err := service.UpdateUpstream(ctx, &req)
+			require.NoError(t, err)
+			require.Equal(t, auth, saved.AuthHeader)
+		})
+	}
 }

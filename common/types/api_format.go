@@ -21,6 +21,8 @@ const (
 	// ApiFormatSystemOne is the SystemOne (jev) API (/v1/systemone), served
 	// natively by the AIGateway SystemOne handler.
 	ApiFormatSystemOne ApiFormat = "systemone"
+	// ApiFormatDecisions is the OpenAI Decisions API (/v1/decisions).
+	ApiFormatDecisions ApiFormat = "decisions"
 )
 
 // AllApiFormats lists every known API format, including ones without routing
@@ -32,6 +34,7 @@ var AllApiFormats = []ApiFormat{
 	ApiFormatMessages,
 	ApiFormatGemini,
 	ApiFormatSystemOne,
+	ApiFormatDecisions,
 }
 
 // RoutableApiFormats lists the API formats the gateway can route natively or
@@ -42,6 +45,7 @@ var RoutableApiFormats = []ApiFormat{
 	ApiFormatResponses,
 	ApiFormatMessages,
 	ApiFormatSystemOne,
+	ApiFormatDecisions,
 }
 
 // Valid reports whether f is a known API format.
@@ -89,6 +93,7 @@ const (
 	PathSegMessages    = "messages"
 	PathSegAnthropic   = "anthropic"
 	PathSegSystemOne   = "systemone"
+	PathSegDecisions   = "decisions"
 )
 
 // standardPathSegments maps each routable format to the path segments
@@ -98,6 +103,7 @@ var standardPathSegments = map[ApiFormat][]string{
 	ApiFormatResponses: {PathSegV1, PathSegResponses},
 	ApiFormatMessages:  {PathSegV1, PathSegMessages},
 	ApiFormatSystemOne: {PathSegV1, PathSegSystemOne},
+	ApiFormatDecisions: {PathSegV1, PathSegDecisions},
 }
 
 // StandardPathSegments returns the path segments appended to a base URL for

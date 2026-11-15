@@ -101,10 +101,11 @@ func (s *agentSkillStoreImpl) ListForAgent(ctx context.Context, userUUID string,
 		Where("r.repository_type = ?", types.SkillRepo)
 
 	// Apply filters
+	query = applyAgentSkillCuration(query, username)
 	query = applyAgentSkillFilter(query, username, filter)
 
 	// Order: pinned first (by pin time desc), then by updated_at desc
-	query = query.OrderExpr("pin_pref.created_at DESC NULLS LAST, s.updated_at DESC")
+	query = orderAgentSkillCuration(query)
 
 	// Get total count
 	total, err := query.Count(ctx)

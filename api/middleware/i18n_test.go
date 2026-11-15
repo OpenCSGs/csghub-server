@@ -50,6 +50,24 @@ func TestModifyAcceptLanguageMiddleware(t *testing.T) {
 	})
 }
 
+func TestShouldSkipRelayRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		path string
+		want bool
+	}{
+		{"/api/v1/relay/v1/agents", true},
+		{"/api/v1/relay/v1/agents/agt_example/connect", true},
+		{"/api/v1/relay/v1/responses/resp_example", true},
+		{"/api/v1/agents", false},
+	} {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, tc.path, nil)
+		assert.Equal(t, tc.want, shouldSkip(c), tc.path)
+	}
+}
+
 func TestLocalizedErrorMiddleware(t *testing.T) {
 	// Set up test LocalizerMap
 	i18n.InitLocalizersFromEmbedFile()

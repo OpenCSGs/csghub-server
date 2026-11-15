@@ -5,9 +5,42 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestInvitationCreditScheduleConfig(t *testing.T) {
+	previousFile := configFile
+	SetConfigFile("")
+	t.Cleanup(func() { SetConfigFile(previousFile) })
+	const key = "STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION"
+	t.Setenv(key, "")
+	require.NoError(t, os.Unsetenv(key))
+	cfg, err := loadConfig()
+	require.NoError(t, err)
+	require.Equal(t, "0 0 * * *", cfg.CronJob.ReleaseInvitationCreditCronExpression)
+	t.Setenv(key, "30 2 * * *")
+	cfg, err = loadConfig()
+	require.NoError(t, err)
+	require.Equal(t, "30 2 * * *", cfg.CronJob.ReleaseInvitationCreditCronExpression)
+}
+
+func TestInvitationAwardEligibilityWindowConfig(t *testing.T) {
+	previousFile := configFile
+	SetConfigFile("")
+	t.Cleanup(func() { SetConfigFile(previousFile) })
+	const key = "OPENCSG_USER_SERVER_INVITATION_AWARD_ELIGIBILITY_WINDOW"
+	t.Setenv(key, "")
+	require.NoError(t, os.Unsetenv(key))
+	cfg, err := loadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 720*time.Hour, cfg.User.InvitationAwardEligibilityWindow)
+	t.Setenv(key, "168h")
+	cfg, err = loadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 168*time.Hour, cfg.User.InvitationAwardEligibilityWindow)
+}
 
 // TestConfigAlipayIdentityInitialization keeps initialization enabled unless explicitly disabled.
 func TestConfigAlipayIdentityInitialization(t *testing.T) {
@@ -235,4 +268,106 @@ func TestRouterGenerationDefaultsAndOverrides(t *testing.T) {
 	require.False(t, cfg.AIGateway.SemanticRouter.GenerationEnabled)
 	require.Equal(t, "stg", cfg.AIGateway.SemanticRouter.CacheEnvironment)
 	require.Equal(t, "isolated", cfg.AIGateway.SemanticRouter.CacheNamespace)
+}
+
+// TestAPIKeyLimitConfiguration verifies defaults, environment overrides, and zero/negative handling.
+func TestAPIKeyLimitConfiguration(t *testing.T) {
+	previous := configFile
+	t.Cleanup(func() { SetConfigFile(previous) })
+	SetConfigFile("")
+	for _, key := range []string{"OPENCSG_USER_SERVER_PERSONAL_API_KEY_LIMIT", "OPENCSG_USER_SERVER_ORGANIZATION_API_KEY_LIMIT"} {
+		t.Setenv(key, "")
+		require.NoError(t, os.Unsetenv(key))
+	}
+	cfg, err := loadConfig()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, cfg.User.PersonalAPIKeyLimit)
+	require.EqualValues(t, 10, cfg.User.OrganizationAPIKeyLimit)
+	t.Setenv("OPENCSG_USER_SERVER_PERSONAL_API_KEY_LIMIT", "0")
+	t.Setenv("OPENCSG_USER_SERVER_ORGANIZATION_API_KEY_LIMIT", "25")
+	cfg, err = loadConfig()
+	require.NoError(t, err)
+	require.Zero(t, cfg.User.PersonalAPIKeyLimit)
+	require.EqualValues(t, 25, cfg.User.OrganizationAPIKeyLimit)
+	t.Setenv("OPENCSG_USER_SERVER_PERSONAL_API_KEY_LIMIT", "-1")
+	_, err = loadConfig()
+	require.Error(t, err)
+}
+
+// TestConfig_loadConfig_UserRateLimit pins the two config-driven off
+// switches of the gateway-global per-user rate limit through the REAL
+// loader pipeline (defaults.SetDefaults -> TOML -> envconfig):
+//   - the dedicated enabled field (enabled = false), and
+//   - explicit per-dimension 0 values (0 = unlimited; both 0 = off).
+//
+// The reviewer's concern was that envconfig's DefaultOverwrite could reset
+// an explicitly configured 0 back to the 20 / 2,400,000 defaults. It does
+// not: the defaults come from the `default` struct tags applied by
+// defaults.SetDefaults BEFORE the TOML decode, and the TOML decoder assigns
+// explicit zero values over them.
+func TestConfig_loadConfig_UserRateLimit(t *testing.T) {
+	writeConfig := func(t *testing.T, body string) {
+		t.Helper()
+		dir := t.TempDir()
+		path := filepath.Join(dir, "config.toml")
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+		SetConfigFile(path)
+	}
+
+	cases := []struct {
+		name        string
+		toml        string
+		wantEnabled bool
+		wantRPM     int64
+		wantTPM     int64
+	}{
+		{
+			name:        "section absent -> defaults, global limit enabled",
+			toml:        "",
+			wantEnabled: true,
+			wantRPM:     20,
+			wantTPM:     2400000,
+		},
+		{
+			name:        "explicit zeros are preserved and disable both dimensions",
+			toml:        "[aigateway.user_rate_limit]\nmax_rpm = 0\nmax_tpm = 0\n",
+			wantEnabled: true, // the enabled flag itself stays default-true...
+			wantRPM:     0,    // ...but explicit zeros are NOT clobbered by the defaults
+			wantTPM:     0,
+		},
+		{
+			name:        "explicit values survive the loader",
+			toml:        "[aigateway.user_rate_limit]\nmax_rpm = 7\nmax_tpm = 123\n",
+			wantEnabled: true,
+			wantRPM:     7,
+			wantTPM:     123,
+		},
+		{
+			name:        "enabled = false survives the loader",
+			toml:        "[aigateway.user_rate_limit]\nenabled = false\nmax_rpm = 5\nmax_tpm = 1000\n",
+			wantEnabled: false,
+			wantRPM:     5,
+			wantTPM:     1000,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			writeConfig(t, tc.toml)
+			t.Cleanup(func() { SetConfigFile("") })
+			for _, key := range []string{
+				"OPENCSG_AIGATEWAY_USER_RATE_LIMIT_ENABLED",
+				"OPENCSG_AIGATEWAY_USER_RATE_LIMIT_MAX_RPM",
+				"OPENCSG_AIGATEWAY_USER_RATE_LIMIT_MAX_TPM",
+			} {
+				t.Setenv(key, "")
+				require.NoError(t, os.Unsetenv(key))
+			}
+
+			cfg, err := loadConfig()
+			require.NoError(t, err)
+			require.Equal(t, tc.wantEnabled, cfg.AIGateway.UserRateLimit.Enabled)
+			require.Equal(t, tc.wantRPM, cfg.AIGateway.UserRateLimit.MaxRPM)
+			require.Equal(t, tc.wantTPM, cfg.AIGateway.UserRateLimit.MaxTPM)
+		})
+	}
 }

@@ -494,6 +494,66 @@ func (_c *MockClient_DescribeTaskQueueEnhanced_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// DescribeWorkflow provides a mock function with given fields: ctx, workflowID, runID
+func (_m *MockClient) DescribeWorkflow(ctx context.Context, workflowID string, runID string) (*client.WorkflowExecutionDescription, error) {
+	ret := _m.Called(ctx, workflowID, runID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DescribeWorkflow")
+	}
+
+	var r0 *client.WorkflowExecutionDescription
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*client.WorkflowExecutionDescription, error)); ok {
+		return rf(ctx, workflowID, runID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *client.WorkflowExecutionDescription); ok {
+		r0 = rf(ctx, workflowID, runID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.WorkflowExecutionDescription)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, workflowID, runID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_DescribeWorkflow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DescribeWorkflow'
+type MockClient_DescribeWorkflow_Call struct {
+	*mock.Call
+}
+
+// DescribeWorkflow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - workflowID string
+//   - runID string
+func (_e *MockClient_Expecter) DescribeWorkflow(ctx interface{}, workflowID interface{}, runID interface{}) *MockClient_DescribeWorkflow_Call {
+	return &MockClient_DescribeWorkflow_Call{Call: _e.mock.On("DescribeWorkflow", ctx, workflowID, runID)}
+}
+
+func (_c *MockClient_DescribeWorkflow_Call) Run(run func(ctx context.Context, workflowID string, runID string)) *MockClient_DescribeWorkflow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockClient_DescribeWorkflow_Call) Return(_a0 *client.WorkflowExecutionDescription, _a1 error) *MockClient_DescribeWorkflow_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_DescribeWorkflow_Call) RunAndReturn(run func(context.Context, string, string) (*client.WorkflowExecutionDescription, error)) *MockClient_DescribeWorkflow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DescribeWorkflowExecution provides a mock function with given fields: ctx, workflowID, runID
 func (_m *MockClient) DescribeWorkflowExecution(ctx context.Context, workflowID string, runID string) (*workflowservice.DescribeWorkflowExecutionResponse, error) {
 	ret := _m.Called(ctx, workflowID, runID)

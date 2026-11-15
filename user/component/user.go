@@ -47,6 +47,8 @@ type userComponentImpl struct {
 	tokenc     AccessTokenComponent
 	userPhonec UserPhoneComponent
 
+	classifySSOSigninError func(context.Context, *rpc.SSOUserInfo, error) error
+
 	// casc      *casdoorsdk.Client
 	// casConfig *casdoorsdk.AuthConfig
 	sso    rpc.SSOInterface
@@ -137,7 +139,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 		return nil, err
 	}
 
-	c := &userComponentImpl{}
+	c := &userComponentImpl{classifySSOSigninError: newSSOSigninErrorClassifier(database.GetDB())}
 	c.rebac, err = rebacfactory.NewAuthorizer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ReBAC authorizer: %w", err)
@@ -1061,10 +1063,21 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 
 	dbu, err := c.ensureLocalUserFromSSO(ctx, cu)
 	if err != nil {
-		return nil, "", err
+		return nil, "", c.signinError(ctx, cu, err)
 	}
 
-	return c.generateLocalJWT(ctx, dbu)
+	claims, signed, err := c.generateLocalJWT(ctx, dbu)
+	if err != nil {
+		return nil, "", c.signinError(ctx, cu, err)
+	}
+	return claims, signed, nil
+}
+
+func (c *userComponentImpl) signinError(ctx context.Context, user *rpc.SSOUserInfo, err error) error {
+	if c.classifySSOSigninError != nil {
+		return c.classifySSOSigninError(ctx, user, err)
+	}
+	return err
 }
 
 // BuildSigninRedirect starts the backend-initiated SSO sign-in flow and

@@ -257,10 +257,19 @@ func (s *agentInstanceSessionStoreImpl) Delete(ctx context.Context, id int64) er
 
 // List retrieves all AgentInstanceSessions with pagination
 func (s *agentInstanceSessionStoreImpl) List(ctx context.Context, userUUID string, filter types.AgentInstanceSessionFilter, per int, page int) ([]AgentInstanceSession, int, error) {
+	if filter.IncludeInstanceID != nil && userUUID == "" {
+		return nil, 0, errorx.ErrForbidden
+	}
 	var sessions []AgentInstanceSession
 	query := s.db.Core.NewSelect().Model(&sessions)
 	if filter.InstanceID != nil {
-		query = query.Where("instance_id = ?", *filter.InstanceID)
+		if filter.IncludeInstanceID != nil {
+			query = query.Where("instance_id IN (?, ?)", *filter.InstanceID, *filter.IncludeInstanceID)
+		} else {
+			query = query.Where("instance_id = ?", *filter.InstanceID)
+		}
+	} else if filter.IncludeInstanceID != nil {
+		return nil, 0, errorx.BadRequest(fmt.Errorf("primary instance ID is required"), nil)
 	}
 
 	if userUUID != "" {
@@ -284,7 +293,7 @@ func (s *agentInstanceSessionStoreImpl) List(ctx context.Context, userUUID strin
 	}
 
 	// Apply pagination and scan
-	err = query.Order("updated_at DESC").Limit(per).Offset((page-1)*per).Scan(ctx, &sessions)
+	err = query.Order("updated_at DESC", "id DESC").Limit(per).Offset((page-1)*per).Scan(ctx, &sessions)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, 0, errorx.HandleDBError(err, map[string]any{
 			"instance_id": filter.InstanceID,

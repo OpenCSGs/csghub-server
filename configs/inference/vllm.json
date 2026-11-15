@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/vllm:v0.31.0",
+      "image": "opencsghq/vllm:v0.32.0",
       "driver_version": "13.0",
-      "engine_version": "v0.31.0",
+      "engine_version": "v0.32.0",
       "extra_archs": [
         "AXK1ForCausalLM",
         "ApertusForCausalLM",
@@ -86,6 +86,7 @@
         "Lfm2MoeForCausalLM",
         "Lfm2VlForConditionalGeneration",
         "LightOnOCRForConditionalGeneration",
+        "Llama4ForCausalLM",
         "Llama4ForConditionalGeneration",
         "Llama_Nemotron_Nano_VL",
         "LlavaForConditionalGeneration",
@@ -201,6 +202,7 @@
         "XLMRobertaForSequenceClassification",
         "Qwen3TTSForConditionalGeneration",
         "FishSpeechSlowARForConditionalGeneration",
+        "FishOmniModel",
         "VoxtralTTSForConditionalGeneration",
         "CosyVoice3Model",
         "OmniVoiceModel",
@@ -218,13 +220,18 @@
         "K2HorizonForCausalLM",
         "NanbeigeForCausalLM",
         "NemotronH_Omni_Reasoning_V3",
-        "Qwen4ExpForCausalLM"
+        "Qwen4ExpForCausalLM",
+        "AfmoeForCausalLM",
+        "CwmForCausalLM"
       ],
       "extra_engine_args": [
         {
           "name": "async-scheduling",
           "value": "enable",
-          "format": "--async-scheduling"
+          "format": "--async-scheduling",
+          "conflicts_with": [
+            "spec-decode-method"
+          ]
         },
         {
           "name": "spec-decode-method",
@@ -361,6 +368,7 @@
         "Lfm2MoeForCausalLM",
         "Lfm2VlForConditionalGeneration",
         "LightOnOCRForConditionalGeneration",
+        "Llama4ForCausalLM",
         "Llama4ForConditionalGeneration",
         "Llama_Nemotron_Nano_VL",
         "LlavaForConditionalGeneration",
@@ -498,7 +506,9 @@
         "Grok1ModelForCausalLM",
         "MPTForCausalLM",
         "PersimmonForCausalLM",
-        "Plamo2ForCausalLM"
+        "Plamo2ForCausalLM",
+        "AfmoeForCausalLM",
+        "CwmForCausalLM"
       ]
     },
     {
@@ -509,7 +519,6 @@
       "extra_archs": [
         "Ernie4_5_ForCausalLM",
         "Ernie4_5_MoeForCausalLM",
-        "HunYuanDenseV1ForCausalLM",
         "HunYuanMoEV1ForCausalLM",
         "MiMoForCausalLM",
         "AquilaForCausalLM",
@@ -599,7 +608,14 @@
         "Grok1ModelForCausalLM",
         "MPTForCausalLM",
         "PersimmonForCausalLM",
-        "Plamo2ForCausalLM"
+        "Plamo2ForCausalLM",
+        "AfmoeForCausalLM",
+        "CwmForCausalLM",
+        "DeepseekV4ForCausalLM",
+        "Rnj1ForCausalLM",
+        "HYV3ForCausalLM",
+        "Ministral3ForCausalLM",
+        "Llama4ForCausalLM"
       ],
       "extra_engine_args": [
         {
@@ -678,7 +694,7 @@
     },
     {
       "name": "enable-prompt-tokens-details",
-      "value": "disable",
+      "value": "enable",
       "format": "--enable-prompt-tokens-details"
     },
     {
@@ -716,13 +732,11 @@
     }
   ],
   "supported_archs": [
-    "AfmoeForCausalLM",
     "BloomForCausalLM",
     "ChatGLMModel",
     "ChatGLMForConditionalGeneration",
     "CohereForCausalLM",
     "Cohere2ForCausalLM",
-    "CwmForCausalLM",
     "DbrxForCausalLM",
     "DeciLMForCausalLM",
     "DeepseekForCausalLM",
@@ -747,7 +761,6 @@
     "InternLM3ForCausalLM",
     "JambaForCausalLM",
     "LlamaForCausalLM",
-    "Llama4ForCausalLM",
     "MambaForCausalLM",
     "MiniCPMForCausalLM",
     "MiniCPM3ForCausalLM",
@@ -771,11 +784,7 @@
     "SolarForCausalLM",
     "TeleChat2ForCausalLM",
     "TeleFLMForCausalLM",
-    "Zamba2ForCausalLM",
-    "DeepseekV4ForCausalLM",
-    "Rnj1ForCausalLM",
-    "HYV3ForCausalLM",
-    "Ministral3ForCausalLM"
+    "Zamba2ForCausalLM"
   ],
   "tool_call_parsers": {
     "DeepseekV3ForCausalLM": "deepseek_v3",

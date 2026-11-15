@@ -489,8 +489,8 @@ func (h *adminAccountUserHandler) List(ctx *gin.Context) { h.list(ctx) }
 // @Param verify_status query string false "Verification status"
 // @Param labels query []string false "User labels"
 // @Param exact_match query bool false "Match the search text exactly"
-// @Param sort_by query string false "Sort field"
-// @Param sort_order query string false "Sort direction"
+// @Param sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Success 200 {object} types.Response{}
 // @Failure 400 {object} types.APIBadRequest
 // @Failure 401 {object} types.APIUnauthorized

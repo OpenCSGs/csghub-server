@@ -57,8 +57,8 @@ func TestResolveResponsesRoutingCSGHubHostedVLLMNative(t *testing.T) {
 	}{
 		{name: "default vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.24.0"},
 		{name: "amd vllm image", runtimeFramework: "amd-vllm", imageID: "opencsghq/amd-vllm:rocm7.2.1_vllm_0.24.0"},
-		{name: "upgraded vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.31.0"},
-		{name: "upgraded amd vllm image", runtimeFramework: "amd-vllm", imageID: "opencsghq/amd-vllm:rocm7.2.3_vllm_0.31.0"},
+		{name: "upgraded vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.32.0"},
+		{name: "upgraded amd vllm image", runtimeFramework: "amd-vllm", imageID: "opencsghq/amd-vllm:rocm7.2.3_vllm_0.32.0"},
 		{name: "future vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.25.1"},
 		{name: "future upstream major vllm image", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v1.0.0"},
 		{name: "multiple version tokens", runtimeFramework: "vllm", imageID: "opencsghq/vllm:v0.8.5_vllm_0.24.0"},

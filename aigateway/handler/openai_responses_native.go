@@ -45,7 +45,7 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 		slog.WarnContext(c.Request.Context(), "invalid auth header", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 	observation := component.ObserveRouteCall(c.Request.Context(), types.RouteCallTarget{Model: modelTarget.Model.ID, UpstreamID: modelTarget.Upstream.ID, Protocol: "responses"}, body)
-	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding(), proxy.WithResponseModifier(observation.Modify))
+	rp, err := newArchiveProxy(backendURL, proxy.WithoutAcceptEncoding(), proxy.WithResponseModifier(observation.Modify))
 	if err != nil {
 		observation.Finish(err)
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)

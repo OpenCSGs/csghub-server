@@ -52,7 +52,6 @@ func (uv *UserVerifyComponentImpl) Create(ctx context.Context, req *types.UserVe
 	}
 	userVerify, err := uv.userVerifyStore.CreateUserVerify(ctx, &database.UserVerify{
 		UUID:        userUUID,
-		RealName:    req.RealName,
 		Username:    req.Username,
 		IDCardFront: req.IDCardFront,
 		IDCardBack:  req.IDCardBack,
@@ -92,7 +91,7 @@ func (uv *UserVerifyComponentImpl) afterVerificationCompleted(status types.Verif
 	}()
 }
 
-// Get applies edition-specific ownership checks before reading and enriching verification data.
+// Get applies edition-specific ownership checks before reading verification status and manual material.
 func (uv *UserVerifyComponentImpl) Get(ctx context.Context, uuid string) (*database.UserVerify, error) {
 	if err := uv.authorizeVerificationQuery(ctx, uuid); err != nil {
 		return nil, err
@@ -100,9 +99,6 @@ func (uv *UserVerifyComponentImpl) Get(ctx context.Context, uuid string) (*datab
 	userVerify, err := uv.userVerifyStore.GetUserVerify(ctx, uuid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user verify, error: %w", err)
-	}
-	if err := uv.enrichVerification(userVerify); err != nil {
-		return nil, err
 	}
 	return userVerify, nil
 }

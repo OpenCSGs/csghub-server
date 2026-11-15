@@ -40,10 +40,13 @@ type LLMConfig struct {
 	Repo               *Repository `bun:"rel:belongs-to,join:repo_id=id" json:"repo,omitempty"`
 	// ModelSizeB is the parameter size of the model in billions. 0 means unknown.
 	ModelSizeB float64 `bun:"model_size_b,notnull,default:0" json:"model_size_b"`
-	// AccessPolicy controls who can view and call the model: "public" allows
+	// AccessPolicy controls who can view and call this model: "public" allows
 	// every authenticated caller, "whitelist" restricts access to the explicit
 	// grants stored in llm_config_model_grants.
 	AccessPolicy string `bun:"access_policy,notnull,default:'public'" json:"access_policy"`
+	// RateLimit caps per-user RPM/TPM for this model; nil means the
+	// gateway-global rate limit policy applies.
+	RateLimit *types.UserRateLimitPolicy `bun:",type:jsonb,nullzero" json:"rate_limit"`
 	// IsPinned is a query-side flag for the gateway model listing: it reports
 	// whether the caller pinned this model, computed by ListGatewayModels on
 	// the same statement as the pinned-first ordering. Never persisted.
@@ -191,27 +194,39 @@ func ResolveLLMTasks(ctx context.Context, store LLMConfigStore, llmConfigID int6
 	return cfg.Tasks()
 }
 
+// GetOptimization explicitly restores loaded upstream credentials after database reads.
 func (s *lLMConfigStoreImpl) GetOptimization(ctx context.Context) (*LLMConfig, error) {
 	var config LLMConfig
 	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Relation("Upstreams.HealthState").Where("(type & ?) > 0 and enabled = true", LLMTypeOptimization).Limit(1).Scan(ctx)
+	if err == nil {
+		err = config.decryptUpstreamCredentials()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("select optimization llm, %w", err)
 	}
 	return &config, nil
 }
 
+// GetModelForSummaryReadme explicitly restores loaded upstream credentials after database reads.
 func (s *lLMConfigStoreImpl) GetModelForSummaryReadme(ctx context.Context) (*LLMConfig, error) {
 	var config LLMConfig
 	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Relation("Upstreams.HealthState").Where("(type & ?) > 0 and enabled = true", LLMTypeSummaryReadme).Limit(1).Scan(ctx)
+	if err == nil {
+		err = config.decryptUpstreamCredentials()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("select llm for summary readme, %w", err)
 	}
 	return &config, nil
 }
 
+// GetByType explicitly restores loaded upstream credentials after database reads.
 func (s *lLMConfigStoreImpl) GetByType(ctx context.Context, llmType int) (*LLMConfig, error) {
 	var config LLMConfig
 	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Relation("Upstreams.HealthState").Where("(type & ?) > 0 and enabled = true", llmType).Limit(1).Scan(ctx)
+	if err == nil {
+		err = config.decryptUpstreamCredentials()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("select llm by type %d, %w", llmType, err)
 	}
@@ -244,6 +259,8 @@ func (s *lLMConfigStoreImpl) Delete(ctx context.Context, id int64) error {
 	}
 	return nil
 }
+
+// Index explicitly restores loaded upstream credentials after database reads.
 func (s *lLMConfigStoreImpl) Index(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*LLMConfig, int, error) {
 	var configs []*LLMConfig
 	offset := (page - 1) * per
@@ -251,6 +268,9 @@ func (s *lLMConfigStoreImpl) Index(ctx context.Context, per, page int, search *t
 	query := s.db.Operator.Core.NewSelect().Model(&configs).Relation("Upstreams.HealthState").Relation("Upstreams.CircuitState").Limit(per).Offset(offset)
 	buildSearchLLMConfigQuery(search, query)
 	err := query.Scan(ctx)
+	if err == nil {
+		err = decryptLLMUpstreams(configs)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("select batch llm config with search, %w", err)
 	}
@@ -261,6 +281,7 @@ func (s *lLMConfigStoreImpl) Index(ctx context.Context, per, page int, search *t
 	return configs, total, nil
 }
 
+// IndexWithRepo explicitly restores loaded upstream credentials after database reads.
 func (s *lLMConfigStoreImpl) IndexWithRepo(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*LLMConfig, int, error) {
 	var configs []*LLMConfig
 	offset := (page - 1) * per
@@ -268,6 +289,9 @@ func (s *lLMConfigStoreImpl) IndexWithRepo(ctx context.Context, per, page int, s
 	query := s.db.Operator.Core.NewSelect().Model(&configs).Relation("Repo").Relation("Upstreams.HealthState").Relation("Upstreams.CircuitState").Limit(per).Offset(offset)
 	buildSearchLLMConfigQuery(search, query)
 	err := query.Scan(ctx)
+	if err == nil {
+		err = decryptLLMUpstreams(configs)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("select batch llm config with repo, %w", err)
 	}
@@ -292,6 +316,7 @@ type gatewayModelListRow struct {
 	IsPinned bool `bun:"is_pinned"`
 }
 
+// ListGatewayModels explicitly restores loaded upstream credentials after database reads.
 func (s *lLMConfigStoreImpl) ListGatewayModels(ctx context.Context, limit, offset int, q *types.GatewayModelListQuery) ([]*LLMConfig, int, error) {
 	// The catalogue view (see its migration for the full derivation:
 	// classification, tasks, availability, priced) carries every
@@ -346,6 +371,9 @@ func (s *lLMConfigStoreImpl) ListGatewayModels(ctx context.Context, limit, offse
 	}
 	configs := make([]*LLMConfig, 0, len(rows))
 	for i := range rows {
+		if err := rows[i].LLMConfig.decryptUpstreamCredentials(); err != nil {
+			return nil, 0, err
+		}
 		// The pinned flag rides on the list statement when the pinned join is
 		// present (see gatewayModelListRow); never persisted.
 		rows[i].LLMConfig.IsPinned = rows[i].IsPinned
@@ -396,6 +424,7 @@ func (s *lLMConfigStoreImpl) loadGatewayPageRepos(ctx context.Context, configs [
 	return nil
 }
 
+// GetByModelName explicitly restores loaded upstream credentials after database reads.
 func (s *lLMConfigStoreImpl) GetByModelName(ctx context.Context, modelName string) (*LLMConfig, error) {
 	var config LLMConfig
 	err := s.db.Operator.Core.NewSelect().Model(&config).
@@ -405,6 +434,9 @@ func (s *lLMConfigStoreImpl) GetByModelName(ctx context.Context, modelName strin
 		Where("model_name = ?", modelName).
 		Limit(1).
 		Scan(ctx)
+	if err == nil {
+		err = config.decryptUpstreamCredentials()
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -433,6 +465,9 @@ func (s *lLMConfigStoreImpl) GetByModelNameForCaller(ctx context.Context, modelN
 		query = query.Where(predicate)
 	}
 	err := query.Limit(1).Scan(ctx)
+	if err == nil {
+		err = config.decryptUpstreamCredentials()
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -459,6 +494,9 @@ func (s *lLMConfigStoreImpl) IndexWithRepoForCaller(ctx context.Context, per, pa
 		query = query.Where(predicate)
 	}
 	err := query.Scan(ctx)
+	if err == nil {
+		err = decryptLLMUpstreams(configs)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("select batch llm config with repo for caller, %w", err)
 	}
@@ -487,9 +525,13 @@ func (s *lLMConfigStoreImpl) GetByRepoPath(ctx context.Context, repoPath string)
 	return &config, nil
 }
 
+// GetByID explicitly restores loaded upstream credentials after database reads.
 func (s *lLMConfigStoreImpl) GetByID(ctx context.Context, id int64) (*LLMConfig, error) {
 	var config LLMConfig
 	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Relation("Upstreams.HealthState").Relation("Upstreams.CircuitState").Where("id = ?", id).Limit(1).Scan(ctx)
+	if err == nil {
+		err = config.decryptUpstreamCredentials()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("select llm config by id %d, %w", id, err)
 	}
@@ -519,6 +561,21 @@ func buildSearchLLMConfigQuery(
 	// Filter by Enabled if provided
 	if search.Enabled != nil {
 		q.Where("llm_config.enabled = ?", *search.Enabled)
+	}
+	// Filter by upstream source, mirroring the portal's source column: a
+	// blank upstream source counts as external, a config is csghub only when
+	// it has upstreams and every one of them is a CSGHub deploy, and
+	// mixed-source configs match neither value.
+	switch search.Source {
+	case string(types.UpstreamSourceCSGHubDeploy):
+		q.Where(
+			"EXISTS (SELECT 1 FROM ai_gateway_upstreams u WHERE u.llm_config_id = llm_config.id AND COALESCE(NULLIF(u.source, ''), 'external') = ?) "+
+				"AND NOT EXISTS (SELECT 1 FROM ai_gateway_upstreams u WHERE u.llm_config_id = llm_config.id AND COALESCE(NULLIF(u.source, ''), 'external') <> ?)",
+			types.UpstreamSourceCSGHubDeploy, types.UpstreamSourceCSGHubDeploy)
+	case string(types.UpstreamSourceExternal):
+		q.Where(
+			"NOT EXISTS (SELECT 1 FROM ai_gateway_upstreams u WHERE u.llm_config_id = llm_config.id AND COALESCE(NULLIF(u.source, ''), 'external') = ?)",
+			types.UpstreamSourceCSGHubDeploy)
 	}
 	applyLLMConfigSort(q, search.SortBy, search.SortOrder, search.AvailableFirst)
 }
@@ -939,4 +996,24 @@ func (c *LLMConfig) PrimaryOfficialName() string {
 		}
 	}
 	return c.ModelName
+}
+
+// decryptUpstreamCredentials restores only upstreams explicitly loaded by the query.
+func (t *LLMConfig) decryptUpstreamCredentials() error {
+	for i := range t.Upstreams {
+		if err := t.Upstreams[i].decryptCredentials(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// decryptLLMUpstreams restores credentials in the rows loaded by an explicit store query.
+func decryptLLMUpstreams(rows []*LLMConfig) error {
+	for i := range rows {
+		if err := rows[i].decryptUpstreamCredentials(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

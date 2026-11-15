@@ -24,7 +24,10 @@ func TestAgentCustomUIProxyComponent_Resolve(t *testing.T) {
 	agent := &database.AgentInstance{
 		ID: 12, Type: "csgclaw", ContentID: "agent-host", Public: true, Kind: string(types.AgentInstanceKindLogical),
 		Metadata: map[string]any{
-			"provision_request": map[string]any{"custom_ui_space_id": float64(7)},
+			"provision_request": map[string]any{
+				"custom_ui_space_id": float64(7),
+				"guest_usage_limit":  map[string]any{"mode": "limited", "max_count": float64(0)},
+			},
 			"template_metadata": map[string]any{"agent_file": map[string]any{"name": "agent-name"}},
 		},
 	}
@@ -36,8 +39,10 @@ func TestAgentCustomUIProxyComponent_Resolve(t *testing.T) {
 	info, matched, err := comp.Resolve(ctx, "agent-host")
 	require.NoError(t, err)
 	require.True(t, matched)
+	guestMaxCount := int64(0)
 	require.Equal(t, &types.AgentCustomUIProxyInfo{
-		AgentContentID: "agent-host", AgentName: "agent-name", ShareName: "s-a-12", Kind: types.AgentInstanceKindLogical, SpaceID: 7,
+		AgentContentID: "agent-host", AgentName: "agent-name", ShareName: "s-a-12", Kind: types.AgentInstanceKindLogical,
+		GuestUsageMaxCount: &guestMaxCount, SpaceID: 7,
 		SpaceSvcName: "ui-svc", SpaceEndpoint: "https://ui.example", SpaceClusterID: "cluster-1", Available: true,
 	}, info)
 }

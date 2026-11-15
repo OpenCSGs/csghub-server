@@ -167,14 +167,16 @@ type Config struct {
 	}
 
 	Mirror struct {
-		URL              string `env:"STARHUB_SERVER_MIRROR_URL" default:"http://localhost:8085"`
-		Token            string `env:"STARHUB_SERVER_MIRROR_Token" default:""`
-		Port             int    `env:"STARHUB_SERVER_MIRROR_PORT" default:"8085"`
-		SessionSecretKey string `env:"STARHUB_SERVER_MIRROR_SESSION_SECRET_KEY" default:"mirror"`
-		ProxyURL         string `env:"STARHUB_SERVER_MIRROR_PROXY_URL" default:""`
-		WorkerNumber     int    `env:"STARHUB_SERVER_MIRROR_WORKER_NUMBER" default:"5"`
-		PartSize         int    `env:"STARHUB_SERVER_MIRROR_PART_SIZE" default:"100"`
-		LfsConcurrency   int    `env:"STARHUB_SERVER_MIRROR_LFS_CONCURRENCY" default:"5"`
+		// TrustedDomains bypasses mirror destination IP checks for exact administrator-approved DNS names.
+		TrustedDomains   []string `env:"STARHUB_SERVER_MIRROR_TRUSTED_DOMAINS" default:"[api.github.com,github.com,huggingface.co]"`
+		URL              string   `env:"STARHUB_SERVER_MIRROR_URL" default:"http://localhost:8085"`
+		Token            string   `env:"STARHUB_SERVER_MIRROR_Token" default:""`
+		Port             int      `env:"STARHUB_SERVER_MIRROR_PORT" default:"8085"`
+		SessionSecretKey string   `env:"STARHUB_SERVER_MIRROR_SESSION_SECRET_KEY" default:"mirror"`
+		ProxyURL         string   `env:"STARHUB_SERVER_MIRROR_PROXY_URL" default:""`
+		WorkerNumber     int      `env:"STARHUB_SERVER_MIRROR_WORKER_NUMBER" default:"5"`
+		PartSize         int      `env:"STARHUB_SERVER_MIRROR_PART_SIZE" default:"100"`
+		LfsConcurrency   int      `env:"STARHUB_SERVER_MIRROR_LFS_CONCURRENCY" default:"5"`
 		// The token number to add to bucket each second
 		RateLimit float64 `env:"STARHUB_SERVER_MIRROR_RATE_LIMIT" default:"0.2"`
 		// The capacity of token bucket
@@ -233,7 +235,8 @@ type Config struct {
 	}
 
 	Frontend struct {
-		URL string `env:"STARHUB_SERVER_FRONTEND_URL"`
+		URL             string `env:"STARHUB_SERVER_FRONTEND_URL"`
+		AccountPurgeKey string `env:"CSGHUB_PORTAL_ACCOUNT_PURGE_KEY"`
 	}
 
 	S3 struct {
@@ -529,6 +532,10 @@ type Config struct {
 	}
 
 	User struct {
+		// PersonalAPIKeyLimit caps custom gateway keys per personal namespace in EE/SaaS; zero forbids creation.
+		PersonalAPIKeyLimit uint `env:"OPENCSG_USER_SERVER_PERSONAL_API_KEY_LIMIT" default:"3"`
+		// OrganizationAPIKeyLimit caps custom gateway keys per organization namespace in EE/SaaS; zero forbids creation.
+		OrganizationAPIKeyLimit uint `env:"OPENCSG_USER_SERVER_ORGANIZATION_API_KEY_LIMIT" default:"10"`
 		// EnableAlipayIdentity initializes the SaaS identity client; disable only to develop without Alipay credentials.
 		EnableAlipayIdentity           bool   `env:"OPENCSG_USER_SERVER_ENABLE_ALIPAY_IDENTITY" default:"true"`
 		Host                           string `env:"OPENCSG_USER_SERVER_HOST" default:"http://localhost"`
@@ -545,6 +552,10 @@ type Config struct {
 		// NamespaceLookupMaxUUIDs limits the number of namespace UUIDs accepted by
 		// the batch namespace lookup endpoint.
 		NamespaceLookupMaxUUIDs int `env:"OPENCSG_USER_SERVER_NAMESPACE_LOOKUP_MAX_UUIDS" default:"100"`
+		// InvitationAwardEligibilityWindow is how long after registration the
+		// invitation eligibility checks may complete before the award is
+		// canceled for both inviter and invitee.
+		InvitationAwardEligibilityWindow time.Duration `env:"OPENCSG_USER_SERVER_INVITATION_AWARD_ELIGIBILITY_WINDOW" default:"720h"`
 	}
 
 	Credential struct {
@@ -607,6 +618,11 @@ type Config struct {
 	LLMWiki struct {
 		Host string `env:"OPENCSG_LLMWIKI_SERVER_HOST" default:"http://127.0.0.1"`
 		Port int    `env:"OPENCSG_LLMWIKI_SERVER_PORT" default:"8100"`
+	}
+
+	CSGRelay struct {
+		Host string `env:"OPENCSG_CSGRELAY_SERVER_HOST" default:"http://127.0.0.1"`
+		Port int    `env:"OPENCSG_CSGRELAY_SERVER_PORT" default:"28080"`
 	}
 
 	Moderation struct {
@@ -684,7 +700,7 @@ type Config struct {
 		IncreaseMultisyncRepoLimitCronExpression string `env:"STARHUB_SERVER_CRON_JOB_INCREASE_MULTISYNC_REPO_LIMIT_CRON_EXPRESSION" default:"0 0 * * *"`
 		MigrateRepoPathCronExpression            string `env:"STARHUB_SERVER_CRON_JOB_MIGRATE_REPO_PATH_CRON_EXPRESSION" default:"* 16-20 * * *"`
 		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
-		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
+		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 * * *"`
 		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/10 * * * *"`
 		AIGatewayAsyncGenerationCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_ASYNC_GENERATION_CRON_EXPRESSION" default:"*/1 * * * *"`
 		AIGatewayMetricsCollectorCronExpression  string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_METRICS_COLLECTOR_CRON_EXPRESSION" default:"* * * * *"` // every minute
@@ -719,16 +735,16 @@ type Config struct {
 		BalanceThreshold                      int    `env:"OPENCSG_AGENT_BALANCE_THRESHOLD" default:"0"`
 		BalanceCheckCacheTTL                  int    `env:"OPENCSG_AGENT_BALANCE_CHECK_CACHE_TTL" default:"86400"`
 		OrchestratorReadinessTimeoutSeconds   int    `env:"OPENCSG_AGENT_ORCHESTRATOR_READINESS_TIMEOUT_SECONDS" default:"1800"`
-		OrchestratorGatewayWaitTimeoutSeconds int    `env:"OPENCSG_AGENT_ORCHESTRATOR_GATEWAY_WAIT_TIMEOUT_SECONDS" default:"30"`
+		OrchestratorGatewayWaitTimeoutSeconds int    `env:"OPENCSG_AGENT_ORCHESTRATOR_GATEWAY_WAIT_TIMEOUT_SECONDS" default:"120"`
 		// OrchestratorMaxConcurrentExecutionsPerAllocation caps concurrent
 		// executions across sessions on one actor runtime. Temporary static
 		// value until load-aware admission is available.
-		OrchestratorMaxConcurrentExecutionsPerAllocation int `env:"OPENCSG_AGENT_ORCHESTRATOR_MAX_CONCURRENT_EXECUTIONS_PER_ALLOCATION" default:"4"`
+		OrchestratorMaxConcurrentExecutionsPerAllocation int `env:"OPENCSG_AGENT_ORCHESTRATOR_MAX_CONCURRENT_EXECUTIONS_PER_ALLOCATION" default:"32"`
 		OrchestratorExecutionReservedTimeoutSeconds      int `env:"OPENCSG_AGENT_ORCHESTRATOR_EXECUTION_RESERVED_TIMEOUT_SECONDS" default:"60"`
 		OrchestratorExecutionHeartbeatIntervalSeconds    int `env:"OPENCSG_AGENT_ORCHESTRATOR_EXECUTION_HEARTBEAT_INTERVAL_SECONDS" default:"30"`
 		OrchestratorExecutionHeartbeatTimeoutSeconds     int `env:"OPENCSG_AGENT_ORCHESTRATOR_EXECUTION_HEARTBEAT_TIMEOUT_SECONDS" default:"90"`
 		OrchestratorExecutionUnknownCapacityHoldSeconds  int `env:"OPENCSG_AGENT_ORCHESTRATOR_EXECUTION_UNKNOWN_CAPACITY_HOLD_SECONDS" default:"3600"`
-		OrchestratorResumeWaitTimeoutSeconds             int `env:"OPENCSG_AGENT_ORCHESTRATOR_RESUME_WAIT_TIMEOUT_SECONDS" default:"60"`
+		OrchestratorResumeWaitTimeoutSeconds             int `env:"OPENCSG_AGENT_ORCHESTRATOR_RESUME_WAIT_TIMEOUT_SECONDS" default:"120"`
 		// UseLatestImage replaces the csgclaw runtime profile image tag with :latest;
 		// Kubernetes then defaults the sandbox container's imagePullPolicy to Always.
 		// Intended for staging environments where images are updated frequently;
@@ -879,6 +895,25 @@ type Config struct {
 			// final failure renders as model_unavailable (503).
 			QueueMaxRePlans int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_QUEUE_MAX_REPLANS" default:"1"`
 		}
+		// UserRateLimit is the gateway-global per-user rate limit (RPM/TPM
+		// over a fixed 60-second window, shared across gateway replicas via
+		// Redis). It applies to every aigateway inference request of a user
+		// whose model does not carry its own enabled UserRateLimitPolicy at
+		// the LLM config level, so hot models can raise their own limits
+		// above this default. Global limiting is ENABLED by default; switch
+		// it off with the dedicated enabled field (enabled = false in the
+		// config file, or OPENCSG_AIGATEWAY_USER_RATE_LIMIT_ENABLED=false).
+		// A value of 0 keeps "unlimited" for that dimension; both values at
+		// 0 also disable global per-user limiting. EE/SaaS only: the
+		// enforcement is edition-gated.
+		UserRateLimit struct {
+			// Enabled switches the gateway-global per-user limit on/off.
+			// Defaults to true; set to false to disable global limiting
+			// entirely (model-level policies still enforce independently).
+			Enabled bool  `env:"OPENCSG_AIGATEWAY_USER_RATE_LIMIT_ENABLED" default:"true"`
+			MaxRPM  int64 `env:"OPENCSG_AIGATEWAY_USER_RATE_LIMIT_MAX_RPM" default:"20"`
+			MaxTPM  int64 `env:"OPENCSG_AIGATEWAY_USER_RATE_LIMIT_MAX_TPM" default:"2400000"`
+		}
 		// PIICheckEnabled turns on sensitive-content detection (PII, credentials)
 		// on request prompts. Detection may rewrite what reaches the upstream
 		// (mask/skip today, block later), so it only ever runs when the
@@ -950,6 +985,20 @@ type Config struct {
 			// DBSinkFlushBatchSize.
 			DBSinkFlushIntervalSeconds int `env:"OPENCSG_AIGATEWAY_METRICS_DBSINK_FLUSH_INTERVAL_SECONDS" default:"5"`
 		}
+	}
+
+	// HTTPArchive records upstream exchanges independently of protocol-specific chat logs.
+	// All limits protect serving traffic; exhaustion is reported as incomplete capture.
+	HTTPArchive struct {
+		Enable                bool   `env:"OPENCSG_HTTP_ARCHIVE_ENABLE" default:"true"`
+		Directory             string `env:"OPENCSG_HTTP_ARCHIVE_DIRECTORY" default:"/data/http-archive"`
+		QueueChunks           int    `env:"OPENCSG_HTTP_ARCHIVE_QUEUE_CHUNKS" default:"256"`
+		MaxActive             int    `env:"OPENCSG_HTTP_ARCHIVE_MAX_ACTIVE" default:"128"`
+		MaxSpoolBytes         int64  `env:"OPENCSG_HTTP_ARCHIVE_MAX_SPOOL_BYTES" default:"268435456"`
+		SpoolBytesPerSecond   int64  `env:"OPENCSG_HTTP_ARCHIVE_SPOOL_BYTES_PER_SECOND" default:"8388608"`
+		PublishBytesPerSecond int64  `env:"OPENCSG_HTTP_ARCHIVE_PUBLISH_BYTES_PER_SECOND" default:"1048576"`
+		StorageBytesPerSecond int64  `env:"OPENCSG_HTTP_ARCHIVE_STORAGE_BYTES_PER_SECOND" default:"4194304"`
+		RedactHeaders         string `env:"OPENCSG_HTTP_ARCHIVE_REDACT_HEADERS" default:""`
 	}
 
 	LLMLog struct {

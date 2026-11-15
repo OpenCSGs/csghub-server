@@ -623,7 +623,6 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		User: &types.User{
 			Username: model.Repository.User.Username,
 			Nickname: model.Repository.User.NickName,
-			Email:    model.Repository.User.Email,
 		},
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.Repository.UpdatedAt,

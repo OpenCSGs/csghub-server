@@ -74,6 +74,7 @@ func (s *sSHKeyStoreImpl) FindByID(ctx context.Context, id int64) (*SSHKey, erro
 		NewSelect().
 		Model(&sshKey).
 		Relation("User").
+		Where(`NOT "user".login_frozen`).
 		Where("ssh_key.id = ?", id).
 		Scan(ctx)
 	return &sshKey, err
@@ -85,6 +86,7 @@ func (s *sSHKeyStoreImpl) FindByFingerpringSHA256(ctx context.Context, fingerpri
 		NewSelect().
 		Model(&sshKey).
 		Relation("User").
+		Where(`NOT "user".login_frozen`).
 		Where("ssh_key.fingerprint_sha256 = ?", fingerprint).
 		Scan(ctx)
 	return &sshKey, err

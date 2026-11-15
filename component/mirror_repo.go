@@ -142,6 +142,9 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	if err != nil {
 		return nil, err
 	}
+	if err := m.validateMirrorDestination(ctx, sourceURL); err != nil {
+		return nil, err
+	}
 	req.SourceGitCloneUrl = sourceURL
 	req.Username = username
 	req.AccessToken = accessToken
@@ -598,6 +601,9 @@ func normalizeMirrorSource(sourceURL, username, accessToken string) (string, str
 	if !strings.HasSuffix(parsedURL.Path, ".git") {
 		parsedURL.Path += ".git"
 	}
+	if _, err := common.ValidatePublicHTTPURL(parsedURL.String()); err != nil {
+		return "", "", "", errorx.MirrorSourceURLInvalid(err, errorx.Ctx())
+	}
 	return parsedURL.String(), username, accessToken, nil
 }
 
@@ -829,4 +835,12 @@ func buildMirrorRepoRecord(req types.CreateMirrorRepoReq, repo *database.Reposit
 	}
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", sourceType, req.RepoType, namespace, name)
 	return mirror
+}
+
+// validateMirrorDestination rejects non-public DNS answers before mirror persistence.
+func (m *mirrorComponentImpl) validateMirrorDestination(ctx context.Context, sourceURL string) error {
+	if _, err := m.sourcePolicy.ResolveURL(ctx, sourceURL); err != nil {
+		return errorx.MirrorSourceURLInvalid(err, errorx.Ctx())
+	}
+	return nil
 }

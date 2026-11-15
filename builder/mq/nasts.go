@@ -164,20 +164,21 @@ func (n *Nats) getOrCreateStreamConsumer(params SubscribeParams) (jetstream.Cons
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	jss, err = n.js.CreateOrUpdateStream(ctx,
-		jetstream.StreamConfig{
-			Name:         params.Group.StreamName,
-			Subjects:     params.Topics,
-			MaxConsumers: -1,
-			MaxMsgs:      -1,
-			// NATS JetStream's unlimited sentinel for byte limit is -1.
-			// Values <= 0 from SubscribeParams are mapped to -1.
-			// See https://nats-io.github.io/nats.net/api/NATS.Client.JetStream.Models.StreamConfig.html
-			MaxBytes: maxBytesOrDefault(params.MaxBytes),
-			// NATS JetStream treats MaxAge 0 as unlimited (no age-based expiry).
-			// See https://nats-io.github.io/nats.net/api/NATS.Client.JetStream.Models.StreamConfig.MaxAge.html
-			MaxAge: params.MaxAge,
-		})
+	streamConfig := jetstream.StreamConfig{
+		Name:         params.Group.StreamName,
+		Subjects:     params.Topics,
+		MaxConsumers: -1,
+		MaxMsgs:      -1,
+		// NATS JetStream's unlimited sentinel for byte limit is -1.
+		// Values <= 0 from SubscribeParams are mapped to -1.
+		// See https://nats-io.github.io/nats.net/api/NATS.Client.JetStream.Models.StreamConfig.html
+		MaxBytes: maxBytesOrDefault(params.MaxBytes),
+		// NATS JetStream treats MaxAge 0 as unlimited (no age-based expiry).
+		// See https://nats-io.github.io/nats.net/api/NATS.Client.JetStream.Models.StreamConfig.MaxAge.html
+		MaxAge: params.MaxAge,
+	}
+	applyHTTPArchiveRetention(&streamConfig, params.Group)
+	jss, err = n.js.CreateOrUpdateStream(ctx, streamConfig)
 	if err != nil {
 		return nil, fmt.Errorf("[nats] failed to create or update stream %s error: %w", params.Group.StreamName, err)
 	}
@@ -378,4 +379,15 @@ func maxDeliverOrDefault(v int) int {
 		return -1
 	}
 	return v
+}
+
+// Raw archives use their own stream, so chat-log retention is unchanged.
+// ACK removes uploaded data; a full stream rejects publishes for spool retry.
+func applyHTTPArchiveRetention(cfg *jetstream.StreamConfig, group MQGroup) {
+	if group != HTTPArchiveGroup {
+		return
+	}
+	cfg.Retention = jetstream.WorkQueuePolicy
+	cfg.Discard = jetstream.DiscardNew
+	cfg.MaxAge = 0
 }

@@ -20,7 +20,6 @@ import (
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/proxy"
 	commontrace "opencsg.com/csghub-server/common/utils/trace"
 )
 
@@ -293,7 +292,7 @@ func (h *imagePipelineHandler) executeGenerateImage(c *gin.Context, ctx context.
 		c.Request.Header.Set(k, v)
 	}
 
-	rp, err := proxy.NewReverseProxy(mt.Target)
+	rp, err := newArchiveProxy(mt.Target)
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		httpbase.ServerError(c, err)
@@ -350,7 +349,7 @@ func (h *imagePipelineHandler) executeEditImage(c *gin.Context, ctx context.Cont
 	c.Request.Header.Set("Content-Type", contentType)
 	c.Request.Header.Del("Content-Length")
 
-	rp, err := proxy.NewReverseProxy(mt.Target)
+	rp, err := newArchiveProxy(mt.Target)
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		httpbase.ServerError(c, err)

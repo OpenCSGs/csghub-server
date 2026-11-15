@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	gwcomp "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -83,7 +82,7 @@ func (m *MCPProxyHandlerImpl) ProxyToApi(api string) gin.HandlerFunc {
 			target = "https://" + target
 		}
 		slog.Debug("mcp proxy target", slog.String("svcName", svcName), slog.String("target", target), slog.String("api", api), slog.String("proxyHost", mcpService.ProxyHost))
-		rp, err := proxy.NewReverseProxy(target)
+		rp, err := newArchiveProxy(target)
 		if err != nil {
 			slog.Error("fail to create mcp reverse proxy", slog.Any("err", err))
 			httpbase.ServerError(ctx, err)

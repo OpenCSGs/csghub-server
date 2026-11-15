@@ -12,15 +12,15 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.31.0
-export IMAGE_TAG=v0.31.0
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.32.0
+export IMAGE_TAG=v0.32.0
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm \
   --push .
 
-# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.2.3_vllm_0.31.0
-export IMAGE_TAG=rocm7.2.3_vllm_0.31.0
+# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.2.3_vllm_0.32.0
+export IMAGE_TAG=rocm7.2.3_vllm_0.32.0
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/amd-vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm-amd \
@@ -232,7 +232,7 @@ docker run -d \
   -e HF_ENDPOINT=https://hub.opencsg.com \
   --gpus device=1 \
   -p 8000:8000 \
-  ${OPENCSG_ACR}/opencsghq/vllm:v0.31.0
+  ${OPENCSG_ACR}/opencsghq/vllm:v0.32.0
 
 # Run TGI
 docker run -d \
@@ -337,7 +337,7 @@ docker run -d \
   -e HF_TASK=text-to-speech \
   --gpus device=0 \
   -p 8000:8000 \
-  ${OPENCSG_ACR}/opencsghq/vllm:v0.31.0
+  ${OPENCSG_ACR}/opencsghq/vllm:v0.32.0
 
 # Call OpenAI-compatible speech API
 curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/speech \
@@ -395,7 +395,7 @@ curl -o result.mp4 \
 *Note: FunASR downloads `REPO_ID` to `/workspace/${REPO_ID}` and preloads that local model at startup. The OpenAI-compatible `model` field can use `local`, the repo id, or the repo name.*
 *Note: FunASR enables VAD chunking by default for long audio with `FUNASR_VAD_MODEL=fsmn-vad`, `FUNASR_VAD_MAX_SINGLE_SEGMENT_TIME=30000`, `FUNASR_BATCH_SIZE_S=60`, and `FUNASR_BATCH_SIZE_THRESHOLD_S=30`. Set `FUNASR_VAD_MODEL=none` to disable VAD.*
 *Note: Diffusers image generation and editing uses a PyTorch CUDA 12.8 base image and downloads `REPO_ID` to `/workspace/${REPO_ID}` before loading the local Diffusers pipeline. The 0.39.0 image pins `diffusers==0.39.0` with `transformers==5.13.0`; the 0.38.0 runtime remains registered for models that do not require the new pipelines.*
-*Note: vLLM text-to-speech is served by vLLM-Omni (`vllm serve --omni`) and exposes `POST /v1/audio/speech` plus `GET /v1/audio/voices`. Supported architectures (see `configs/inference/vllm.json` extra_archs): Qwen3-TTS, Fish Speech S2 Pro, Voxtral TTS, CosyVoice3, OmniVoice, VoxCPM2, MOSS-TTS-Nano.*
+*Note: vLLM text-to-speech is served by vLLM-Omni (`vllm serve --omni`) and exposes `POST /v1/audio/speech` plus `GET /v1/audio/voices`. Supported architectures (see `configs/inference/vllm.json` extra_archs): Qwen3-TTS, Fish Speech S2 Pro, Fish Drama 3, Voxtral TTS, CosyVoice3, OmniVoice, VoxCPM2, MOSS-TTS-Nano. `FishOmniModel` is served in its block-FP8 form (`fishaudio/drama-3`); vLLM-Omni 0.32.0 does not support the `drama3-int4` variant (`fishaudio/drama-3-int4`). The architecture is registered for the ROCm `amd-vllm` image but has not been validated there; its FP8 MoE path is verified on CUDA only.*
 *Note: AudioFly is a latent-diffusion text-to-audio (sound effect) model, not an LLM-based TTS, so vLLM-Omni cannot serve it; the dedicated `audiofly` image wraps the model's own `ldm` inference code with the same OpenAI speech API (`/v1/audio/speech`, `/v1/audio/speech/batch`, `/v1/audio/voices`). Generation is non-streaming and wav-only; see `docker/inference/audiofly/README.md`.*
 
 ### TGI ROCm model compatibility
@@ -419,8 +419,8 @@ ROCm-specific limits:
 ## inference image name, version and cuda version
 | Task| Image Name | Version | CUDA Version | Fix
 | --- | --- | --- | --- |--- |
-|text generation / embedding / reranking / text to speech| vllm | v0.31.0 | 13.0 |pooling runner support for embedding and reranking; vllm-omni 0.31.0rc1 for text-to-speech (/v1/audio/speech)|
-|text generation / embedding / reranking| amd-vllm | rocm7.2.3_vllm_0.31.0 | - |ROCm 7.2.3, vLLM 0.31.0|
+|text generation / embedding / reranking / text to speech| vllm | v0.32.0 | 13.0 |pooling runner support for embedding and reranking; vllm-omni 0.32.0 for text-to-speech (/v1/audio/speech), adds Drama 3 (FishOmniModel) support|
+|text generation / embedding / reranking| amd-vllm | rocm7.2.3_vllm_0.32.0 | - |ROCm 7.2.3, vLLM 0.32.0|
 |text generation| vllm | v0.8.5 | 12.4 |fix hf hub timestamp|
 |text generation| vllm-cpu | v0.24.0 | - |vLLM 0.24.0, supports --enable-prompt-tokens-details|
 |text generation| tgi | 2.2 | 12.1 |- |

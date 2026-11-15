@@ -203,6 +203,66 @@ func (_c *MockAgentOrchestratorStore_BeginAllocationResume_Call) RunAndReturn(ru
 	return _c
 }
 
+// BeginAllocationSuspend provides a mock function with given fields: ctx, allocationID, actor
+func (_m *MockAgentOrchestratorStore) BeginAllocationSuspend(ctx context.Context, allocationID int64, actor types.AgentActor) (*database.AgentAllocationOperation, error) {
+	ret := _m.Called(ctx, allocationID, actor)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BeginAllocationSuspend")
+	}
+
+	var r0 *database.AgentAllocationOperation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, types.AgentActor) (*database.AgentAllocationOperation, error)); ok {
+		return rf(ctx, allocationID, actor)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, types.AgentActor) *database.AgentAllocationOperation); ok {
+		r0 = rf(ctx, allocationID, actor)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AgentAllocationOperation)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, types.AgentActor) error); ok {
+		r1 = rf(ctx, allocationID, actor)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentOrchestratorStore_BeginAllocationSuspend_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BeginAllocationSuspend'
+type MockAgentOrchestratorStore_BeginAllocationSuspend_Call struct {
+	*mock.Call
+}
+
+// BeginAllocationSuspend is a helper method to define mock.On call
+//   - ctx context.Context
+//   - allocationID int64
+//   - actor types.AgentActor
+func (_e *MockAgentOrchestratorStore_Expecter) BeginAllocationSuspend(ctx interface{}, allocationID interface{}, actor interface{}) *MockAgentOrchestratorStore_BeginAllocationSuspend_Call {
+	return &MockAgentOrchestratorStore_BeginAllocationSuspend_Call{Call: _e.mock.On("BeginAllocationSuspend", ctx, allocationID, actor)}
+}
+
+func (_c *MockAgentOrchestratorStore_BeginAllocationSuspend_Call) Run(run func(ctx context.Context, allocationID int64, actor types.AgentActor)) *MockAgentOrchestratorStore_BeginAllocationSuspend_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(types.AgentActor))
+	})
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_BeginAllocationSuspend_Call) Return(_a0 *database.AgentAllocationOperation, _a1 error) *MockAgentOrchestratorStore_BeginAllocationSuspend_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_BeginAllocationSuspend_Call) RunAndReturn(run func(context.Context, int64, types.AgentActor) (*database.AgentAllocationOperation, error)) *MockAgentOrchestratorStore_BeginAllocationSuspend_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BeginLogicalAgentDeletion provides a mock function with given fields: ctx, logicalInstanceID, ownerUUID
 func (_m *MockAgentOrchestratorStore) BeginLogicalAgentDeletion(ctx context.Context, logicalInstanceID int64, ownerUUID string) (*database.BeginLogicalAgentDeletionResult, error) {
 	ret := _m.Called(ctx, logicalInstanceID, ownerUUID)
@@ -559,6 +619,53 @@ func (_c *MockAgentOrchestratorStore_CompleteResumeOperation_Call) Return(_a0 er
 }
 
 func (_c *MockAgentOrchestratorStore_CompleteResumeOperation_Call) RunAndReturn(run func(context.Context, int64, int64) error) *MockAgentOrchestratorStore_CompleteResumeOperation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CompleteSuspendOperation provides a mock function with given fields: ctx, operationID
+func (_m *MockAgentOrchestratorStore) CompleteSuspendOperation(ctx context.Context, operationID int64) error {
+	ret := _m.Called(ctx, operationID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CompleteSuspendOperation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, operationID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentOrchestratorStore_CompleteSuspendOperation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CompleteSuspendOperation'
+type MockAgentOrchestratorStore_CompleteSuspendOperation_Call struct {
+	*mock.Call
+}
+
+// CompleteSuspendOperation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operationID int64
+func (_e *MockAgentOrchestratorStore_Expecter) CompleteSuspendOperation(ctx interface{}, operationID interface{}) *MockAgentOrchestratorStore_CompleteSuspendOperation_Call {
+	return &MockAgentOrchestratorStore_CompleteSuspendOperation_Call{Call: _e.mock.On("CompleteSuspendOperation", ctx, operationID)}
+}
+
+func (_c *MockAgentOrchestratorStore_CompleteSuspendOperation_Call) Run(run func(ctx context.Context, operationID int64)) *MockAgentOrchestratorStore_CompleteSuspendOperation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_CompleteSuspendOperation_Call) Return(_a0 error) *MockAgentOrchestratorStore_CompleteSuspendOperation_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_CompleteSuspendOperation_Call) RunAndReturn(run func(context.Context, int64) error) *MockAgentOrchestratorStore_CompleteSuspendOperation_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -921,6 +1028,67 @@ func (_c *MockAgentOrchestratorStore_FindCallerAllocation_Call) Return(_a0 *data
 }
 
 func (_c *MockAgentOrchestratorStore_FindCallerAllocation_Call) RunAndReturn(run func(context.Context, int64, string, string) (*database.AgentAllocation, error)) *MockAgentOrchestratorStore_FindCallerAllocation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindCallerAllocations provides a mock function with given fields: ctx, logicalInstanceIDs, actorKind, actorID
+func (_m *MockAgentOrchestratorStore) FindCallerAllocations(ctx context.Context, logicalInstanceIDs []int64, actorKind string, actorID string) ([]database.AgentAllocation, error) {
+	ret := _m.Called(ctx, logicalInstanceIDs, actorKind, actorID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindCallerAllocations")
+	}
+
+	var r0 []database.AgentAllocation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64, string, string) ([]database.AgentAllocation, error)); ok {
+		return rf(ctx, logicalInstanceIDs, actorKind, actorID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64, string, string) []database.AgentAllocation); ok {
+		r0 = rf(ctx, logicalInstanceIDs, actorKind, actorID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AgentAllocation)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64, string, string) error); ok {
+		r1 = rf(ctx, logicalInstanceIDs, actorKind, actorID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentOrchestratorStore_FindCallerAllocations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindCallerAllocations'
+type MockAgentOrchestratorStore_FindCallerAllocations_Call struct {
+	*mock.Call
+}
+
+// FindCallerAllocations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - logicalInstanceIDs []int64
+//   - actorKind string
+//   - actorID string
+func (_e *MockAgentOrchestratorStore_Expecter) FindCallerAllocations(ctx interface{}, logicalInstanceIDs interface{}, actorKind interface{}, actorID interface{}) *MockAgentOrchestratorStore_FindCallerAllocations_Call {
+	return &MockAgentOrchestratorStore_FindCallerAllocations_Call{Call: _e.mock.On("FindCallerAllocations", ctx, logicalInstanceIDs, actorKind, actorID)}
+}
+
+func (_c *MockAgentOrchestratorStore_FindCallerAllocations_Call) Run(run func(ctx context.Context, logicalInstanceIDs []int64, actorKind string, actorID string)) *MockAgentOrchestratorStore_FindCallerAllocations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_FindCallerAllocations_Call) Return(_a0 []database.AgentAllocation, _a1 error) *MockAgentOrchestratorStore_FindCallerAllocations_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_FindCallerAllocations_Call) RunAndReturn(run func(context.Context, []int64, string, string) ([]database.AgentAllocation, error)) *MockAgentOrchestratorStore_FindCallerAllocations_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1432,6 +1600,53 @@ func (_c *MockAgentOrchestratorStore_MarkResumeOperationRunning_Call) Return(_a0
 }
 
 func (_c *MockAgentOrchestratorStore_MarkResumeOperationRunning_Call) RunAndReturn(run func(context.Context, int64) error) *MockAgentOrchestratorStore_MarkResumeOperationRunning_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MarkSuspendOperationRunning provides a mock function with given fields: ctx, operationID
+func (_m *MockAgentOrchestratorStore) MarkSuspendOperationRunning(ctx context.Context, operationID int64) error {
+	ret := _m.Called(ctx, operationID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkSuspendOperationRunning")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, operationID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkSuspendOperationRunning'
+type MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call struct {
+	*mock.Call
+}
+
+// MarkSuspendOperationRunning is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operationID int64
+func (_e *MockAgentOrchestratorStore_Expecter) MarkSuspendOperationRunning(ctx interface{}, operationID interface{}) *MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call {
+	return &MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call{Call: _e.mock.On("MarkSuspendOperationRunning", ctx, operationID)}
+}
+
+func (_c *MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call) Run(run func(ctx context.Context, operationID int64)) *MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call) Return(_a0 error) *MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call) RunAndReturn(run func(context.Context, int64) error) *MockAgentOrchestratorStore_MarkSuspendOperationRunning_Call {
 	_c.Call.Return(run)
 	return _c
 }

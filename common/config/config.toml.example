@@ -32,10 +32,6 @@ public_aigateway_url = "http://aigateway:8094/v1"
 metrics_collector_lookback_minutes = 60
 health_check_probe_workers = 32
 health_check_persistence_workers = 4
-unsafe_rules = [
-    { level = "Unsafe" },
-    { level = "Controversial", category = "Politically Sensitive Topics" }
-]
 
 # EE/SaaS automatic model selection (unavailable in CE).
 # Leave server_url empty to disable: the
@@ -52,7 +48,7 @@ orchestrator_readiness_timeout_seconds = 1800
 orchestrator_gateway_wait_timeout_seconds = 30
 # Temporary static cap on concurrent executions across sessions on one actor
 # runtime, until load-aware admission is available.
-orchestrator_max_concurrent_executions_per_allocation = 4
+orchestrator_max_concurrent_executions_per_allocation = 32
 orchestrator_execution_reserved_timeout_seconds = 60
 orchestrator_execution_heartbeat_interval_seconds = 30
 orchestrator_execution_heartbeat_timeout_seconds = 90
@@ -170,7 +166,11 @@ max_content_length = 7000
 # Zero keeps the legacy all-synchronous behavior.
 prompt_max_chunks = 3
 
-
+[sensitive_check.llm]
+unsafe_rules = [
+    { level = "Unsafe" },
+    { level = "Controversial", category = "Politically Sensitive Topics" }
+]
 
 [jwt]
 signing_key = "signing-key"

@@ -347,6 +347,8 @@ func (h *UserHandler) Get(ctx *gin.Context) {
 // @Param        verify_status  query  string true "verify_status"
 // @Param        search  query  string true "search"
 // @Param        labels  query  []string false "labels, such as ['vip', 'basic']"
+// @Param        sort_by query string false "Sort field; defaults to id" Enums(id, last_login_at)
+// @Param        sort_order query string false "Sort direction, case-insensitive; defaults to asc" Enums(asc, desc)
 // @Param        exact_match  query  bool false "exact_match, default is false"
 // @Success      200  {object}  types.Response{data=[]types.User,total=int} "OK"
 // @Param        exact_match  query  bool false "exact_match, default is false"
@@ -410,7 +412,7 @@ func (h *UserHandler) UserChoice(ctx *gin.Context) {
 	httpbase.OK(ctx, user)
 }
 
-// parseUserListRequest preserves pagination, filtering, and validation for both list projections.
+// parseUserListRequest validates filters and sorting before either list projection calls the component.
 func parseUserListRequest(ctx *gin.Context) (types.UserListReq, error) {
 	visitorName := httpbase.GetCurrentUser(ctx)
 	search := ctx.Query("search")
@@ -435,7 +437,7 @@ func parseUserListRequest(ctx *gin.Context) (types.UserListReq, error) {
 		}
 
 	}
-	return types.UserListReq{
+	req := types.UserListReq{
 		VisitorName:  visitorName,
 		Search:       search,
 		VerifyStatus: verifyStatus,
@@ -445,7 +447,11 @@ func parseUserListRequest(ctx *gin.Context) (types.UserListReq, error) {
 		SortBy:       sortBy,
 		SortOrder:    sortOrder,
 		ExactMatch:   exactMatch,
-	}, nil
+	}
+	if err := req.NormalizeSort(); err != nil {
+		return types.UserListReq{}, errorx.ReqParamInvalid(err, nil)
+	}
+	return req, nil
 }
 
 func (h *UserHandler) Casdoor(ctx *gin.Context) {
@@ -529,6 +535,27 @@ func (h *UserHandler) Portico(ctx *gin.Context) {
 func (h *UserHandler) handleSigninCallback(ctx *gin.Context, code, oauthState, routingState string) {
 	jwtToken, signed, err := h.c.Signin(ctx.Request.Context(), code, oauthState)
 	if err != nil {
+		var accountErrorCode string
+		switch {
+		case errors.Is(err, errorx.ErrAccountBanned):
+			accountErrorCode = errorx.ErrAccountBanned.Code()
+		case errors.Is(err, errorx.ErrAccountClosed):
+			accountErrorCode = errorx.ErrAccountClosed.Code()
+		}
+		if accountErrorCode != "" {
+			// Browser callbacks preserve the configured failure URL and replace only its error code.
+			// No OAuth credentials are appended.
+			failureURL, parseErr := url.Parse(h.signinFailureRedirectURL)
+			if parseErr != nil {
+				httpbase.ServerError(ctx, errorx.ErrInternalServerError)
+				return
+			}
+			query := failureURL.Query()
+			query.Set("error_code", accountErrorCode)
+			failureURL.RawQuery = query.Encode()
+			redirectWithoutBody(ctx, http.StatusFound, failureURL.String())
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to signin", slog.Any("error", commonlog.SafeError(err)), slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", oauthState)))
 		var customErr errorx.CustomError
 		if errors.As(err, &customErr) {
@@ -696,7 +723,7 @@ func (h *UserHandler) getStarshipApiKey(ctx *gin.Context, userName, tokenName st
 // CreateVerify godoc
 // @Security     ApiKey
 // @Summary      Create user verification
-// @Description  Create a user verification request; SaaS binds ownership to the authenticated user UUID.
+// @Description  Submit manual image material without separate identity text; SaaS binds ownership to the authenticated user UUID.
 // @Tags         UserVerify
 // @Accept       json
 // @Produce      json
@@ -708,14 +735,13 @@ func (h *UserHandler) getStarshipApiKey(ctx *gin.Context, userName, tokenName st
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/verify [post]
 func (h *UserHandler) CreateVerify(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
 	var req types.UserVerifyReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	req.Username = currentUser
+	req.Username = httpbase.GetCurrentUser(ctx)
 	orgVerify, err := h.uv.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
@@ -731,7 +757,7 @@ func (h *UserHandler) CreateVerify(ctx *gin.Context) {
 		return
 	}
 
-	slog.InfoContext(ctx.Request.Context(), "Create organization Verify succeed", slog.String("real name", orgVerify.RealName))
+	slog.InfoContext(ctx.Request.Context(), "Create user verification succeeded", slog.Int64("verification_id", orgVerify.ID))
 	httpbase.OK(ctx, orgVerify)
 }
 
@@ -785,14 +811,14 @@ func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
 		return
 	}
 
-	slog.InfoContext(ctx.Request.Context(), "update organization Verify succeed", slog.String("real name", orgVerify.RealName))
+	slog.InfoContext(ctx.Request.Context(), "Update user verification succeeded", slog.Int64("verification_id", orgVerify.ID))
 	httpbase.OK(ctx, orgVerify)
 }
 
 // GetVerify reads verification while preserving request authorization and cancellation in the component.
 // @Security     ApiKey
 // @Summary      Get user verification
-// @Description  Get local verification information by user UUID; SaaS permits only the authenticated account's UUID and includes a masked identity number when available.
+// @Description  Get local verification information by user UUID; SaaS permits only the authenticated account's UUID without returning identity text.
 // @Tags         UserVerify
 // @Accept       json
 // @Produce      json
@@ -959,8 +985,9 @@ func (h *UserHandler) FindByUUIDs(ctx *gin.Context) {
 // @Produce      json
 // @Param        username path string true "username"
 // @Param        current_user  query  string true "current user"
-// @Param        repository  query  bool false "repository"
-// @Param        discussion  query  bool false "discussion"
+// @Description  Legacy CE endpoint. EE and SaaS use /user/{username}/account_closure.
+// @Param        repository  query  bool false "CE only"
+// @Param        discussion  query  bool false "CE only"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      409  {object}  types.APIBadRequest "The user is the last administrator of an organization"

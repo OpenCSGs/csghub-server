@@ -78,7 +78,7 @@ func (b *messagesHandlerBridge) ServeProxy(c *gin.Context, backendURL, host stri
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 	}
 	observation := component.ObserveRouteCall(c.Request.Context(), target, body)
-	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding(), proxy.WithResponseModifier(observation.Modify))
+	rp, err := newArchiveProxy(backendURL, proxy.WithoutAcceptEncoding(), proxy.WithResponseModifier(observation.Modify))
 	if err != nil {
 		observation.Finish(err)
 		c.JSON(http.StatusBadGateway, gin.H{

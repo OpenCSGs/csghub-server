@@ -121,7 +121,7 @@ func (_c *MockModelTreeComponent_ProcessModelTree_Call) RunAndReturn(run func(co
 }
 
 // ScanModelTree provides a mock function with given fields: ctx, req
-func (_m *MockModelTreeComponent) ScanModelTree(ctx context.Context, req types.ScanModels) error {
+func (_m *MockModelTreeComponent) ScanModelTree(ctx context.Context, req types.ScanModelTreeParams) error {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
@@ -129,7 +129,7 @@ func (_m *MockModelTreeComponent) ScanModelTree(ctx context.Context, req types.S
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.ScanModels) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.ScanModelTreeParams) error); ok {
 		r0 = rf(ctx, req)
 	} else {
 		r0 = ret.Error(0)
@@ -145,14 +145,14 @@ type MockModelTreeComponent_ScanModelTree_Call struct {
 
 // ScanModelTree is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req types.ScanModels
+//   - req types.ScanModelTreeParams
 func (_e *MockModelTreeComponent_Expecter) ScanModelTree(ctx interface{}, req interface{}) *MockModelTreeComponent_ScanModelTree_Call {
 	return &MockModelTreeComponent_ScanModelTree_Call{Call: _e.mock.On("ScanModelTree", ctx, req)}
 }
 
-func (_c *MockModelTreeComponent_ScanModelTree_Call) Run(run func(ctx context.Context, req types.ScanModels)) *MockModelTreeComponent_ScanModelTree_Call {
+func (_c *MockModelTreeComponent_ScanModelTree_Call) Run(run func(ctx context.Context, req types.ScanModelTreeParams)) *MockModelTreeComponent_ScanModelTree_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.ScanModels))
+		run(args[0].(context.Context), args[1].(types.ScanModelTreeParams))
 	})
 	return _c
 }
@@ -162,7 +162,7 @@ func (_c *MockModelTreeComponent_ScanModelTree_Call) Return(_a0 error) *MockMode
 	return _c
 }
 
-func (_c *MockModelTreeComponent_ScanModelTree_Call) RunAndReturn(run func(context.Context, types.ScanModels) error) *MockModelTreeComponent_ScanModelTree_Call {
+func (_c *MockModelTreeComponent_ScanModelTree_Call) RunAndReturn(run func(context.Context, types.ScanModelTreeParams) error) *MockModelTreeComponent_ScanModelTree_Call {
 	_c.Call.Return(run)
 	return _c
 }

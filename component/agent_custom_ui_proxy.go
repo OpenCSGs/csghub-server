@@ -105,11 +105,12 @@ func (c *agentCustomUIProxyComponent) Resolve(ctx context.Context, agentContentI
 		}
 	}
 	info := &types.AgentCustomUIProxyInfo{
-		AgentContentID: agent.ContentID,
-		AgentName:      agentName,
-		ShareName:      share.ShareName,
-		Kind:           types.AgentInstanceKind(agent.Kind),
-		SpaceID:        spaceID,
+		AgentContentID:     agent.ContentID,
+		AgentName:          agentName,
+		ShareName:          share.ShareName,
+		Kind:               types.AgentInstanceKind(agent.Kind),
+		GuestUsageMaxCount: types.CSGClawGuestUsageMaxCount(&agent.Metadata),
+		SpaceID:            spaceID,
 	}
 	deploy, err := c.deployStore.GetLatestDeployBySpaceID(ctx, spaceID)
 	if err != nil {

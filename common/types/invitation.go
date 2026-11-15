@@ -35,6 +35,9 @@ const (
 	InvitationActivityStatusPending InvitationActivityStatus = "pending"
 	InvitationActivityStatusAwarded InvitationActivityStatus = "awarded"
 	InvitationActivityStatusFailed  InvitationActivityStatus = "failed"
+	// InvitationActivityStatusExpired marks a pending inviter award whose
+	// eligibility checks did not pass within the eligibility window.
+	InvitationActivityStatusExpired InvitationActivityStatus = "expired"
 )
 
 func (s InvitationActivityStatus) String() string {
@@ -43,7 +46,7 @@ func (s InvitationActivityStatus) String() string {
 
 func (s InvitationActivityStatus) Validate() error {
 	switch s {
-	case InvitationActivityStatusPending, InvitationActivityStatusAwarded, InvitationActivityStatusFailed:
+	case InvitationActivityStatusPending, InvitationActivityStatusAwarded, InvitationActivityStatusFailed, InvitationActivityStatusExpired:
 		return nil
 	default:
 		return fmt.Errorf("invalid invitation activity status: %s", s)
@@ -52,8 +55,8 @@ func (s InvitationActivityStatus) Validate() error {
 
 type InvitationActivityFilter struct {
 	InviterUUID   string                   `json:"inviter_uuid"`
-	InviterStatus InvitationActivityStatus `json:"inviter_status" binding:"omitempty,oneof=pending awarded failed"`
-	InviteeStatus InvitationActivityStatus `json:"invitee_status" binding:"omitempty,oneof=pending awarded failed"`
+	InviterStatus InvitationActivityStatus `json:"inviter_status" binding:"omitempty,oneof=pending awarded failed expired"`
+	InviteeStatus InvitationActivityStatus `json:"invitee_status" binding:"omitempty,oneof=pending awarded failed expired"`
 	StartDate     string                   `json:"start_date"`
 	EndDate       string                   `json:"end_date"`
 	Per           int                      `json:"per"`

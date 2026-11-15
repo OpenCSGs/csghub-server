@@ -393,13 +393,13 @@ func deleteRepositoriesByIDs(ctx context.Context, tx bun.Tx, repositoryIDs []int
 		return nil, nil
 	}
 
-	namespacePaths := make([]string, 0, len(repositories))
+	namespacePaths := make([]repositoryNamespacePath, 0, len(repositories))
 	for _, repository := range repositories {
 		separator := strings.LastIndex(repository.Path, "/")
 		if separator <= 0 {
 			return nil, fmt.Errorf("repository %d has invalid path %q", repository.ID, repository.Path)
 		}
-		namespacePaths = append(namespacePaths, repository.Path[:separator])
+		namespacePaths = append(namespacePaths, repositoryNamespacePath{Path: repository.Path[:separator]})
 	}
 	ownersByPath, err := loadRepositoryOwnersByNamespacePath(ctx, tx, namespacePaths)
 	if err != nil {
@@ -494,18 +494,31 @@ func repositoryDeletionTupleTx(ctx context.Context, tx bun.Tx, repositories []Re
 	return types.NewRebacTuple("repository.delete", types.TupleOperation{Delete: true, Relationships: relationships}), nil
 }
 
+type repositoryNamespacePath struct{ Path string }
+
 type repositoryOwner struct {
 	Type NamespaceType
 	UUID string
 }
 
+// An exact namespace wins. Historical case variants are safe only if there is no competing namespace.
+const namespaceMatchesPath = `lower(namespace.path) = lower(?0) AND
+ (namespace.path = ?0 OR NOT EXISTS (SELECT 1 FROM namespaces AS other
+ WHERE lower(other.path) = lower(namespace.path) AND other.id <> namespace.id))`
+
 // loadRepositoryOwnersByNamespacePath resolves authorization owners through
 // the namespace's entity relationship. Namespace.UUID is not the stable user
 // or organization UUID used by Repository ReBAC.
-func loadRepositoryOwnersByNamespacePath(ctx context.Context, tx bun.Tx, namespacePaths []string) (map[string]repositoryOwner, error) {
-	var namespaces []Namespace
-	if err := tx.NewSelect().Model(&namespaces).WhereAllWithDeleted().
-		Where("path IN (?)", bun.In(namespacePaths)).Order("id ASC").Scan(ctx); err != nil {
+func loadRepositoryOwnersByNamespacePath(ctx context.Context, tx bun.Tx, namespacePaths []repositoryNamespacePath) (map[string]repositoryOwner, error) {
+	var namespaces []struct {
+		Namespace     `bun:",embed"`
+		RequestedPath string
+	}
+	if err := tx.NewSelect().Model((*Namespace)(nil)).WhereAllWithDeleted().
+		With("requested", tx.NewValues(&namespacePaths)).Distinct().
+		ColumnExpr("namespace.*, requested.path AS requested_path").
+		Join("CROSS JOIN requested").
+		Where(namespaceMatchesPath, bun.Safe("requested.path")).Order("namespace.id ASC").Scan(ctx, &namespaces); err != nil {
 		return nil, fmt.Errorf("load repository namespaces before deletion: %w", err)
 	}
 
@@ -562,10 +575,10 @@ func loadRepositoryOwnersByNamespacePath(ctx context.Context, tx bun.Tx, namespa
 		default:
 			continue
 		}
-		if _, exists := ownersByPath[namespace.Path]; exists {
+		if _, exists := ownersByPath[namespace.RequestedPath]; exists {
 			return nil, fmt.Errorf("load repository namespace %q: multiple active owners", namespace.Path)
 		}
-		ownersByPath[namespace.Path] = owner
+		ownersByPath[namespace.RequestedPath] = owner
 	}
 	return ownersByPath, nil
 }

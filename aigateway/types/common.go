@@ -2,6 +2,7 @@ package types
 
 import (
 	"net/http"
+	"opencsg.com/csghub-server/aigateway/httparchive"
 
 	commontypes "opencsg.com/csghub-server/common/types"
 )
@@ -16,6 +17,7 @@ func ApplyRequestAuthHeaders(header http.Header, authHeadStr string) error {
 		return err
 	}
 	for authKey, authVal := range authMap {
+		httparchive.RegisterAuthHeader(authKey)
 		header.Set(authKey, authVal)
 	}
 	return nil

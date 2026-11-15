@@ -126,6 +126,37 @@ func TestInternalComponent_GetCommitDiff(t *testing.T) {
 	require.Equal(t, &types.GiteaCallbackPushReq{Ref: "main"}, resp)
 }
 
+func TestInternalComponent_GetCommitDiffPassesRepoFields(t *testing.T) {
+	ctx := context.TODO()
+	ic := initializeTestInternalComponent(ctx, t)
+
+	req := types.GetDiffBetweenTwoCommitsReq{
+		Namespace:     "ns",
+		Name:          "n",
+		RepoType:      types.ModelRepo,
+		Ref:           "master",
+		LeftCommitId:  "l",
+		RightCommitId: "r",
+	}
+	ic.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		&database.Repository{Private: true, DefaultBranch: "master"}, nil,
+	)
+	ic.mocks.gitServer.EXPECT().GetDiffBetweenTwoCommits(ctx, gitserver.GetDiffBetweenTwoCommitsReq{
+		Namespace:     req.Namespace,
+		Name:          req.Name,
+		RepoType:      req.RepoType,
+		Ref:           req.Ref,
+		LeftCommitId:  req.LeftCommitId,
+		RightCommitId: req.RightCommitId,
+		Private:       true,
+		DefaultBranch: "master",
+	}).Return(&types.GiteaCallbackPushReq{Ref: "master"}, nil)
+
+	resp, err := ic.GetCommitDiff(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, &types.GiteaCallbackPushReq{Ref: "master"}, resp)
+}
+
 func TestInternalComponent_LfsAuthenticate(t *testing.T) {
 	ctx := context.TODO()
 	ic := initializeTestInternalComponent(ctx, t)

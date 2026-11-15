@@ -1,8 +1,7 @@
 package token
 
 import (
-	"log/slog"
-	"sync"
+	"context"
 	"unicode/utf8"
 
 	"github.com/pkoukk/tiktoken-go"
@@ -40,39 +39,12 @@ func newTiktokenTokenizerForTest(enc pieceEncoder) Tokenizer {
 	return &tiktokenTokenizerImpl{enc: enc}
 }
 
-// sharedTiktoken holds the single cl100k_base BPE instance. NewTokenizerImpl
-// runs per request, and each tiktoken.GetEncoding call re-derives the lookup
-// tables of CoreBPE (100k-entry decoder map, sorted token bytes, compiled
-// regexes), so the instance is built once and reused. CoreBPE is immutable
-// after construction and its regexp2 patterns are safe for concurrent use.
-var (
-	sharedTiktokenOnce sync.Once
-	sharedTiktoken     *tiktoken.Tiktoken
-	sharedTiktokenErr  error
-)
-
-// newTiktokenTokenizerImpl creates a tokenizer for billing / quota purpose.
-// Token definition follows OpenAI chat completion semantics.
+// newTiktokenTokenizerImpl retains bounded synchronous initialization for
+// billing callers. Routing uses the same cache without waiting for startup IO.
 func newTiktokenTokenizerImpl() Tokenizer {
-	// Platform-level billing tokenizer:
-	// cl100k_base is the de-facto OpenAI standard for the OpenAI embedding
-	// models and the gpt-4 / gpt-3.5 / deepseek approximations.
-	sharedTiktokenOnce.Do(func() {
-		tk, err := tiktoken.GetEncoding(tiktoken.MODEL_CL100K_BASE)
-		if err != nil {
-			slog.Error("failed to initialize tiktoken cl100k_base", slog.Any("error", err))
-			sharedTiktokenErr = err
-			return
-		}
-		sharedTiktoken = tk
-	})
-	if sharedTiktokenErr != nil {
-		return nil
-	}
-
-	return &tiktokenTokenizerImpl{
-		enc: &tiktokenPieceAdapter{tk: sharedTiktoken},
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), tokenizerLoadTimeout)
+	defer cancel()
+	return sharedLocalTokenizer.wait(ctx)
 }
 
 // Encode calculates the OpenAI-compatible token usage of a single chat message.

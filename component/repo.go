@@ -650,7 +650,10 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 	}
 
 	// 2. Check if target repository path is already occupied
-	targetExists, _ := c.IsExists(ctx, req.SourceRepoType, req.TargetNamespace, req.TargetName)
+	targetExists, err := c.IsExists(ctx, req.SourceRepoType, req.TargetNamespace, req.TargetName)
+	if err != nil {
+		return nil, fmt.Errorf("check target repository: %w", err)
+	}
 	if targetExists {
 		return nil, errorx.BadRequest(errors.New("target repository path is already occupied"), nil)
 	}
@@ -677,11 +680,11 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 		}
 	}
 
-	temPath := strings.SplitN(uuid.NewString(), "-", 2)
+	tempPath := strings.SplitN(uuid.NewString(), "-", 2)
 	dbRepo := database.Repository{
 		UserID:               user.ID,
-		Path:                 path.Join(temPath[0], temPath[1]),
-		GitPath:              fmt.Sprintf("%ss_%s/%s", string(req.SourceRepoType), temPath[0], temPath[1]),
+		Path:                 path.Join(tempPath[0], tempPath[1]),
+		GitPath:              fmt.Sprintf("%ss_%s/%s", string(req.SourceRepoType), tempPath[0], tempPath[1]),
 		Name:                 req.TargetName,
 		Nickname:             sourceRepo.Nickname,
 		Description:          sourceRepo.Description,
@@ -698,7 +701,7 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 	dbRepo.TupleNamespacePath = req.TargetNamespace
 	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create database repo, error: %w", err)
+		return nil, fmt.Errorf("failed to create database repo: %w", err)
 	}
 
 	err = c.recomStore.UpsertScore(ctx, []*database.RecomRepoScore{
@@ -718,13 +721,12 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 		SourceNamespace: req.SourceNamespace,
 		SourceName:      req.SourceName,
 		TargetRepoType:  req.SourceRepoType,
-		TargetNamespace: temPath[0],
-		TargetName:      temPath[1],
-		Revision:        sourceRepo.DefaultBranch,
+		TargetNamespace: tempPath[0],
+		TargetName:      tempPath[1],
+		Revision:        newDBRepo.DefaultBranch,
 	}
 
-	err = c.git.CreateFork(ctx, forkReq)
-	if err != nil {
+	if err = c.git.CreateFork(ctx, forkReq); err != nil {
 		slog.Error("failed to create fork in git", slog.Any("req", forkReq), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to create fork in git, error: %w", err)
 	}
@@ -2899,7 +2901,7 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 
 	for _, file := range req.Files {
 		for _, existFile := range existFiles {
-			if existFile.Path == file.Path {
+			if existFile.Path == file.Path && file.Action == types.CommitActionCreate {
 				file.Action = types.CommitActionUpdate
 			}
 		}

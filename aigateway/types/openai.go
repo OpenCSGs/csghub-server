@@ -83,6 +83,10 @@ type Model struct {
 	// request (set by applyEndpointOverrides); used for cost attribution in
 	// metering, never exposed on /v1/models.
 	UpstreamID int64 `json:"-"`
+	// RateLimit is the model-level per-user rate limit policy carried from
+	// the LLM config. It overrides the gateway-global policy when enabled;
+	// internal only, never exposed on /v1/models.
+	RateLimit *commontypes.UserRateLimitPolicy `json:"-"`
 	// AutoRoute marks the virtual model that stands for automatic model
 	// selection.  It has no upstream of its own and must be replaced with
 	// a real model before any upstream is resolved.

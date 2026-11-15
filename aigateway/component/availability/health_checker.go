@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"opencsg.com/csghub-server/aigateway/httparchive"
 	"opencsg.com/csghub-server/aigateway/sample"
 	"opencsg.com/csghub-server/aigateway/types"
 	prom "opencsg.com/csghub-server/builder/prometheus"
@@ -147,7 +148,7 @@ func NewHealthChecker(
 		upstreamStore:    upstreamStore,
 		llmConfigStore:   llmConfigStore,
 		stateCache:       stateCache,
-		httpClient:       &http.Client{},
+		httpClient:       &http.Client{Transport: httparchive.WrapTransport(nil)},
 		sampleRegistry:   sample.NewDefaultRegistry(),
 		stopCh:           make(chan struct{}),
 		leaderNodeID:     fmt.Sprintf("%s-%d", hostname, time.Now().UnixNano()),

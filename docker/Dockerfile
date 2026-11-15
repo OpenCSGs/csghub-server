@@ -1,5 +1,7 @@
 FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-build-go1.26.0 AS build-env
 ENV GOPROXY=https://goproxy.cn,direct
+# Use the patched toolchain even when the cached base image contains Go 1.26.0.
+ENV GOTOOLCHAIN=go1.26.10
 WORKDIR /starhub
 COPY . .
 

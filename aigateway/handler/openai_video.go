@@ -156,7 +156,7 @@ func proxyCreateVideoRequest(c *gin.Context, ctx context.Context, providerReq *t
 		slog.WarnContext(ctx, "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 
-	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
+	rp, err := newArchiveProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
@@ -470,7 +470,7 @@ func newVideoReverseProxy(c *gin.Context, ctx context.Context, modelTarget *reso
 		slog.WarnContext(ctx, "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 
-	rp, err := proxy.NewReverseProxy(modelTarget.Target, opts...)
+	rp, err := newArchiveProxy(modelTarget.Target, opts...)
 	if err != nil {
 		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, fmt.Errorf("failed to create reverse proxy:%w", err).Error(), types.ErrTypeServer)
 		return nil, false
@@ -857,7 +857,7 @@ func streamVideoDownloadURL(c *gin.Context, downloadURL string) {
 		return
 	}
 	target := parsed.Scheme + "://" + parsed.Host
-	rp, err := proxy.NewReverseProxy(target)
+	rp, err := newArchiveProxy(target)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
 			Code:    types.ErrCodeInternal,

@@ -657,9 +657,9 @@ func TestGitalyFile_GetTree(t *testing.T) {
 				Limit: 0,
 			}).Return(&MockGrpcStreamClient[*gitalypb.GetBlobsResponse]{
 				data: []*gitalypb.GetBlobsResponse{
-					{Path: []byte(prefix + "a"), Mode: 1, Oid: "o1"},
-					{Path: []byte(prefix + "b"), Mode: 1, Oid: "o2"},
-					{Path: []byte(prefix + "c"), Mode: 1, Oid: "o1"},
+					{Path: []byte(prefix + "a"), Mode: 1, Type: gitalypb.ObjectType_BLOB, Oid: "o1"},
+					{Path: []byte(prefix + "b"), Mode: 1, Type: gitalypb.ObjectType_BLOB, Oid: "o2"},
+					{Path: []byte(prefix + "c"), Mode: 1, Type: gitalypb.ObjectType_BLOB, Oid: "o1"},
 				},
 			}, nil)
 
@@ -693,15 +693,15 @@ size 507607173`
 			})
 			require.NoError(t, err)
 			require.Equal(t, []*types.File{
-				{Name: "a", Path: prefix + "a", Type: "dir", Mode: "1",
+				{Name: "a", Path: prefix + "a", Type: "file", Mode: "1",
 					SHA:       "o1",
 					LfsSHA256: "a4f0e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5",
 					Lfs:       true, Size: 507607173,
 					LfsRelativePath: "a4/f0/e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5",
 					LfsPointerSize:  1234,
 				},
-				{Name: "b", Path: prefix + "b", Type: "dir", Mode: "1", SHA: "o2"},
-				{Name: "c", Path: prefix + "c", Type: "dir", Mode: "1",
+				{Name: "b", Path: prefix + "b", Type: "file", Mode: "1", SHA: "o2"},
+				{Name: "c", Path: prefix + "c", Type: "file", Mode: "1",
 					SHA:       "o1",
 					LfsSHA256: "a4f0e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5",
 					Lfs:       true, Size: 507607173,
@@ -951,4 +951,24 @@ func TestGitalyFile_CreateRepoLarge(t *testing.T) {
 	require.JSONEq(t, eh, ah)
 	require.Equal(t, actions[1], m.sends[1])
 	require.Equal(t, actions[2], m.sends[2])
+}
+
+func TestGetBlobInfoExcludesSubmoduleFromLFSCandidates(t *testing.T) {
+	tester := newGitalyTester(t)
+	repo := &gitalypb.Repository{StorageName: "st", RelativePath: "repo.git"}
+	paths := []*gitalypb.GetBlobsRequest_RevisionPath{{Revision: "head", Path: []byte("weights")}, {Revision: "head", Path: []byte("submodule")}}
+	tester.mocks.blobClient.EXPECT().GetBlobs(mock.Anything, mock.Anything).Return(&MockGrpcStreamClient[*gitalypb.GetBlobsResponse]{data: []*gitalypb.GetBlobsResponse{
+		{Path: []byte("weights"), Type: gitalypb.ObjectType_BLOB, Oid: "blob", Size: 100},
+		{Path: []byte("submodule"), Type: gitalypb.ObjectType_COMMIT, Oid: "missing-submodule-commit", Size: 0},
+	}}, nil)
+	pointer := "version https://git-lfs.github.com/spec/v1\noid sha256:a4f0e7e96b4f6af4a1b597c2fc4a42ec9a997c64ab7da96760c40582a0ac27a5\nsize 42\n"
+	tester.mocks.blobClient.EXPECT().GetLFSPointers(mock.Anything, &gitalypb.GetLFSPointersRequest{Repository: repo, BlobIds: []string{"blob"}}).Return(
+		&MockGrpcStreamClient[*gitalypb.GetLFSPointersResponse]{data: []*gitalypb.GetLFSPointersResponse{{LfsPointers: []*gitalypb.LFSPointer{{Oid: "blob", Data: []byte(pointer)}}}}}, nil)
+	files, err := tester.getBlobInfo(context.Background(), repo, paths)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+	require.True(t, files[0].Lfs)
+	require.Equal(t, int64(42), files[0].Size)
+	require.False(t, files[1].Lfs)
+	require.Equal(t, "missing-submodule-commit", files[1].SHA)
 }
