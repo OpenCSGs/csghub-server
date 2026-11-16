@@ -358,7 +358,7 @@ func TestChatCompletionChunkModerationTextReasoningPrecedence(t *testing.T) {
 	})
 	assert.Equal(t, "answer\nsecret reasoning", onlyReasoning)
 
-	// Same precedence as chatDeltaReasoning: do not audit both fields when both are set.
+	// The raw event is forwarded with both fields, so both distinct values are audited.
 	both := chatCompletionChunkModerationText(types.ChatCompletionChunk{
 		Choices: []types.ChatCompletionChunkChoice{{
 			Delta: types.ChatCompletionChunkChoiceDelta{
@@ -367,7 +367,17 @@ func TestChatCompletionChunkModerationTextReasoningPrecedence(t *testing.T) {
 			},
 		}},
 	})
-	assert.Equal(t, "preferred", both)
+	assert.Equal(t, "preferred\nfallback", both)
+
+	same := chatCompletionChunkModerationText(types.ChatCompletionChunk{
+		Choices: []types.ChatCompletionChunkChoice{{
+			Delta: types.ChatCompletionChunkChoiceDelta{
+				ReasoningContent: "same",
+				Reasoning:        "same",
+			},
+		}},
+	})
+	assert.Equal(t, "same", same)
 }
 
 func TestModerationImpl_CloseStreamCheck(t *testing.T) {
