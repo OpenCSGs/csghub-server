@@ -1089,6 +1089,25 @@ func TestModerationImpl_PendingPromptVerdictGatesResponse(t *testing.T) {
 		mockSvcClient.AssertExpectations(t)
 	})
 
+	t.Run("reasoning text is submitted to response checking", func(t *testing.T) {
+		for name, field := range map[string]string{"reasoning_content": "reasoning_content", "reasoning": "reasoning"} {
+			t.Run(name, func(t *testing.T) {
+				mockSvcClient := new(MockModerationSvcClient)
+				modImpl := &moderationImpl{modSvcClient: mockSvcClient}
+				mockSvcClient.On("PassTextCheck", mock.Anything, commontypes.ScenarioChatDetection, "answer\nsecret thoughts").
+					Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+				var completion types.ChatCompletion
+				body := `{"choices":[{"message":{"role":"assistant","content":"answer","` + field + `":"secret thoughts"}}]}`
+				assert.NoError(t, json.Unmarshal([]byte(body), &completion))
+				r, err := modImpl.CheckChatNonStreamResponse(context.Background(), completion)
+				assert.NoError(t, err)
+				assert.True(t, r.IsSensitive)
+				mockSvcClient.AssertExpectations(t)
+			})
+		}
+	})
+
 	t.Run("tool call text is submitted to response checking", func(t *testing.T) {
 		mockSvcClient := new(MockModerationSvcClient)
 		modImpl := &moderationImpl{modSvcClient: mockSvcClient}
