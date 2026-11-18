@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
+	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
 )
 
@@ -161,4 +162,44 @@ func TestResponseWriterWrapper_StreamWrite_WithWhiteSpace(t *testing.T) {
 			assert.Equal(t, w.Body.String(), string(tt.wantResp))
 		})
 	}
+}
+
+func TestResponseWriterWrapper_StreamWrite_FallbackReasoningModeration(t *testing.T) {
+	// Primary and fallback reasoning fields differ; the raw event carries both.
+	raw := `{"id":"test-id","choices":[{"index":0,"delta":{"reasoning_content":"harmless","reasoning":"LEAKED-FALLBACK"}}]}`
+	input := []byte("data: " + raw + "\n\n")
+
+	t.Run("hit on fallback field blocks the original chunk", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		mockMod := component.NewMockModeration(t)
+		mockMod.EXPECT().CheckChatStreamResponse(mock.Anything, mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, chunk types.ChatCompletionChunk, _ string) (*rpc.CheckResult, error) {
+				// Only the fallback field is sensitive.
+				assert.Equal(t, "harmless", chunk.Choices[0].Delta.ReasoningContent)
+				return &rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil
+			})
+		wrapper := NewResponseWriterWrapper(ChatWriterParams{InternalWriter: ctx.Writer, Stream: true, ModerationComponent: mockMod, RequestCtx: context.Background()})
+
+		_, err := wrapper.Write(input)
+
+		assert.ErrorIs(t, err, ErrSensitiveContent)
+		body := w.Body.String()
+		assert.NotContains(t, body, "LEAKED-FALLBACK")
+		assert.NotContains(t, body, "harmless")
+		assert.Contains(t, body, `"finish_reason":"sensitive"`)
+		assert.Contains(t, body, "data: [DONE]")
+	})
+
+	t.Run("moderation disabled leaves the event unchanged", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		wrapper := NewResponseWriterWrapper(ChatWriterParams{InternalWriter: ctx.Writer, Stream: true, RequestCtx: context.Background()})
+
+		n, err := wrapper.Write(input)
+
+		assert.NoError(t, err)
+		assert.Equal(t, len(input), n)
+		assert.Equal(t, string(input), w.Body.String())
+	})
 }
