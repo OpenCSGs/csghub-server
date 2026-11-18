@@ -1108,6 +1108,38 @@ func TestModerationImpl_PendingPromptVerdictGatesResponse(t *testing.T) {
 		}
 	})
 
+	t.Run("reasoning fields are combined, deduplicated and filtered", func(t *testing.T) {
+		cases := []struct {
+			name    string
+			message string
+			want    string
+		}{
+			{"different values", `"reasoning_content":"thought a","reasoning":"thought b"`, "answer\nthought a\nthought b"},
+			{"identical values", `"reasoning_content":"same","reasoning":"same"`, "answer\nsame"},
+			{"whitespace-only preferred field", `"reasoning_content":"  \n","reasoning":"thought b"`, "answer\nthought b"},
+			{"non-string and null fields", `"reasoning_content":null,"reasoning":42`, "answer"},
+			{"reasoning only response", `"content":"","reasoning":"only thoughts"`, "only thoughts"},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				mockSvcClient := new(MockModerationSvcClient)
+				modImpl := &moderationImpl{modSvcClient: mockSvcClient}
+				mockSvcClient.On("PassTextCheck", mock.Anything, commontypes.ScenarioChatDetection, tc.want).
+					Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+				body := `{"choices":[{"message":{"role":"assistant","content":"answer",` + tc.message + `}}]}`
+				if strings.Contains(tc.message, `"content"`) {
+					body = `{"choices":[{"message":{"role":"assistant",` + tc.message + `}}]}`
+				}
+				var completion types.ChatCompletion
+				assert.NoError(t, json.Unmarshal([]byte(body), &completion))
+				_, err := modImpl.CheckChatNonStreamResponse(context.Background(), completion)
+				assert.NoError(t, err)
+				mockSvcClient.AssertExpectations(t)
+			})
+		}
+	})
+
 	t.Run("tool call text is submitted to response checking", func(t *testing.T) {
 		mockSvcClient := new(MockModerationSvcClient)
 		modImpl := &moderationImpl{modSvcClient: mockSvcClient}

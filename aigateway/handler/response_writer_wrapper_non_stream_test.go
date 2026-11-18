@@ -442,3 +442,42 @@ func TestNonStreamResponseWriter_EmptyChoicesSplitAcrossWrites(t *testing.T) {
 
 	assert.Equal(t, string(body), w.Body.String())
 }
+
+func TestNonStreamResponseWriter_BlockedResponseDropsReasoning(t *testing.T) {
+	for name, body := range map[string]string{
+		"reasoning_content": `{"choices":[{"message":{"role":"assistant","content":"answer","reasoning_content":"secret thoughts"}}]}`,
+		"reasoning":         `{"choices":[{"message":{"role":"assistant","content":"answer","reasoning":"secret thoughts"}}]}`,
+		"both":              `{"choices":[{"message":{"role":"assistant","content":"answer","reasoning_content":"secret thoughts","reasoning":"secret thoughts"}}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			w.Header().Set("Content-Encoding", "")
+			ctx, _ := gin.CreateTestContext(w)
+			mockMod := component.NewMockModeration(t)
+			nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, RequestCtx: context.Background()})
+
+			mockMod.EXPECT().CheckChatNonStreamResponse(mock.Anything, mock.Anything).
+				Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+			_, err := nsw.Write([]byte(body))
+			require.NoError(t, err)
+
+			assert.NotContains(t, w.Body.String(), "secret thoughts", "a blocked response must not carry the original reasoning text")
+			var out types.ChatCompletion
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+			assert.Contains(t, out.Choices[0].Message.Content, "has been blocked")
+		})
+	}
+}
+
+func TestNonStreamResponseWriter_NoModerationPreservesReasoning(t *testing.T) {
+	w := httptest.NewRecorder()
+	w.Header().Set("Content-Encoding", "")
+	ctx, _ := gin.CreateTestContext(w)
+	nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, RequestCtx: context.Background()})
+
+	body := `{"choices":[{"message":{"role":"assistant","content":"answer","reasoning_content":"thoughts a","reasoning":"thoughts b"}}]}`
+	_, err := nsw.Write([]byte(body))
+	require.NoError(t, err)
+	assert.Equal(t, body, w.Body.String())
+}
