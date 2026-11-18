@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -11,8 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
-	"opencsg.com/csghub-server/aigateway/types"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	aicomponent "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/common/config"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func TestResponseWriterWrapper_StreamWrite(t *testing.T) {
@@ -165,25 +169,32 @@ func TestResponseWriterWrapper_StreamWrite_WithWhiteSpace(t *testing.T) {
 }
 
 func TestResponseWriterWrapper_StreamWrite_FallbackReasoningModeration(t *testing.T) {
-	// Primary and fallback reasoning fields differ; the raw event carries both.
-	raw := `{"id":"test-id","choices":[{"index":0,"delta":{"reasoning_content":"harmless","reasoning":"LEAKED-FALLBACK"}}]}`
-	input := []byte("data: " + raw + "\n\n")
+	// The real moderation component runs; only the moderation service is
+	// stubbed. The stub flags text only when it contains the fallback marker.
+	newModeration := func(t *testing.T, seen *[]string) aicomponent.Moderation {
+		client := mockrpc.NewMockModerationSvcClient(t)
+		client.EXPECT().PassLLMRespCheck(mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, req commontypes.LLMCheckRequest) (*rpc.CheckResult, error) {
+				*seen = append(*seen, req.Text)
+				return &rpc.CheckResult{IsSensitive: strings.Contains(req.Text, "LEAKED-FALLBACK"), Reason: "toxic"}, nil
+			})
+		return aicomponent.NewModerationImplWithClient(&config.Config{}, client, nil)
+	}
+	event := func(delta string) []byte {
+		return []byte(`data: {"id":"test-id","choices":[{"index":0,"delta":` + delta + `}]}` + "\n\n")
+	}
 
 	t.Run("hit on fallback field blocks the original chunk", func(t *testing.T) {
+		var seen []string
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		mockMod := component.NewMockModeration(t)
-		mockMod.EXPECT().CheckChatStreamResponse(mock.Anything, mock.Anything, mock.Anything).
-			RunAndReturn(func(_ context.Context, chunk types.ChatCompletionChunk, _ string) (*rpc.CheckResult, error) {
-				// Only the fallback field is sensitive.
-				assert.Equal(t, "harmless", chunk.Choices[0].Delta.ReasoningContent)
-				return &rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil
-			})
-		wrapper := NewResponseWriterWrapper(ChatWriterParams{InternalWriter: ctx.Writer, Stream: true, ModerationComponent: mockMod, RequestCtx: context.Background()})
+		wrapper := NewResponseWriterWrapper(ChatWriterParams{InternalWriter: ctx.Writer, Stream: true, ModerationComponent: newModeration(t, &seen), RequestCtx: context.Background()})
 
-		_, err := wrapper.Write(input)
+		_, err := wrapper.Write(event(`{"reasoning_content":"harmless","reasoning":"LEAKED-FALLBACK"}`))
 
 		assert.ErrorIs(t, err, ErrSensitiveContent)
+		assert.Len(t, seen, 1)
+		assert.Contains(t, seen[0], "LEAKED-FALLBACK")
 		body := w.Body.String()
 		assert.NotContains(t, body, "LEAKED-FALLBACK")
 		assert.NotContains(t, body, "harmless")
@@ -191,7 +202,21 @@ func TestResponseWriterWrapper_StreamWrite_FallbackReasoningModeration(t *testin
 		assert.Contains(t, body, "data: [DONE]")
 	})
 
+	t.Run("hit on fallback field with empty primary blocks the chunk", func(t *testing.T) {
+		var seen []string
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		wrapper := NewResponseWriterWrapper(ChatWriterParams{InternalWriter: ctx.Writer, Stream: true, ModerationComponent: newModeration(t, &seen), RequestCtx: context.Background()})
+
+		_, err := wrapper.Write(event(`{"reasoning":"LEAKED-FALLBACK"}`))
+
+		assert.ErrorIs(t, err, ErrSensitiveContent)
+		assert.NotContains(t, w.Body.String(), "LEAKED-FALLBACK")
+		assert.Contains(t, w.Body.String(), `"finish_reason":"sensitive"`)
+	})
+
 	t.Run("moderation disabled leaves the event unchanged", func(t *testing.T) {
+		input := event(`{"reasoning_content":"harmless","reasoning":"LEAKED-FALLBACK"}`)
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 		wrapper := NewResponseWriterWrapper(ChatWriterParams{InternalWriter: ctx.Writer, Stream: true, RequestCtx: context.Background()})
