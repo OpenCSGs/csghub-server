@@ -169,9 +169,9 @@ func (w *nativeResponseWriter) extractUsageFromNativeSSE(eventType string, data 
 					FinishReason: finishReason,
 				}},
 				Usage: openai.CompletionUsage{
-					PromptTokens:     w.inputTokens,
+					PromptTokens:     w.promptTokens(),
 					CompletionTokens: w.outputTokens,
-					TotalTokens:      w.inputTokens + w.outputTokens,
+					TotalTokens:      w.promptTokens() + w.outputTokens,
 				},
 			})
 		}
@@ -314,11 +314,18 @@ func (w *nativeResponseWriter) Finalize() error {
 	return nil
 }
 
+// promptTokens returns the total prompt size. Anthropic's input_tokens excludes
+// cache reads and cache creation, whereas tokenUsage.PromptTokens is inclusive
+// of cached tokens (as in the OpenAI-style adapters and metering).
+func (w *nativeResponseWriter) promptTokens() int64 {
+	return w.inputTokens + w.cacheReadTokens + w.cacheCreationTokens
+}
+
 func (w *nativeResponseWriter) Usage() tokenUsage {
 	return tokenUsage{
-		PromptTokens:              w.inputTokens,
+		PromptTokens:              w.promptTokens(),
 		CompletionTokens:          w.outputTokens,
-		TotalTokens:               w.inputTokens + w.outputTokens,
+		TotalTokens:               w.promptTokens() + w.outputTokens,
 		CachedPromptTokens:        w.cacheReadTokens,
 		CacheCreationPromptTokens: w.cacheCreationTokens,
 	}

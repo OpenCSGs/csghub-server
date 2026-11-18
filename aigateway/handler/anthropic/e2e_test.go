@@ -1326,14 +1326,14 @@ func TestE2E_Billing_TokensRecorded_Native_NonStream(t *testing.T) {
 		return recorder.recorded
 	}, 2*time.Second, 10*time.Millisecond)
 
-	assert.Equal(t, int64(10), recorder.inputTokens)
+	assert.Equal(t, int64(15), recorder.inputTokens)
 	assert.Equal(t, int64(5), recorder.outputTokens)
 	assert.Equal(t, int64(3), recorder.cachedPromptTokens)
 	assert.Equal(t, int64(2), recorder.cacheCreationTokens)
 	assert.Equal(t, int64(0), recorder.reasoningTokens)
 
 	assert.True(t, metrics.usageRecorded)
-	assert.Equal(t, int64(10), metrics.inputTokens)
+	assert.Equal(t, int64(15), metrics.inputTokens)
 	assert.Equal(t, int64(5), metrics.outputTokens)
 	assert.Equal(t, int64(3), metrics.cachedPromptTokens)
 }
@@ -1370,7 +1370,7 @@ func TestE2E_Billing_TokensRecorded_Native_Stream(t *testing.T) {
 		return recorder.recorded
 	}, 2*time.Second, 10*time.Millisecond)
 
-	assert.Equal(t, int64(10), recorder.inputTokens)
+	assert.Equal(t, int64(15), recorder.inputTokens)
 	assert.Equal(t, int64(5), recorder.outputTokens)
 	assert.Equal(t, int64(4), recorder.cachedPromptTokens)
 	assert.Equal(t, int64(1), recorder.cacheCreationTokens)
