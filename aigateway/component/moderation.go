@@ -997,7 +997,12 @@ func chatCompletionChunkModerationText(chunk types.ChatCompletionChunk) string {
 	var b strings.Builder
 	for _, choice := range chunk.Choices {
 		writeTextModerationPart(&b, choice.Delta.Content)
-		writeTextModerationPart(&b, choice.Delta.ReasoningText())
+		// The wrapper forwards the raw event, so the client may see both fields:
+		// moderate each distinct value, not only the one chosen for output.
+		writeTextModerationPart(&b, choice.Delta.ReasoningContent)
+		if choice.Delta.Reasoning != choice.Delta.ReasoningContent {
+			writeTextModerationPart(&b, choice.Delta.Reasoning)
+		}
 		writeTextModerationPart(&b, choice.Delta.Refusal)
 		for _, call := range choice.Delta.ToolCalls {
 			writeTextModerationPart(&b, call.Function.Name)
