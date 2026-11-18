@@ -153,11 +153,27 @@ func (w *nativeResponseWriter) extractUsageFromNativeSSE(eventType string, data 
 				StopReason string `json:"stop_reason"`
 			} `json:"delta"`
 			Usage struct {
-				OutputTokens int `json:"output_tokens"`
+				InputTokens              *int `json:"input_tokens"`
+				OutputTokens             int  `json:"output_tokens"`
+				CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
+				CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
 			} `json:"usage"`
 		}
 		if err := json.Unmarshal(data, &event); err == nil {
 			w.outputTokens = int64(event.Usage.OutputTokens)
+			// Anthropic documents message_delta usage as cumulative and newer
+			// responses include input/cache counts there; only override the
+			// message_start values with positive counts so a proxy that sends
+			// zeros does not wipe them.
+			if event.Usage.InputTokens != nil && *event.Usage.InputTokens > 0 {
+				w.inputTokens = int64(*event.Usage.InputTokens)
+			}
+			if event.Usage.CacheReadInputTokens != nil && *event.Usage.CacheReadInputTokens > 0 {
+				w.cacheReadTokens = int64(*event.Usage.CacheReadInputTokens)
+			}
+			if event.Usage.CacheCreationInputTokens != nil && *event.Usage.CacheCreationInputTokens > 0 {
+				w.cacheCreationTokens = int64(*event.Usage.CacheCreationInputTokens)
+			}
 		}
 		if w.recorder != nil {
 			finishReason := messagesStopReasonToFinishReason(event.Delta.StopReason)
