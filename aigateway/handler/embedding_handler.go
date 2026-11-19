@@ -176,8 +176,10 @@ func (h *embeddingPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 		Provider: mt.Model.Provider,
 	})
 	w := NewResponseWriterWrapperEmbedding(c.Writer, tokenCounter)
-	if req.Input.OfString.String() != "" {
-		tokenCounter.Input(req.Input.OfString.Value)
+	// PromptText covers both the single-string and array-of-strings forms, so
+	// the tokenizer fallback still bills when the upstream returns no usage.
+	if text := req.PromptText(); text != "" {
+		tokenCounter.Input(text)
 	}
 
 	proxyStartTime := time.Now()
