@@ -709,7 +709,7 @@ func TestGitHTTPComponent_ListLocks(t *testing.T) {
 	gc.mocks.stores.LfsLockMock().EXPECT().FindByPath(ctx, int64(123), "foo/bar").Return(
 		&database.LfsLock{ID: 12, RepositoryID: 123}, nil,
 	)
-	gc.mocks.stores.LfsLockMock().EXPECT().FindByRepoID(ctx, int64(123), 1, 10).Return(
+	gc.mocks.stores.LfsLockMock().EXPECT().FindByRepoID(ctx, int64(123), 2, 10).Return(
 		[]database.LfsLock{{ID: 13, RepositoryID: 123}}, nil,
 	)
 
@@ -740,6 +740,47 @@ func TestGitHTTPComponent_ListLocks(t *testing.T) {
 	require.Equal(t, &types.LFSLockList{
 		Locks: []*types.LFSLock{{ID: "13", Owner: &types.LFSLockOwner{}}},
 	}, ll)
+}
+
+func TestGitHTTPComponent_ListLocks_CursorIsZeroBased(t *testing.T) {
+	ctx := context.TODO()
+	gc := initializeTestGitHTTPComponent(ctx, t)
+
+	gc.mocks.stores.RepoMock().EXPECT().FindByPath(
+		ctx, types.ModelRepo, "ns", "n",
+	).Return(&database.Repository{ID: 123, Private: true}, nil)
+	gc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{}, nil)
+	gc.mocks.components.repo.EXPECT().AllowReadAccess(
+		ctx, types.ModelRepo, "ns", "n", "user",
+	).Return(true, nil)
+
+	// the first request carries no cursor (0) and must be served as page 1
+	gc.mocks.stores.LfsLockMock().EXPECT().FindByRepoID(ctx, int64(123), 1, 2).Return(
+		[]database.LfsLock{{ID: 1, RepositoryID: 123}, {ID: 2, RepositoryID: 123}}, nil,
+	)
+	// the cursor returned by the first page must lead to page 2
+	gc.mocks.stores.LfsLockMock().EXPECT().FindByRepoID(ctx, int64(123), 2, 2).Return(
+		[]database.LfsLock{{ID: 3, RepositoryID: 123}}, nil,
+	)
+
+	req := types.ListLFSLockReq{
+		Namespace:   "ns",
+		Name:        "n",
+		RepoType:    types.ModelRepo,
+		CurrentUser: "user",
+		Cursor:      0,
+		Limit:       2,
+	}
+	ll, err := gc.ListLocks(ctx, req)
+	require.Nil(t, err)
+	require.Len(t, ll.Locks, 2)
+	require.Equal(t, "1", ll.Next)
+
+	req.Cursor = 1
+	ll, err = gc.ListLocks(ctx, req)
+	require.Nil(t, err)
+	require.Len(t, ll.Locks, 1)
+	require.Equal(t, "", ll.Next)
 }
 
 func TestGitHTTPComponent_UnLock(t *testing.T) {
@@ -794,7 +835,7 @@ func TestGitHTTPComponent_VerifyLock(t *testing.T) {
 		ctx, types.ModelRepo, "ns", "n", "user",
 	).Return(true, nil)
 
-	gc.mocks.stores.LfsLockMock().EXPECT().FindByRepoID(ctx, int64(123), 10, 1).Return(
+	gc.mocks.stores.LfsLockMock().EXPECT().FindByRepoID(ctx, int64(123), 11, 1).Return(
 		[]database.LfsLock{{ID: 11, RepositoryID: 123, User: database.User{Username: "zzz"}}}, nil,
 	)
 
