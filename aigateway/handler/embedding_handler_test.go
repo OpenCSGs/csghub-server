@@ -117,3 +117,61 @@ func TestEmbeddingPipelineExecute_ProxiesEndpointPathToUpstream(t *testing.T) {
 		})
 	}
 }
+
+// TestEmbeddingPipelineExecute_ArrayInputFeedsTokenizerFallback guards the
+// billing fallback: when the upstream response carries no usage (or is too
+// large to capture), the counter estimates tokens from the text handed to
+// Input. An array-of-strings request must hand it every string, not nothing.
+func TestEmbeddingPipelineExecute_ArrayInputFeedsTokenizerFallback(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		_, err := rw.Write([]byte(`{"object":"list","data":[{"object":"embedding","index":0,"embedding":[0.1]},{"object":"embedding","index":1,"embedding":[0.2]}],"model":"provider-model"}`))
+		require.NoError(t, err)
+	}))
+	defer upstream.Close()
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{ID: "test-model"},
+		Endpoint:  upstream.URL,
+	}
+	modelTarget := &types.ModelTarget{
+		Model:     model,
+		Upstream:  commontypes.UpstreamConfig{ID: 1, URL: upstream.URL, Enabled: true},
+		Target:    upstream.URL,
+		ModelName: "provider-model",
+	}
+
+	mockCounter := mocktoken.NewMockEmbeddingTokenCounter(t)
+	mockCounter.EXPECT().Input("hello\nworld").Return().Once()
+	mockCounter.EXPECT().Embedding(mock.Anything).Maybe().Return()
+	mockCounter.EXPECT().Usage(mock.Anything).Maybe().Return((*token.Usage)(nil), nil)
+	tester.mocks.tokenCounterFactory.EXPECT().
+		NewEmbedding(token.CreateParam{Endpoint: upstream.URL, Model: "provider-model"}).
+		Return(mockCounter).Once()
+	tester.mocks.openAIComp.EXPECT().
+		RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Maybe().
+		Return(nil)
+
+	req := &types.EmbeddingRequest{}
+	req.Model = "provider-model"
+	req.Input = openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"hello", "world"}}
+
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewReader([]byte(`{"model":"test-model","input":["hello","world"]}`)))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	meta := &types.RequestMetadata{
+		Protocol:   string(types.ProtocolChat),
+		Task:       "embedding",
+		Model:      "test-model",
+		TenantID:   "testuuid",
+		UserID:     "testuser",
+		ParsedBody: req,
+	}
+	h := &embeddingPipelineHandler{handler: tester.handler}
+	require.NoError(t, h.Execute(c, meta, &types.RequestPlan{ModelTarget: modelTarget}))
+}
