@@ -600,7 +600,8 @@ func (c *gitHTTPComponentImpl) ListLocks(ctx context.Context, req types.ListLFSL
 		return buildLFSLockList([]database.LfsLock{*l}), nil
 	}
 
-	locks, err := c.lfsLockStore.FindByRepoID(ctx, repo.ID, req.Cursor, req.Limit)
+	// the cursor is 0-based while the store pages are 1-based
+	locks, err := c.lfsLockStore.FindByRepoID(ctx, repo.ID, req.Cursor+1, req.Limit)
 	if err != nil {
 		return buildLFSLockList([]database.LfsLock{}), err
 	}
@@ -685,7 +686,8 @@ func (c *gitHTTPComponentImpl) VerifyLock(ctx context.Context, req types.VerifyL
 		return nil, errorx.ErrUnauthorized
 	}
 
-	locks, err := c.lfsLockStore.FindByRepoID(ctx, repo.ID, req.Cursor, req.Limit)
+	// the cursor is 0-based while the store pages are 1-based
+	locks, err := c.lfsLockStore.FindByRepoID(ctx, repo.ID, req.Cursor+1, req.Limit)
 	if err != nil {
 		return &types.LFSLockListVerify{}, err
 	}
