@@ -105,9 +105,13 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 	rdata := types.MonitorData{}
 	rdata.Metric = m.getMetrics(pResult.Metric)
 
-	limit, err := m.CPULimit(ctx, req)
+	limit, err := m.CPULimit(ctx, req, namespace)
 	if err != nil {
 		slog.Warn("failed to get cpu limit", slog.Any("err", err))
+	}
+	if limit <= 0 {
+		// no usable limit: avoid dividing by zero (+Inf/NaN)
+		limit = 1
 	}
 
 	for _, values := range pResult.Values {
@@ -128,8 +132,8 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 	return &resp, nil
 }
 
-func (m *monitorComponentImpl) CPULimit(ctx context.Context, req *types.MonitorReq) (float64, error) {
-	query := fmt.Sprintf("%s{pod='%s',namespace='%s',resource='cpu'}", m.metrics.cpuLimit, req.Instance, m.k8sNameSpace)
+func (m *monitorComponentImpl) CPULimit(ctx context.Context, req *types.MonitorReq, namespace string) (float64, error) {
+	query := fmt.Sprintf("%s{pod='%s',namespace='%s',resource='cpu'}", m.metrics.cpuLimit, req.Instance, namespace)
 	slog.InfoContext(ctx, "cpu-limit", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(url.QueryEscape(query), "")
