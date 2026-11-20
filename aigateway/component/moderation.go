@@ -964,6 +964,9 @@ func (modImpl *moderationImpl) CheckChatNonStreamResponse(ctx context.Context, c
 func chatCompletionMessageModerationText(message openai.ChatCompletionMessage) string {
 	var b strings.Builder
 	writeTextModerationPart(&b, message.Content)
+	for _, reasoning := range chatCompletionMessageReasoning(message) {
+		writeTextModerationPart(&b, reasoning)
+	}
 	writeTextModerationPart(&b, message.Refusal)
 	//nolint:staticcheck // legacy field still emitted by some upstreams and must stay audited
 	writeTextModerationPart(&b, message.FunctionCall.Name)
@@ -976,6 +979,29 @@ func chatCompletionMessageModerationText(message openai.ChatCompletionMessage) s
 		writeTextModerationPart(&b, call.Custom.Input)
 	}
 	return b.String()
+}
+
+// chatCompletionMessageReasoning returns the distinct reasoning_content and
+// reasoning values of a non-stream message. The SDK message type has no field
+// for them, so they are read from the unknown fields it preserves; the
+// response is forwarded to the client unchanged, so both must be audited.
+func chatCompletionMessageReasoning(message openai.ChatCompletionMessage) []string {
+	var out []string
+	for _, key := range []string{"reasoning_content", "reasoning"} {
+		field, ok := message.JSON.ExtraFields[key]
+		if !ok {
+			continue
+		}
+		var value string
+		if err := json.Unmarshal([]byte(field.Raw()), &value); err != nil || strings.TrimSpace(value) == "" {
+			continue
+		}
+		if len(out) == 1 && out[0] == value {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
 }
 
 func (modImpl *moderationImpl) checkResponseText(ctx context.Context, content string) (*rpc.CheckResult, error) {
