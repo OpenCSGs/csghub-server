@@ -94,12 +94,21 @@ func (rw *nonStreamAudioResponseWriter) captureText(data []byte) {
 		Usage    struct {
 			PromptTokens     int64    `json:"prompt_tokens"`
 			CompletionTokens int64    `json:"completion_tokens"`
+			InputTokens      int64    `json:"input_tokens"`
+			OutputTokens     int64    `json:"output_tokens"`
 			TotalTokens      int64    `json:"total_tokens"`
 			Seconds          *float64 `json:"seconds"`
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &resp); err == nil {
 		rw.captureDuration(resp.Usage.Seconds, resp.Duration)
+		// OpenAI transcribe models report usage as input_tokens/output_tokens.
+		if resp.Usage.PromptTokens == 0 {
+			resp.Usage.PromptTokens = resp.Usage.InputTokens
+		}
+		if resp.Usage.CompletionTokens == 0 {
+			resp.Usage.CompletionTokens = resp.Usage.OutputTokens
+		}
 		if resp.Usage.TotalTokens > 0 || resp.Usage.PromptTokens > 0 || resp.Usage.CompletionTokens > 0 {
 			duration, _ := rw.DurationSeconds()
 			rw.tokenCounter.SetUsage(token.Usage{
