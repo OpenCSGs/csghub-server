@@ -275,10 +275,7 @@ func (w *responsesNativeNonStreamWriter) checkNativeNonStreamSensitive(data []by
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return false
 	}
-	content := resp.OutputText
-	if content == "" {
-		content = responsesOutputModerationText(resp.Output)
-	}
+	content := responsesResponseModerationText(resp)
 	if strings.TrimSpace(content) == "" {
 		return false
 	}
@@ -319,10 +316,10 @@ func (w *responsesNativeNonStreamWriter) checkNativeNonStreamSensitive(data []by
 	return true
 }
 
-// responsesStreamEventText extracts a single text field from a Responses SSE
-// event payload for sensitive-content moderation. Returns ok=true when the
-// payload contains at least one of: a `delta` string, a `response.output_text`
-// assembly, or a refusal string.
+// responsesStreamEventText extracts text from a Responses SSE event payload
+// for sensitive-content moderation. Returns ok=true when the payload contains
+// a delta, an assembled response (output_text plus any reasoning summary), an
+// output item, or a content part.
 func responsesStreamEventText(data []byte) (string, bool) {
 	var ev types.ResponsesStreamEvent
 	if err := json.Unmarshal(data, &ev); err != nil {
@@ -332,10 +329,7 @@ func responsesStreamEventText(data []byte) (string, bool) {
 		return text, true
 	}
 	if ev.Response != nil {
-		if text := strings.TrimSpace(ev.Response.OutputText); text != "" {
-			return text, true
-		}
-		if text := strings.TrimSpace(responsesOutputModerationText(ev.Response.Output)); text != "" {
+		if text := strings.TrimSpace(responsesResponseModerationText(*ev.Response)); text != "" {
 			return text, true
 		}
 	}
@@ -355,6 +349,23 @@ func responsesStreamEventText(data []byte) (string, bool) {
 	return "", false
 }
 
+// responsesResponseModerationText is the audited text of one assembled
+// Responses payload. output_text covers the assistant message, but a reasoning
+// item's summary is not part of output_text and has to be checked with it.
+// When output_text is blank, the output items are the whole payload.
+func responsesResponseModerationText(resp types.ResponsesResponse) string {
+	var b strings.Builder
+	if strings.TrimSpace(resp.OutputText) == "" {
+		writeModerationText(&b, responsesOutputModerationText(resp.Output))
+		return b.String()
+	}
+	writeModerationText(&b, resp.OutputText)
+	for _, item := range resp.Output {
+		writeOutputItemSummary(&b, item)
+	}
+	return b.String()
+}
+
 func responsesOutputModerationText(items []types.ResponsesOutputItem) string {
 	var b strings.Builder
 	for _, item := range items {
@@ -363,8 +374,15 @@ func responsesOutputModerationText(items []types.ResponsesOutputItem) string {
 		for _, part := range item.Content {
 			writeModerationText(&b, responsesContentPartModerationText(part))
 		}
+		writeOutputItemSummary(&b, item)
 	}
 	return b.String()
+}
+
+func writeOutputItemSummary(b *strings.Builder, item types.ResponsesOutputItem) {
+	for _, part := range item.Summary {
+		writeModerationText(b, part.Text)
+	}
 }
 
 func responsesContentPartModerationText(part types.ResponsesContentPart) string {
