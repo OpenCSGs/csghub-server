@@ -523,6 +523,56 @@ func TestResponsesNativeReasoningSummaryPreservedWhenClean(t *testing.T) {
 	})
 }
 
+func TestResponsesNativeStreamWriterBlocksSensitiveAssembledEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mapper, err := responsespkg.NewIDMapper("test-secret")
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	transformer := newResponsesNativePayloadTransformer(mapper, responsespkg.IDClaims{NamespaceUUID: "namespace-1", UpstreamID: 7}, "", nil)
+
+	moderation := mockcomp.NewMockModeration(t)
+	moderation.EXPECT().CheckText(
+		mock.Anything,
+		types.TextModerationRequest{
+			Content: "safe first chunk",
+			Key:     "session-1",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeStream,
+		},
+	).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+	moderation.EXPECT().CheckText(
+		mock.Anything,
+		types.TextModerationRequest{
+			Content: "answer\nlookup\nsecret-arguments",
+			Key:     "session-1",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeStream,
+		},
+	).Return(&rpc.CheckResult{IsSensitive: true, Reason: "blocked"}, nil).Once()
+	moderation.EXPECT().CloseStreamCheck(mock.Anything, "session-1").
+		Return(&rpc.CheckResult{IsSensitive: false}, nil).Maybe()
+
+	writer := newResponsesNativeStreamWriter(ctx.Writer, transformer, moderation, "session-1")
+	writer.WriteHeader(http.StatusOK)
+	fixture := "event: response.output_text.delta\n" +
+		`data: {"type":"response.output_text.delta","delta":"safe first chunk"}` + "\n\n" +
+		"event: response.completed\n" +
+		`data: {"type":"response.completed","response":{"output_text":"answer","output":[{"type":"function_call","name":"lookup","arguments":"secret-arguments"}]}}` + "\n\n" +
+		"data: [DONE]\n\n"
+	_, err = writer.Write([]byte(fixture))
+	require.NoError(t, err)
+	require.NoError(t, writer.Finalize())
+
+	body := rec.Body.String()
+	require.Contains(t, body, "safe first chunk")
+	require.Contains(t, body, responsespkg.BlockedMessage)
+	require.NotContains(t, body, "secret-arguments")
+	require.NotContains(t, body, "lookup")
+	require.Equal(t, 1, strings.Count(body, "event: response.completed"))
+	require.Equal(t, 1, strings.Count(body, "data: [DONE]"))
+}
+
 func TestResponsesNativeStreamWriterPassthroughUpstreamJSONError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	mapper, err := responsespkg.NewIDMapper("test-secret")
