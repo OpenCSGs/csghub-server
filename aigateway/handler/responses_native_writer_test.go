@@ -304,6 +304,26 @@ func TestResponsesNativeReasoningSummaryStreamEvent(t *testing.T) {
 	}`))
 	require.True(t, ok)
 	require.Equal(t, "answer", text)
+
+	text, ok = responsesStreamEventText([]byte(`{
+		"type":"response.completed",
+		"response":{
+			"output_text":"answer",
+			"output":[{"type":"reasoning","content":[{"type":"reasoning_text","text":"secret thoughts"}]}]
+		}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "answer\nsecret thoughts", text)
+
+	text, ok = responsesStreamEventText([]byte(`{
+		"type":"response.completed",
+		"response":{
+			"output_text":"answer",
+			"output":[{"type":"function_call","name":"lookup","arguments":"{\"q\":\"secret thoughts\"}"}]
+		}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "answer\nlookup\n{\"q\":\"secret thoughts\"}", text)
 }
 
 func TestResponsesNativeReasoningSummaryNonStream(t *testing.T) {
@@ -381,6 +401,34 @@ func TestResponsesNativeReasoningSummaryNonStream(t *testing.T) {
 				"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"  \n"}]}]
 			}`,
 			want: "answer",
+		},
+		{
+			name: "reasoning content plus output_text",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output_text":"answer",
+				"output":[
+					{"type":"reasoning","content":[{"type":"reasoning_text","text":"secret thoughts"}]},
+					{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]}
+				]
+			}`,
+			want: "answer\nsecret thoughts",
+		},
+		{
+			name: "function_call plus output_text",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output_text":"answer",
+				"output":[
+					{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"q\":\"secret thoughts\"}"},
+					{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]}
+				]
+			}`,
+			want: "answer\nlookup\n{\"q\":\"secret thoughts\"}",
 		},
 	}
 	for _, tc := range cases {

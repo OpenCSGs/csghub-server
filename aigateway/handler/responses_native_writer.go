@@ -318,7 +318,7 @@ func (w *responsesNativeNonStreamWriter) checkNativeNonStreamSensitive(data []by
 
 // responsesStreamEventText extracts text from a Responses SSE event payload
 // for sensitive-content moderation. Returns ok=true when the payload contains
-// a delta, an assembled response (output_text plus any reasoning summary), an
+// a delta, an assembled response (output_text plus non-message items), an
 // output item, or a content part.
 func responsesStreamEventText(data []byte) (string, bool) {
 	var ev types.ResponsesStreamEvent
@@ -350,9 +350,10 @@ func responsesStreamEventText(data []byte) (string, bool) {
 }
 
 // responsesResponseModerationText is the audited text of one assembled
-// Responses payload. output_text covers the assistant message, but a reasoning
-// item's summary is not part of output_text and has to be checked with it.
-// When output_text is blank, the output items are the whole payload.
+// Responses payload. output_text covers assistant message items. Reasoning
+// content, tool names and arguments, and reasoning summaries are not part of
+// output_text, so every other output item is checked with it. When output_text
+// is blank, the output items are the whole payload.
 func responsesResponseModerationText(resp types.ResponsesResponse) string {
 	var b strings.Builder
 	if strings.TrimSpace(resp.OutputText) == "" {
@@ -360,9 +361,14 @@ func responsesResponseModerationText(resp types.ResponsesResponse) string {
 		return b.String()
 	}
 	writeModerationText(&b, resp.OutputText)
+	extra := make([]types.ResponsesOutputItem, 0, len(resp.Output))
 	for _, item := range resp.Output {
-		writeOutputItemSummary(&b, item)
+		if item.Type == "message" {
+			continue
+		}
+		extra = append(extra, item)
 	}
+	writeModerationText(&b, responsesOutputModerationText(extra))
 	return b.String()
 }
 
