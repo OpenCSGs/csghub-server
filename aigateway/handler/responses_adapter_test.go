@@ -2210,6 +2210,26 @@ func TestResponsesToChatRequestKeepsSurvivingFunctionToolChoice(t *testing.T) {
 	require.JSONEq(t, `{"type":"function","function":{"name":"get_weather"}}`, string(parsed["tool_choice"]))
 }
 
+func TestResponsesToChatRequestConvertsFlatFunctionToolChoice(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:      "public",
+		Input:      json.RawMessage(`"hello"`),
+		ToolChoice: json.RawMessage(`{"type":"function","name":"get_weather"}`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "get_weather", "parameters": {"type": "object"}},
+			{"type": "code_interpreter"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.JSONEq(t, `{"type":"function","function":{"name":"get_weather"}}`, string(parsed["tool_choice"]))
+}
+
 func TestResponsesToChatRequestDropsMissingFunctionToolChoice(t *testing.T) {
 	req := &types.ResponsesRequest{
 		Model:      "public",
