@@ -719,7 +719,11 @@ func responsesToolChoiceToChatToolChoice(ctx context.Context, raw json.RawMessag
 	}
 	var function map[string]json.RawMessage
 	if err := json.Unmarshal(obj["function"], &function); err != nil {
-		return nil, nil
+		// Responses API forces a tool with a flat {"type":"function","name":...}.
+		if _, ok := obj["name"]; !ok {
+			return nil, nil
+		}
+		function = map[string]json.RawMessage{"name": obj["name"]}
 	}
 	var functionName string
 	_ = json.Unmarshal(function["name"], &functionName)
@@ -736,6 +740,7 @@ func responsesToolChoiceToChatToolChoice(ctx context.Context, raw json.RawMessag
 		return nil, fmt.Errorf("convert responses tool_choice to chat tool_choice: %w", err)
 	}
 	obj["function"] = functionRaw
+	delete(obj, "name")
 	result, err := json.Marshal(obj)
 	if err != nil {
 		return nil, fmt.Errorf("convert responses tool_choice to chat tool_choice: %w", err)
