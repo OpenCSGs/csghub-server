@@ -258,6 +258,321 @@ func TestResponsesNativeNonStreamWriterModeratesRefusalContent(t *testing.T) {
 	require.Equal(t, "application/json; charset=utf-8", rec.Header().Get("Content-Type"))
 }
 
+func TestResponsesNativeReasoningSummaryStreamEvent(t *testing.T) {
+	text, ok := responsesStreamEventText([]byte(`{
+		"type":"response.completed",
+		"response":{
+			"output_text":"answer",
+			"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"secret thoughts"}]}]
+		}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "answer\nsecret thoughts", text)
+
+	text, ok = responsesStreamEventText([]byte(`{
+		"type":"response.output_item.done",
+		"item":{"type":"reasoning","summary":[{"type":"summary_text","text":"secret thoughts"}]}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "secret thoughts", text)
+
+	text, ok = responsesStreamEventText([]byte(`{
+		"type":"response.output_item.done",
+		"item":{
+			"type":"reasoning",
+			"content":[{"type":"output_text","text":"answer"}],
+			"summary":[{"type":"summary_text","text":"secret thoughts"}]
+		}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "answer\nsecret thoughts", text)
+
+	text, ok = responsesStreamEventText([]byte(`{
+		"type":"response.reasoning_summary_text.delta",
+		"delta":"chunk",
+		"response":{"output_text":"answer","output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"secret thoughts"}]}]}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "chunk", text)
+
+	text, ok = responsesStreamEventText([]byte(`{
+		"type":"response.completed",
+		"response":{
+			"output_text":"answer",
+			"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"  \n"}]}]
+		}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "answer", text)
+
+	text, ok = responsesStreamEventText([]byte(`{
+		"type":"response.completed",
+		"response":{
+			"output_text":"answer",
+			"output":[{"type":"reasoning","content":[{"type":"reasoning_text","text":"secret thoughts"}]}]
+		}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "answer\nsecret thoughts", text)
+
+	text, ok = responsesStreamEventText([]byte(`{
+		"type":"response.completed",
+		"response":{
+			"output_text":"answer",
+			"output":[{"type":"function_call","name":"lookup","arguments":"{\"q\":\"secret thoughts\"}"}]
+		}
+	}`))
+	require.True(t, ok)
+	require.Equal(t, "answer\nlookup\n{\"q\":\"secret thoughts\"}", text)
+}
+
+func TestResponsesNativeReasoningSummaryNonStream(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "output_text plus summary",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output_text":"answer",
+				"output":[
+					{"type":"reasoning","summary":[{"type":"summary_text","text":"secret thoughts"}]},
+					{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]}
+				]
+			}`,
+			want: "answer\nsecret thoughts",
+		},
+		{
+			name: "summary only",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"secret thoughts"}]}]
+			}`,
+			want: "secret thoughts",
+		},
+		{
+			name: "blank output_text still audits the summary",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output_text":"  \n",
+				"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"secret thoughts"}]}]
+			}`,
+			want: "secret thoughts",
+		},
+		{
+			name: "message content and summary without output_text",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output":[
+					{"type":"reasoning","summary":[{"type":"summary_text","text":"secret thoughts"}]},
+					{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]}
+				]
+			}`,
+			want: "secret thoughts\nanswer",
+		},
+		{
+			name: "several summary parts",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output_text":"answer",
+				"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"first"},{"type":"summary_text","text":"second"}]}]
+			}`,
+			want: "answer\nfirst\nsecond",
+		},
+		{
+			name: "whitespace summary is not submitted",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output_text":"answer",
+				"output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"  \n"}]}]
+			}`,
+			want: "answer",
+		},
+		{
+			name: "reasoning content plus output_text",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output_text":"answer",
+				"output":[
+					{"type":"reasoning","content":[{"type":"reasoning_text","text":"secret thoughts"}]},
+					{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]}
+				]
+			}`,
+			want: "answer\nsecret thoughts",
+		},
+		{
+			name: "function_call plus output_text",
+			body: `{
+				"id":"resp_upstream_1",
+				"object":"response",
+				"status":"completed",
+				"output_text":"answer",
+				"output":[
+					{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"q\":\"secret thoughts\"}"},
+					{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]}
+				]
+			}`,
+			want: "answer\nlookup\n{\"q\":\"secret thoughts\"}",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			mapper, err := responsespkg.NewIDMapper("test-secret")
+			require.NoError(t, err)
+			rec := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(rec)
+			transformer := newResponsesNativePayloadTransformer(mapper, responsespkg.IDClaims{NamespaceUUID: "namespace-1", UpstreamID: 7}, "", nil)
+
+			moderation := mockcomp.NewMockModeration(t)
+			moderation.EXPECT().CheckText(
+				mock.MatchedBy(func(ctx context.Context) bool {
+					deadline, ok := ctx.Deadline()
+					return ok && time.Until(deadline) <= responsespkg.ModerationTimeout
+				}),
+				types.TextModerationRequest{
+					Content: tc.want,
+					Key:     "session-1",
+					Phase:   types.TextModerationPhaseResponse,
+					Mode:    types.TextModerationModeNonStream,
+				},
+			).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+			writer := newResponsesNativeNonStreamWriter(ctx.Writer, transformer, moderation, "session-1")
+			writer.WriteHeader(http.StatusOK)
+			_, err = writer.Write([]byte(tc.body))
+			require.NoError(t, err)
+			require.NoError(t, writer.Finalize())
+
+			body := rec.Body.String()
+			require.Contains(t, body, responsespkg.BlockedMessage)
+			require.NotContains(t, body, "secret thoughts")
+			require.NotContains(t, body, "resp_upstream_1")
+			require.Equal(t, http.StatusOK, rec.Code)
+		})
+	}
+}
+
+func TestResponsesNativeReasoningSummaryPreservedWhenClean(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mapper, err := responsespkg.NewIDMapper("test-secret")
+	require.NoError(t, err)
+	body := `{
+		"id":"resp_upstream_1",
+		"object":"response",
+		"status":"completed",
+		"output_text":"answer",
+		"output":[
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"secret thoughts"}]},
+			{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]}
+		]
+	}`
+
+	t.Run("not sensitive", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(rec)
+		transformer := newResponsesNativePayloadTransformer(mapper, responsespkg.IDClaims{NamespaceUUID: "namespace-1", UpstreamID: 7}, "", nil)
+		moderation := mockcomp.NewMockModeration(t)
+		moderation.EXPECT().CheckText(
+			mock.Anything,
+			types.TextModerationRequest{
+				Content: "answer\nsecret thoughts",
+				Key:     "session-1",
+				Phase:   types.TextModerationPhaseResponse,
+				Mode:    types.TextModerationModeNonStream,
+			},
+		).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+		writer := newResponsesNativeNonStreamWriter(ctx.Writer, transformer, moderation, "session-1")
+		writer.WriteHeader(http.StatusOK)
+		_, err := writer.Write([]byte(body))
+		require.NoError(t, err)
+		require.NoError(t, writer.Finalize())
+		require.Contains(t, rec.Body.String(), "secret thoughts")
+		require.Contains(t, rec.Body.String(), "answer")
+		require.NotContains(t, rec.Body.String(), responsespkg.BlockedMessage)
+	})
+
+	t.Run("moderation disabled", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(rec)
+		transformer := newResponsesNativePayloadTransformer(mapper, responsespkg.IDClaims{NamespaceUUID: "namespace-1", UpstreamID: 7}, "", nil)
+		writer := newResponsesNativeNonStreamWriter(ctx.Writer, transformer, nil, "session-1")
+		writer.WriteHeader(http.StatusOK)
+		_, err := writer.Write([]byte(body))
+		require.NoError(t, err)
+		require.NoError(t, writer.Finalize())
+		require.Contains(t, rec.Body.String(), "secret thoughts")
+		require.Contains(t, rec.Body.String(), `"output_text":"answer"`)
+	})
+}
+
+func TestResponsesNativeStreamWriterBlocksSensitiveAssembledEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mapper, err := responsespkg.NewIDMapper("test-secret")
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	transformer := newResponsesNativePayloadTransformer(mapper, responsespkg.IDClaims{NamespaceUUID: "namespace-1", UpstreamID: 7}, "", nil)
+
+	moderation := mockcomp.NewMockModeration(t)
+	moderation.EXPECT().CheckText(
+		mock.Anything,
+		types.TextModerationRequest{
+			Content: "safe first chunk",
+			Key:     "session-1",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeStream,
+		},
+	).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+	moderation.EXPECT().CheckText(
+		mock.Anything,
+		types.TextModerationRequest{
+			Content: "answer\nlookup\nsecret-arguments",
+			Key:     "session-1",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeStream,
+		},
+	).Return(&rpc.CheckResult{IsSensitive: true, Reason: "blocked"}, nil).Once()
+	moderation.EXPECT().CloseStreamCheck(mock.Anything, "session-1").
+		Return(&rpc.CheckResult{IsSensitive: false}, nil).Maybe()
+
+	writer := newResponsesNativeStreamWriter(ctx.Writer, transformer, moderation, "session-1")
+	writer.WriteHeader(http.StatusOK)
+	fixture := "event: response.output_text.delta\n" +
+		`data: {"type":"response.output_text.delta","delta":"safe first chunk"}` + "\n\n" +
+		"event: response.completed\n" +
+		`data: {"type":"response.completed","response":{"output_text":"answer","output":[{"type":"function_call","name":"lookup","arguments":"secret-arguments"}]}}` + "\n\n" +
+		"data: [DONE]\n\n"
+	_, err = writer.Write([]byte(fixture))
+	require.NoError(t, err)
+	require.NoError(t, writer.Finalize())
+
+	body := rec.Body.String()
+	require.Contains(t, body, "safe first chunk")
+	require.Contains(t, body, responsespkg.BlockedMessage)
+	require.NotContains(t, body, "secret-arguments")
+	require.NotContains(t, body, "lookup")
+	require.Equal(t, 1, strings.Count(body, "event: response.completed"))
+	require.Equal(t, 1, strings.Count(body, "data: [DONE]"))
+}
+
 func TestResponsesNativeStreamWriterPassthroughUpstreamJSONError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	mapper, err := responsespkg.NewIDMapper("test-secret")
