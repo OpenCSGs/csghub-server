@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/url"
 	"testing"
 
@@ -630,4 +631,149 @@ func TestMonitor_CPUUsage(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestMonitor_CPUUsage_NoLimit(t *testing.T) {
+	ctx := context.TODO()
+
+	req := &types.MonitorReq{
+		CurrentUser:  "user",
+		Namespace:    "ns",
+		Name:         "n",
+		RepoType:     types.SpaceRepo,
+		DeployID:     1,
+		Instance:     "test-instance",
+		LastDuration: "30m",
+	}
+
+	cfg := &config.Config{}
+
+	usc := mock_rpc.NewMockUserSvcClient(t)
+	client := prometheus_mock.NewMockPrometheusClient(t)
+	deployTaskStore := mockdb.NewMockDeployTaskStore(t)
+	repoStore := mockdb.NewMockRepoStore(t)
+
+	usc.EXPECT().GetUserInfo(ctx, req.CurrentUser, req.CurrentUser).Return(&rpc.User{
+		ID:       1,
+		Username: req.CurrentUser,
+		Roles:    []string{"person"},
+	}, nil)
+	repoStore.EXPECT().FindByPath(ctx, req.RepoType, req.Namespace, req.Name).Return(&database.Repository{
+		ID: 1,
+	}, nil)
+	deployTaskStore.EXPECT().GetDeployByID(ctx, req.DeployID).Return(&database.Deploy{
+		ID:      1,
+		RepoID:  1,
+		SvcName: "test",
+		UserID:  1,
+	}, nil)
+
+	// the limit query finds nothing
+	query := fmt.Sprintf("kube_pod_container_resource_limits{pod='%s',namespace='%s',resource='cpu'}", req.Instance, "")
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
+		Data: types.PrometheusData{ResultType: "vector"},
+	}, nil)
+
+	query = fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='user-container'}[1m])[%s:])[%s:%s]", req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
+		Data: types.PrometheusData{
+			ResultType: "vector",
+			Result: []types.PrometheusResult{
+				{
+					Metric: map[string]string{"pod": "test-instance"},
+					Values: [][]any{{1678617600.0, "0.5"}},
+				},
+			},
+		},
+	}, nil)
+
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, nil, defaultTestMetrics)
+	require.Nil(t, err)
+
+	resp, err := mon.CPUUsage(ctx, req)
+	require.Nil(t, err)
+	require.Len(t, resp.Result, 1)
+	require.Len(t, resp.Result[0].Values, 1)
+	v := resp.Result[0].Values[0].Value
+	require.False(t, math.IsInf(v, 0) || math.IsNaN(v))
+	require.GreaterOrEqual(t, v, 0.0)
+	require.LessOrEqual(t, v, 100.0)
+}
+
+func TestMonitor_CPUUsage_Evaluation_WorkflowNamespace(t *testing.T) {
+	ctx := context.TODO()
+
+	req := &types.MonitorReq{
+		CurrentUser:  "user",
+		Namespace:    "ns",
+		Name:         "n",
+		RepoType:     types.SpaceRepo,
+		DeployType:   "evaluation",
+		DeployID:     1,
+		Instance:     "test-instance",
+		LastDuration: "30m",
+	}
+
+	// the space namespace differs from the workflow namespace
+	cfg := &config.Config{}
+	cfg.Cluster.SpaceNamespace = "spaces"
+
+	usc := mock_rpc.NewMockUserSvcClient(t)
+	client := prometheus_mock.NewMockPrometheusClient(t)
+	deployTaskStore := mockdb.NewMockDeployTaskStore(t)
+	repoStore := mockdb.NewMockRepoStore(t)
+	mockWorkflowStore := mockdb.NewMockArgoWorkFlowStore(t)
+
+	usc.EXPECT().GetUserByName(ctx, req.CurrentUser).Return(&types.User{
+		ID:       1,
+		Username: req.CurrentUser,
+		UUID:     "user-uuid-1",
+		Roles:    []string{"person"},
+	}, nil)
+	mockWorkflowStore.EXPECT().FindByID(ctx, req.DeployID).Return(database.ArgoWorkflow{
+		ID:        1,
+		Username:  "user",
+		UserUUID:  "user-uuid-1",
+		Namespace: "workflows",
+	}, nil)
+	usc.EXPECT().GetNameSpaceInfoByUUID(ctx, "user-uuid-1").Return(&rpc.Namespace{
+		Path:   "user",
+		NSType: "user",
+	}, nil)
+
+	// limit query must use the workflow namespace, not the space namespace
+	query := fmt.Sprintf("kube_pod_container_resource_limits{pod='%s',namespace='%s',resource='cpu'}", req.Instance, "workflows")
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
+		Data: types.PrometheusData{
+			ResultType: "vector",
+			Result: []types.PrometheusResult{
+				{
+					Metric: map[string]string{"pod": "test-instance"},
+					Value:  []any{1678617600.0, "2"},
+				},
+			},
+		},
+	}, nil)
+
+	query = fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='main'}[1m])[%s:])[%s:%s]", req.Instance, "workflows", req.LastDuration, req.LastDuration, req.TimeRange)
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
+		Data: types.PrometheusData{
+			ResultType: "vector",
+			Result: []types.PrometheusResult{
+				{
+					Metric: map[string]string{"pod": "test-instance"},
+					Values: [][]any{{1678617600.0, "0.5"}},
+				},
+			},
+		},
+	}, nil)
+
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, mockWorkflowStore, nil, defaultTestMetrics)
+	require.Nil(t, err)
+
+	resp, err := mon.CPUUsage(ctx, req)
+	require.Nil(t, err)
+	require.Len(t, resp.Result, 1)
+	require.Len(t, resp.Result[0].Values, 1)
+	require.InDelta(t, 25.0, resp.Result[0].Values[0].Value, 1e-9)
 }
