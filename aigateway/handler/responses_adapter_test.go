@@ -354,6 +354,42 @@ func TestResponsesToChatRequestMapsStringInputAndInstructions(t *testing.T) {
 	require.Len(t, chatReq.Messages, 2)
 }
 
+func TestResponsesToChatRequestMapsTextFormatToResponseFormat(t *testing.T) {
+	cases := map[string]struct {
+		format string
+		want   string
+	}{
+		"flat json_schema": {
+			format: `{"type":"json_schema","name":"person","description":"a person","schema":{"type":"object"},"strict":true}`,
+			want:   `{"type":"json_schema","json_schema":{"name":"person","description":"a person","schema":{"type":"object"},"strict":true}}`,
+		},
+		"nested json_schema": {
+			format: `{"type":"json_schema","json_schema":{"name":"person","schema":{"type":"object"}}}`,
+			want:   `{"type":"json_schema","json_schema":{"name":"person","schema":{"type":"object"}}}`,
+		},
+		"json_object": {
+			format: `{"type":"json_object"}`,
+			want:   `{"type":"json_object"}`,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			req := &types.ResponsesRequest{
+				Model: "public",
+				Input: json.RawMessage(`"hello"`),
+				Text:  json.RawMessage(`{"format":` + tc.format + `}`),
+			}
+			chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+			require.NoError(t, err)
+			body, err := json.Marshal(chatReq)
+			require.NoError(t, err)
+			var got map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(body, &got))
+			require.JSONEq(t, tc.want, string(got["response_format"]))
+		})
+	}
+}
+
 func TestResponsesToChatRequestIgnoresNonStringInstructions(t *testing.T) {
 	req := &types.ResponsesRequest{
 		Model:        "public",
