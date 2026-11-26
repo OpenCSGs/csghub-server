@@ -82,6 +82,14 @@ func responsesToChatRequestResolved(ctx context.Context, req *types.ResponsesReq
 		Temperature: floatPtrValue(req.Temperature),
 		TopP:        floatPtrValue(req.TopP),
 	}
+	// The float64 fields are omitempty, so an explicit 0 must go through RawJSON
+	// or the upstream applies its own default.
+	if req.Temperature != nil && *req.Temperature == 0 {
+		mergeChatRawJSON(chatReq, "temperature", 0)
+	}
+	if req.TopP != nil && *req.TopP == 0 {
+		mergeChatRawJSON(chatReq, "top_p", 0)
+	}
 	// Convert tools before messages so history remapping can consult the aliases.
 	if len(req.Tools) > 0 {
 		chatTools, err := responsesToolsToChatTools(ctx, req.Tools, modelName, toolAliases)
