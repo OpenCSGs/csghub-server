@@ -119,9 +119,12 @@ func messagesToChatRequest(req *types.AnthropicMessagesRequest, modelName string
 	// When the client does not set the top-level thinking field, also check
 	// extra_body.reasoning_effort as a compatibility fallback — some clients
 	// (Litellm, OpenAI SDK) pass reasoning_effort that way.
+	// An explicit output_config.effort wins over the thinking budget.
+	outputCfg := parseOutputConfig(req)
 	effort := ""
 	if req.HasThinking() {
-		if req.Thinking.BudgetTokens > 0 {
+		effort = outputCfg.reasoningEffort()
+		if effort == "" && req.Thinking.BudgetTokens > 0 {
 			effort = budgetToEffort(req.Thinking.BudgetTokens)
 		}
 	} else {
@@ -132,6 +135,17 @@ func messagesToChatRequest(req *types.AnthropicMessagesRequest, modelName string
 			effort = "medium"
 		}
 		chatReq["reasoning_effort"] = effort
+	}
+	// Structured output → response_format.  strict is left at its default
+	// (false) so Anthropic schemas with optional properties are accepted.
+	if schema := outputCfg.jsonSchema(); schema != nil {
+		chatReq["response_format"] = map[string]any{
+			"type": "json_schema",
+			"json_schema": map[string]any{
+				"name":   structuredOutputName,
+				"schema": schema,
+			},
+		}
 	}
 
 	return chatReq, nil
