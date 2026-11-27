@@ -734,13 +734,13 @@ func messagesToResponsesRequest(req *types.AnthropicMessagesRequest, modelName s
 
 	// Structured output → text.format.  strict is set explicitly because the
 	// Responses API defaults it to true, which rejects optional properties
-	// that Anthropic schemas allow.
+	// that Anthropic schemas allow.  Replies are validated either way.
 	if schema := outputCfg.jsonSchema(); schema != nil {
 		text, err := json.Marshal(map[string]any{"format": map[string]any{
 			"type":   "json_schema",
 			"name":   structuredOutputName,
 			"schema": schema,
-			"strict": false,
+			"strict": strictSchema(schema),
 		}})
 		if err != nil {
 			return nil, fmt.Errorf("marshal output format: %w", err)

@@ -2,8 +2,12 @@ package anthropic
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -64,4 +68,80 @@ func TestMessagesAdaptersForwardOutputConfigFormat(t *testing.T) {
 	respReq, err := messagesToResponsesRequest(req, "upstream-model")
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"format":{"type":"json_schema","name":"response","schema":`+schema+`,"strict":false}}`, string(respReq.Text))
+}
+
+// An upstream may complete normally without honouring the schema; that reply
+// must not reach the client as a successful message.
+func TestMessagesAdaptersRejectReplyBreakingOutputSchema(t *testing.T) {
+	req := decodeMessagesRequest(t, `,"output_config":{"format":{"type":"json_schema","schema":{"type":"object","properties":{"summary":{"type":"string"},"note":{"type":"string"}},"required":["summary"]}}}`)
+	schema, err := newOutputSchema(req)
+	require.NoError(t, err)
+
+	chatBody := func(text string) string {
+		return `{"id":"c","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":` + jsonString(text) + `},"finish_reason":"stop"}]}`
+	}
+	responsesBody := func(text string) string {
+		return `{"id":"r","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":` + jsonString(text) + `}]}]}`
+	}
+	chatChunk := func(text string) string {
+		return `data: {"id":"c","choices":[{"index":0,"delta":{"content":` + jsonString(text) + `},"finish_reason":"stop"}]}` + "\n\n"
+	}
+	responsesEvents := func(text string) string {
+		return "event: response.created\ndata: " + `{"type":"response.created","response":{"id":"r"}}` + "\n\n" +
+			"event: response.output_text.delta\ndata: " + `{"type":"response.output_text.delta","delta":` + jsonString(text) + `}` + "\n\n" +
+			"event: response.completed\ndata: " + `{"type":"response.completed","response":{"id":"r","status":"completed"}}` + "\n\n"
+	}
+	adapters := []struct {
+		name   string
+		stream bool
+		body   func(string) string
+	}{
+		{"chat", false, chatBody},
+		{"responses", false, responsesBody},
+		{"chat stream", true, chatChunk},
+		{"responses stream", true, responsesEvents},
+	}
+	for _, a := range adapters {
+		for text, valid := range map[string]bool{`{"summary":"ok"}`: true, `{}`: false, `not json`: false} {
+			t.Run(a.name+" "+text, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(rec)
+				var w interface {
+					Write([]byte) (int, error)
+					Finalize() error
+				}
+				if strings.HasPrefix(a.name, "chat") {
+					cw := newToChatResponseWriter(c.Writer, a.stream, "m", "m", nil)
+					cw.schema, w = schema, cw
+				} else {
+					rw := newToResponsesResponseWriter(c.Writer, a.stream, "m", "m", nil)
+					rw.schema, w = schema, rw
+				}
+				_, err := w.Write([]byte(a.body(text)))
+				require.NoError(t, err)
+				require.NoError(t, w.Finalize())
+
+				assert.Equal(t, !valid, strings.Contains(rec.Body.String(), outputSchemaMismatch), rec.Body.String())
+				if a.stream {
+					assert.Equal(t, valid, strings.Contains(rec.Body.String(), "message_stop"), rec.Body.String())
+				} else if !valid {
+					assert.Equal(t, http.StatusBadGateway, rec.Code)
+				}
+			})
+		}
+	}
+}
+
+func TestMessagesAdaptersUseStrictModeForStrictSchemas(t *testing.T) {
+	req := decodeMessagesRequest(t, `,"output_config":{"format":{"type":"json_schema","schema":{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"],"additionalProperties":false}}}`)
+
+	chatReq, err := messagesToChatRequest(req, "m", false)
+	require.NoError(t, err)
+	body, err := json.Marshal(chatReq["response_format"])
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `"strict":true`)
+
+	respReq, err := messagesToResponsesRequest(req, "m")
+	require.NoError(t, err)
+	assert.Contains(t, string(respReq.Text), `"strict":true`)
 }
