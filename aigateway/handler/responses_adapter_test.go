@@ -2906,3 +2906,29 @@ func TestCaptureChatStreamUsageKeepsUsageDetails(t *testing.T) {
 	require.NotNil(t, w.usage.OutputTokensDetails)
 	require.Equal(t, int64(25), w.usage.OutputTokensDetails.ReasoningTokens)
 }
+
+func TestResponsesToChatRequestKeepsZeroSamplingParams(t *testing.T) {
+	marshal := func(t *testing.T, body string) map[string]any {
+		var req types.ResponsesRequest
+		require.NoError(t, json.Unmarshal([]byte(body), &req))
+		chatReq, err := responsesToChatRequest(context.Background(), &req, "model", nil)
+		require.NoError(t, err)
+		data, err := json.Marshal(chatReq)
+		require.NoError(t, err)
+		var got map[string]any
+		require.NoError(t, json.Unmarshal(data, &got))
+		return got
+	}
+
+	t.Run("explicit zero is forwarded", func(t *testing.T) {
+		got := marshal(t, `{"model":"model","input":"hi","temperature":0,"top_p":0}`)
+		require.Equal(t, float64(0), got["temperature"])
+		require.Equal(t, float64(0), got["top_p"])
+	})
+
+	t.Run("unset stays absent", func(t *testing.T) {
+		got := marshal(t, `{"model":"model","input":"hi"}`)
+		require.NotContains(t, got, "temperature")
+		require.NotContains(t, got, "top_p")
+	})
+}
