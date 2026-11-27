@@ -37,7 +37,12 @@ func (h *Handler) adaptToResponses(c *gin.Context, req *types.AnthropicMessagesR
 	}
 
 	// Create the response writer.
+	schema, err := newOutputSchema(req)
+	if err != nil {
+		return nil, err
+	}
 	writer := newToResponsesResponseWriter(c.Writer, req.Stream, req.Model, p.ModelTarget.ModelName, logCapture)
+	writer.schema = schema
 	return &types.AdaptResult{Body: body, Writer: writer}, nil
 }
 
@@ -72,6 +77,10 @@ type toResponsesResponseWriter struct {
 	cacheCreationTokens int64
 	reasoningTokens     int64
 	stopReason          string
+
+	// Structured output check; replyText accumulates the streamed text.
+	schema    *outputSchema
+	replyText strings.Builder
 
 	// Stream error tracking.
 	streamFailed    bool
@@ -250,6 +259,12 @@ func (w *toResponsesResponseWriter) Finalize() error {
 					"type": "content_block_stop", "index": tc.blockIdx,
 				})
 			}
+			// A reply that breaks the requested schema ends in an error
+			// event instead of a success completion.
+			if !w.schema.accepts(w.stopReason, w.replyText.String()) {
+				writeAnthropicStreamError(w.ginWriter, http.StatusBadGateway, []byte(outputSchemaMismatchBody))
+				return nil
+			}
 			usageMap := map[string]any{
 				"input_tokens":  int64(uncachedInputTokens(int(w.inputTokens), int(w.cacheReadTokens), int(w.cacheCreationTokens))),
 				"output_tokens": w.outputTokens,
@@ -329,6 +344,11 @@ func (w *toResponsesResponseWriter) Finalize() error {
 		w.recorder.Completion(buildChatCompletionFromResponsesResponse(&resp, w.upstreamModel))
 	}
 	w.ginWriter.Header().Set("Content-Type", "application/json")
+	if !w.schema.accepts(stopReasonOf(result.StopReason), replyText(result.Content)) {
+		w.statusCode = http.StatusBadGateway
+		writeAnthropicErrorJSON(w.ginWriter, http.StatusBadGateway, ErrTypeAPI, outputSchemaMismatch)
+		return nil
+	}
 	if w.statusCode != 0 {
 		w.ginWriter.WriteHeader(w.statusCode)
 	} else {
@@ -480,6 +500,7 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 				"content_block": map[string]any{"type": "text", "text": ""},
 			})
 		}
+		w.replyText.WriteString(event.Delta)
 		writeSSEEventRaw(w.ginWriter, "content_block_delta", map[string]any{
 			"type":  "content_block_delta",
 			"index": w.textBlockIdx,

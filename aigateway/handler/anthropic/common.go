@@ -718,13 +718,34 @@ func messagesToResponsesRequest(req *types.AnthropicMessagesRequest, modelName s
 		respReq.Tools = toolsRaw
 	}
 
-	// Thinking → reasoning.
+	// Thinking → reasoning.  An explicit output_config.effort wins over the
+	// effort derived from the thinking budget.
+	outputCfg := parseOutputConfig(req)
 	if req.HasThinking() {
 		effort := "medium"
 		if req.Thinking.BudgetTokens > 0 {
 			effort = budgetToEffort(req.Thinking.BudgetTokens)
 		}
+		if e := outputCfg.reasoningEffort(); e != "" {
+			effort = e
+		}
 		respReq.Reasoning = json.RawMessage(fmt.Sprintf(`{"effort":%q}`, effort))
+	}
+
+	// Structured output → text.format.  strict is set explicitly because the
+	// Responses API defaults it to true, which rejects optional properties
+	// that Anthropic schemas allow.  Replies are validated either way.
+	if schema := outputCfg.jsonSchema(); schema != nil {
+		text, err := json.Marshal(map[string]any{"format": map[string]any{
+			"type":   "json_schema",
+			"name":   structuredOutputName,
+			"schema": schema,
+			"strict": strictSchema(schema),
+		}})
+		if err != nil {
+			return nil, fmt.Errorf("marshal output format: %w", err)
+		}
+		respReq.Text = text
 	}
 
 	return respReq, nil
@@ -853,6 +874,55 @@ func budgetToEffort(budget int) string {
 	default:
 		return "high"
 	}
+}
+
+// structuredOutputName is the schema name OpenAI requires and Anthropic's
+// output_config.format does not carry.
+const structuredOutputName = "response"
+
+// anthropicOutputConfig is the part of the Messages output_config field that
+// has an OpenAI equivalent.
+type anthropicOutputConfig struct {
+	Effort string `json:"effort"`
+	Format *struct {
+		Type   string          `json:"type"`
+		Schema json.RawMessage `json:"schema"`
+	} `json:"format"`
+}
+
+// parseOutputConfig reads output_config from ExtraFields.  A missing or
+// malformed value yields the zero config.
+func parseOutputConfig(req *types.AnthropicMessagesRequest) anthropicOutputConfig {
+	var cfg anthropicOutputConfig
+	raw, ok := req.ExtraFields["output_config"]
+	if !ok {
+		return cfg
+	}
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return anthropicOutputConfig{}
+	}
+	return cfg
+}
+
+// reasoningEffort maps the Anthropic effort level to an OpenAI one, capped at
+// "high" like budgetToEffort.  Returns "" for absent or unknown levels.
+func (c anthropicOutputConfig) reasoningEffort() string {
+	switch c.Effort {
+	case "low", "medium", "high":
+		return c.Effort
+	case "xhigh", "max":
+		return "high"
+	default:
+		return ""
+	}
+}
+
+// jsonSchema returns the requested structured output schema, or nil.
+func (c anthropicOutputConfig) jsonSchema() json.RawMessage {
+	if c.Format == nil || c.Format.Type != "json_schema" || len(c.Format.Schema) == 0 {
+		return nil
+	}
+	return c.Format.Schema
 }
 
 func jsonString(s string) string {

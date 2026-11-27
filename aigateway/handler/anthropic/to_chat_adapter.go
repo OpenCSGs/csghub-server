@@ -37,8 +37,14 @@ func (h *Handler) adaptToChat(c *gin.Context, req *types.AnthropicMessagesReques
 		return nil, err
 	}
 
+	schema, err := newOutputSchema(req)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create the response writer.
 	writer := newToChatResponseWriter(c.Writer, req.Stream, req.Model, p.ModelTarget.ModelName, logCapture)
+	writer.schema = schema
 	return &types.AdaptResult{Body: body, Writer: writer}, nil
 }
 
@@ -119,9 +125,12 @@ func messagesToChatRequest(req *types.AnthropicMessagesRequest, modelName string
 	// When the client does not set the top-level thinking field, also check
 	// extra_body.reasoning_effort as a compatibility fallback — some clients
 	// (Litellm, OpenAI SDK) pass reasoning_effort that way.
+	// An explicit output_config.effort wins over the thinking budget.
+	outputCfg := parseOutputConfig(req)
 	effort := ""
 	if req.HasThinking() {
-		if req.Thinking.BudgetTokens > 0 {
+		effort = outputCfg.reasoningEffort()
+		if effort == "" && req.Thinking.BudgetTokens > 0 {
 			effort = budgetToEffort(req.Thinking.BudgetTokens)
 		}
 	} else {
@@ -132,6 +141,22 @@ func messagesToChatRequest(req *types.AnthropicMessagesRequest, modelName string
 			effort = "medium"
 		}
 		chatReq["reasoning_effort"] = effort
+	}
+	// Structured output → response_format.  strict is only enabled for schemas
+	// within the strict subset, so Anthropic schemas with optional properties
+	// are still accepted.  Replies are validated either way.
+	if schema := outputCfg.jsonSchema(); schema != nil {
+		jsonSchema := map[string]any{
+			"name":   structuredOutputName,
+			"schema": schema,
+		}
+		if strictSchema(schema) {
+			jsonSchema["strict"] = true
+		}
+		chatReq["response_format"] = map[string]any{
+			"type":        "json_schema",
+			"json_schema": jsonSchema,
+		}
 	}
 
 	return chatReq, nil
@@ -173,6 +198,10 @@ type toChatResponseWriter struct {
 	// unindexedToolCalls counts calls opened without a tool_calls[].index; they
 	// are keyed by negative numbers so they never collide with real indexes.
 	unindexedToolCalls int
+
+	// Structured output check; replyText accumulates the streamed text.
+	schema    *outputSchema
+	replyText strings.Builder
 
 	// Stream error tracking.
 	streamFailed    bool
@@ -343,6 +372,12 @@ func (w *toChatResponseWriter) Finalize() error {
 				})
 			}
 			hasToolUse := len(sortedToolCalls) > 0
+			// A reply that breaks the requested schema ends in an error
+			// event instead of a success completion.
+			if !w.schema.accepts(chatStopReason(w.finishReason, hasToolUse), w.replyText.String()) {
+				writeAnthropicStreamError(w.ginWriter, http.StatusBadGateway, []byte(outputSchemaMismatchBody))
+				return nil
+			}
 			// message_delta with stop_reason and usage.
 			usageMap := map[string]any{
 				"input_tokens":  int64(uncachedInputTokens(int(w.inputTokens), int(w.cacheReadTokens))),
@@ -411,6 +446,11 @@ func (w *toChatResponseWriter) Finalize() error {
 		}
 	}
 	w.ginWriter.Header().Set("Content-Type", "application/json")
+	if !w.schema.accepts(stopReasonOf(resp.StopReason), replyText(resp.Content)) {
+		w.statusCode = http.StatusBadGateway
+		writeAnthropicErrorJSON(w.ginWriter, http.StatusBadGateway, ErrTypeAPI, outputSchemaMismatch)
+		return nil
+	}
 	if w.statusCode != 0 {
 		w.ginWriter.WriteHeader(w.statusCode)
 	} else {
@@ -515,6 +555,7 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 				"content_block": map[string]any{"type": "text", "text": ""},
 			})
 		}
+		w.replyText.WriteString(content)
 		writeSSEEventRaw(w.ginWriter, "content_block_delta", map[string]any{
 			"type":  "content_block_delta",
 			"index": w.textBlockIdx,
