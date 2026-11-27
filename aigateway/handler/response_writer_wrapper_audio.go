@@ -92,8 +92,8 @@ func (rw *nonStreamAudioResponseWriter) captureText(data []byte) {
 		Text     string   `json:"text"`
 		Duration *float64 `json:"duration"`
 		Usage    struct {
-			PromptTokens     int64    `json:"prompt_tokens"`
-			CompletionTokens int64    `json:"completion_tokens"`
+			PromptTokens     *int64   `json:"prompt_tokens"`
+			CompletionTokens *int64   `json:"completion_tokens"`
 			InputTokens      int64    `json:"input_tokens"`
 			OutputTokens     int64    `json:"output_tokens"`
 			TotalTokens      int64    `json:"total_tokens"`
@@ -103,18 +103,21 @@ func (rw *nonStreamAudioResponseWriter) captureText(data []byte) {
 	if err := json.Unmarshal(body, &resp); err == nil {
 		rw.captureDuration(resp.Usage.Seconds, resp.Duration)
 		// OpenAI transcribe models report usage as input_tokens/output_tokens.
-		if resp.Usage.PromptTokens == 0 {
-			resp.Usage.PromptTokens = resp.Usage.InputTokens
+		// Read them only when the prompt/completion fields are absent.
+		promptTokens := resp.Usage.InputTokens
+		if resp.Usage.PromptTokens != nil {
+			promptTokens = *resp.Usage.PromptTokens
 		}
-		if resp.Usage.CompletionTokens == 0 {
-			resp.Usage.CompletionTokens = resp.Usage.OutputTokens
+		completionTokens := resp.Usage.OutputTokens
+		if resp.Usage.CompletionTokens != nil {
+			completionTokens = *resp.Usage.CompletionTokens
 		}
-		if resp.Usage.TotalTokens > 0 || resp.Usage.PromptTokens > 0 || resp.Usage.CompletionTokens > 0 {
+		if resp.Usage.TotalTokens > 0 || promptTokens > 0 || completionTokens > 0 {
 			duration, _ := rw.DurationSeconds()
 			rw.tokenCounter.SetUsage(token.Usage{
 				TotalTokens:      resp.Usage.TotalTokens,
-				PromptTokens:     resp.Usage.PromptTokens,
-				CompletionTokens: resp.Usage.CompletionTokens,
+				PromptTokens:     promptTokens,
+				CompletionTokens: completionTokens,
 				DataType:         string(commontypes.DataTypeAudio),
 				Duration:         duration,
 				CompletionRC:     1,
