@@ -135,7 +135,7 @@ func responsesToChatRequestResolved(ctx context.Context, req *types.ResponsesReq
 		var textObj map[string]json.RawMessage
 		if err := json.Unmarshal(req.Text, &textObj); err == nil {
 			if format, ok := textObj["format"]; ok {
-				mergeChatRawJSONRaw(chatReq, "response_format", format)
+				mergeChatRawJSONRaw(chatReq, "response_format", responsesTextFormatToChatResponseFormat(format))
 			}
 		}
 	}
@@ -146,6 +146,27 @@ func responsesToChatRequestResolved(ctx context.Context, req *types.ResponsesReq
 		}
 	}
 	return chatReq, toolAliases, nil
+}
+
+// responsesTextFormatToChatResponseFormat nests the fields of a flat Responses
+// {"type":"json_schema",...} format under "json_schema", as Chat Completions
+// expects. Other formats have the same shape in both APIs.
+func responsesTextFormatToChatResponseFormat(raw json.RawMessage) json.RawMessage {
+	var format map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &format); err != nil {
+		return raw
+	}
+	var formatType string
+	_ = json.Unmarshal(format["type"], &formatType)
+	if _, nested := format["json_schema"]; formatType != "json_schema" || nested {
+		return raw
+	}
+	delete(format, "type")
+	converted, err := json.Marshal(map[string]any{"type": formatType, "json_schema": format})
+	if err != nil {
+		return raw
+	}
+	return converted
 }
 
 func mergeChatRawJSON(chatReq *types.ChatCompletionRequest, key string, value any) {
