@@ -134,7 +134,7 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 	// Decoder errors are reserved for future checks such as buffer overflow.
 	events, _ := w.decoder.Write(data)
 	for _, event := range events {
-		if event.Type == "error" {
+		if event.Type == "error" || isChatStreamDataError(event.Data) {
 			w.failResponseStream(event)
 			return len(data), nil
 		}
@@ -267,6 +267,28 @@ func (w *responsesAdapterStreamWriter) failResponseStream(event *streamdecoder.E
 	}
 	w.failed = true
 	w.writeRawEvent(event)
+}
+
+// isChatStreamDataError reports whether a chunk carries an upstream error.
+// OpenAI-style upstreams send mid-stream errors as data-only events, without an
+// "event: error" line.
+func isChatStreamDataError(data []byte) bool {
+	var payload struct {
+		Error any `json:"error"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return false
+	}
+	switch value := payload.Error.(type) {
+	case nil:
+		return false
+	case string:
+		return value != ""
+	case map[string]any:
+		return len(value) > 0
+	default:
+		return false
+	}
 }
 
 func (w *responsesAdapterStreamWriter) captureChatStreamUsage(chunk types.ChatCompletionChunk) {

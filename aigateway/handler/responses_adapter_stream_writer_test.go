@@ -141,6 +141,46 @@ func TestResponsesAdapterStreamWriterPassthroughUpstreamJSONError(t *testing.T) 
 	require.NotContains(t, rec.Body.String(), "[DONE]")
 }
 
+func TestResponsesAdapterStreamWriterForwardsDataOnlyError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for name, payload := range map[string]string{
+		"error object":          `{"error":{"message":"upstream overloaded","type":"server_error"}}`,
+		"error string":          `{"error":"upstream overloaded"}`,
+		"error alongside delta": `{"error":{"message":"upstream overloaded"},"choices":[{"index":0,"delta":{"content":""},"finish_reason":"error"}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(rec)
+
+			w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+			_, err := w.Write([]byte("data: " + payload + "\n\ndata: [DONE]\n\n"))
+			require.NoError(t, err)
+			require.NoError(t, w.Finalize(http.StatusOK))
+
+			require.Equal(t, "data: "+payload+"\n\n", rec.Body.String())
+		})
+	}
+}
+
+func TestResponsesAdapterStreamWriterIgnoresEmptyErrorField(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, value := range []string{`null`, `""`, `{}`} {
+		t.Run(value, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(rec)
+
+			w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+			_, err := w.Write([]byte(`data: {"error":` + value + `,"choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":"stop"}]}` + "\n\ndata: [DONE]\n\n"))
+			require.NoError(t, err)
+
+			require.Contains(t, rec.Body.String(), `"delta":"hi"`)
+			require.Contains(t, rec.Body.String(), "event: response.completed")
+		})
+	}
+}
+
 func TestResponsesAdapterStreamWriterFinalizeSkipsCompletionOnErrorStatus(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
