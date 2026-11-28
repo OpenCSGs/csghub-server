@@ -140,6 +140,37 @@ func TestResponsesAdapterNonStreamWriterModeratesRefusalAndToolCalls(t *testing.
 	require.NotContains(t, body, "blocked refusal")
 }
 
+func TestResponsesAdapterNonStreamWriterModeratesReasoning(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, field := range []string{"reasoning_content", "reasoning"} {
+		t.Run(field, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(rec)
+
+			moderation := mockcomp.NewMockModeration(t)
+			moderation.EXPECT().CheckText(
+				mock.Anything,
+				mock.MatchedBy(func(req types.TextModerationRequest) bool {
+					return strings.Contains(req.Content, "blocked thought")
+				}),
+			).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+			w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", nil, moderation, "session-1")
+			chatBody := []byte(`{"id":"chat-1","object":"chat.completion","model":"upstream-model",` +
+				`"choices":[{"index":0,"message":{"role":"assistant","content":"hello","` + field +
+				`":"blocked thought"},"finish_reason":"stop"}]}`)
+			_, err := w.Write(chatBody)
+			require.NoError(t, err)
+			require.NoError(t, w.Finalize(http.StatusOK))
+
+			body := rec.Body.String()
+			require.Contains(t, body, responsespkg.BlockedMessage)
+			require.NotContains(t, body, "blocked thought")
+		})
+	}
+}
+
 func TestResponsesAdapterNonStreamWriterFinalizeSurfacesMalformedChatBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
