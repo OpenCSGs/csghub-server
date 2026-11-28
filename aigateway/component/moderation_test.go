@@ -1400,3 +1400,20 @@ func TestModerationImpl_AsyncTierReplay(t *testing.T) {
 		mockSvcClient.AssertExpectations(t)
 	})
 }
+
+func TestModeration_CheckChatNonStreamResponse_AllChoices(t *testing.T) {
+	var completion types.ChatCompletion
+	assert.NoError(t, json.Unmarshal([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":"first answer"}},{"index":1,"message":{"role":"assistant","content":"second answer"}}]}`), &completion))
+
+	mockModClient := &MockModerationSvcClient{}
+	mockModClient.On("PassTextCheck", mock.Anything, mock.Anything, mock.MatchedBy(func(text string) bool {
+		return strings.Contains(text, "first answer") && strings.Contains(text, "second answer")
+	})).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+	mockModClient.On("PassTextCheck", mock.Anything, mock.Anything, mock.Anything).
+		Return(&rpc.CheckResult{IsSensitive: false}, nil).Maybe()
+	modImpl := &moderationImpl{modSvcClient: mockModClient}
+
+	result, err := modImpl.CheckChatNonStreamResponse(context.Background(), completion)
+	assert.NoError(t, err)
+	assert.True(t, result.IsSensitive)
+}

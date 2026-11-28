@@ -121,11 +121,15 @@ func (nsw *nonStreamResponseWriter) nonStreamWrite(originData []byte) (int, erro
 		slog.Debug("NonStreamResponseWriter nonStreamWrite checkresult is sensitive",
 			slog.Any("content", completion),
 			slog.Any("reason", result.Reason))
-		completion.Choices[0].Message.Content = "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation."
-		// A gated response must not carry executable tool calls.
-		completion.Choices[0].Message.ToolCalls = nil
-		//nolint:staticcheck // legacy field still emitted by some upstreams and must stay cleared
-		completion.Choices[0].Message.FunctionCall = openai.ChatCompletionMessageFunctionCall{}
+		// The verdict covers the whole response, so every choice is replaced.
+		for i := range completion.Choices {
+			message := &completion.Choices[i].Message
+			message.Content = "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation."
+			// A gated response must not carry executable tool calls.
+			message.ToolCalls = nil
+			//nolint:staticcheck // legacy field still emitted by some upstreams and must stay cleared
+			message.FunctionCall = openai.ChatCompletionMessageFunctionCall{}
+		}
 
 		// Re-encode modified completion
 		modifiedData, _ := json.Marshal(completion)

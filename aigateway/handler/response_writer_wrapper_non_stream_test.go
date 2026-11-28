@@ -470,6 +470,29 @@ func TestNonStreamResponseWriter_BlockedResponseDropsReasoning(t *testing.T) {
 	}
 }
 
+func TestNonStreamResponseWriter_BlockedResponseRedactsAllChoices(t *testing.T) {
+	w := httptest.NewRecorder()
+	w.Header().Set("Content-Encoding", "")
+	ctx, _ := gin.CreateTestContext(w)
+	mockMod := component.NewMockModeration(t)
+	nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, RequestCtx: context.Background()})
+
+	mockMod.EXPECT().CheckChatNonStreamResponse(mock.Anything, mock.Anything).
+		Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+	body := `{"choices":[{"index":0,"message":{"role":"assistant","content":"first answer"}},{"index":1,"message":{"role":"assistant","content":"second answer","tool_calls":[{"id":"call-1","type":"function","function":{"name":"run_shell","arguments":"{}"}}]}}]}`
+	_, err := nsw.Write([]byte(body))
+	require.NoError(t, err)
+
+	var out types.ChatCompletion
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+	require.Len(t, out.Choices, 2)
+	for _, choice := range out.Choices {
+		assert.Contains(t, choice.Message.Content, "has been blocked")
+		assert.Empty(t, choice.Message.ToolCalls)
+	}
+}
+
 func TestNonStreamResponseWriter_NoModerationPreservesReasoning(t *testing.T) {
 	w := httptest.NewRecorder()
 	w.Header().Set("Content-Encoding", "")
