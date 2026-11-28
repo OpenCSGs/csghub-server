@@ -946,7 +946,12 @@ func (modImpl *moderationImpl) CheckChatNonStreamResponse(ctx context.Context, c
 	if len(completion.Choices) == 0 {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
-	text := chatCompletionMessageModerationText(completion.Choices[0].Message)
+	// With n>1 every choice reaches the client, so all of them are audited.
+	var b strings.Builder
+	for _, choice := range completion.Choices {
+		writeTextModerationPart(&b, chatCompletionMessageModerationText(choice.Message))
+	}
+	text := b.String()
 	if strings.TrimSpace(text) == "" {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
