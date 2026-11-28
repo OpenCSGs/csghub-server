@@ -101,7 +101,7 @@ func (w *responsesAdapterNonStreamWriter) checkNonStreamSensitive(ctx context.Co
 	if len(chat.Choices) == 0 {
 		return false
 	}
-	content := chatCompletionModerationText(chat)
+	content := chatCompletionModerationText(chat, chatResponseReasoning(chatBody))
 	if strings.TrimSpace(content) == "" {
 		return false
 	}
@@ -140,8 +140,12 @@ func (w *responsesAdapterNonStreamWriter) checkNonStreamSensitive(ctx context.Co
 	return true
 }
 
-func chatCompletionModerationText(chat types.ChatCompletion) string {
+// chatCompletionModerationText collects the model output to audit. reasoning is
+// passed in because the SDK message type has no field for it, while the adapter
+// forwards it to the client as a reasoning output item.
+func chatCompletionModerationText(chat types.ChatCompletion, reasoning string) string {
 	var b strings.Builder
+	writeModerationText(&b, reasoning)
 	for _, choice := range chat.Choices {
 		msg := choice.Message
 		writeModerationText(&b, msg.Content)
